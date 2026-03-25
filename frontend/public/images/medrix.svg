@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2064" height="2591" viewBox="0 0 2064 2591">
+  <defs>
+    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d4aa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00a8e8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="grad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00a8e8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6366f1;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <g transform="translate(1032, 1295)">
+    <circle cx="0" cy="0" r="900" fill="none" stroke="url(#grad1)" stroke-width="40" opacity="0.3"/>
+    <circle cx="0" cy="0" r="750" fill="none" stroke="url(#grad2)" stroke-width="30" opacity="0.2"/>
+    <path d="M -300 -600 C -100 -400, 100 -200, 300 0 C 100 200, -100 400, -300 600" 
+          fill="none" stroke="url(#grad1)" stroke-width="60" stroke-linecap="round"/>
+    <path d="M 300 -600 C 100 -400, -100 -200, -300 0 C -100 200, 100 400, 300 600" 
+          fill="none" stroke="url(#grad2)" stroke-width="60" stroke-linecap="round"/>
+    <line x1="-200" y1="-450" x2="200" y2="-450" stroke="#00d4aa" stroke-width="25" stroke-linecap="round" opacity="0.6"/>
+    <line x1="-250" y1="-300" x2="250" y2="-300" stroke="#00a8e8" stroke-width="25" stroke-linecap="round" opacity="0.6"/>
+    <line x1="-280" y1="-150" x2="280" y2="-150" stroke="#6366f1" stroke-width="25" stroke-linecap="round" opacity="0.6"/>
+    <line x1="-300" y1="0" x2="300" y2="0" stroke="#00d4aa" stroke-width="25" stroke-linecap="round" opacity="0.6"/>
+    <line x1="-280" y1="150" x2="280" y2="150" stroke="#00a8e8" stroke-width="25" stroke-linecap="round" opacity="0.6"/>
+    <line x1="-250" y1="300" x2="250" y2="300" stroke="#6366f1" stroke-width="25" stroke-linecap="round" opacity="0.6"/>
+    <line x1="-200" y1="450" x2="200" y2="450" stroke="#00d4aa" stroke-width="25" stroke-linecap="round" opacity="0.6"/>
+    <path d="M -500 -200 L -350 -200 L -300 -150" fill="none" stroke="url(#grad1)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <path d="M 500 200 L 350 200 L 300 150" fill="none" stroke="url(#grad2)" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <circle cx="0" cy="0" r="80" fill="url(#grad1)" opacity="0.9"/>
+    <text x="0" y="15" text-anchor="middle" font-family="sans-serif" font-size="80" font-weight="bold" fill="white">M</text>
+    <circle cx="-350" cy="-500" r="30" fill="#00d4aa" opacity="0.8"/>
+    <circle cx="350" cy="-500" r="30" fill="#00a8e8" opacity="0.8"/>
+    <circle cx="-350" cy="500" r="30" fill="#6366f1" opacity="0.8"/>
+    <circle cx="350" cy="500" r="30" fill="#00d4aa" opacity="0.8"/>
+  </g>
+</svg>

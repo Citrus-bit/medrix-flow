@@ -1,0 +1,319 @@
+# Configuration Guide
+
+This guide explains how to configure MedrixFlow for your environment.
+
+## Config Versioning
+
+`config.example.yaml` contains a `config_version` field that tracks schema changes. When the example version is higher than your local `config.yaml`, the application emits a startup warning:
+
+```
+WARNING - Your config.yaml (version 0) is outdated — the latest version is 1.
+Run `make config-upgrade` to merge new fields into your config.
+```
+
+- **Missing `config_version`** in your config is treated as version 0.
+- Run `make config-upgrade` to auto-merge missing fields (your existing values are preserved, a `.bak` backup is created).
+- When changing the config schema, bump `config_version` in `config.example.yaml`.
+
+## Configuration Sections
+
+### Models
+
+Configure the LLM models available to the agent:
+
+```yaml
+models:
+  - name: gpt-4                    # Internal identifier
+    display_name: GPT-4            # Human-readable name
+    use: langchain_openai:ChatOpenAI  # LangChain class path
+    model: gpt-4                   # Model identifier for API
+    api_key: $OPENAI_API_KEY       # API key (use env var)
+    max_tokens: 4096               # Max tokens per request
+    temperature: 0.7               # Sampling temperature
+```
+
+**Supported Providers**:
+- OpenAI (`langchain_openai:ChatOpenAI`)
+- Anthropic (`langchain_anthropic:ChatAnthropic`)
+- DeepSeek (`langchain_deepseek:ChatDeepSeek`)
+- Claude Code OAuth (`medrix_flow.models.claude_provider:ClaudeChatModel`)
+- Codex CLI (`medrix_flow.models.openai_codex_provider:CodexChatModel`)
+- Any LangChain-compatible provider
+
+CLI-backed provider examples:
+
+```yaml
+models:
+  - name: gpt-5.4
+    display_name: GPT-5.4 (Codex CLI)
+    use: medrix_flow.models.openai_codex_provider:CodexChatModel
+    model: gpt-5.4
+    supports_thinking: true
+    supports_reasoning_effort: true
+
+  - name: claude-sonnet-4.6
+    display_name: Claude Sonnet 4.6 (Claude Code OAuth)
+    use: medrix_flow.models.claude_provider:ClaudeChatModel
+    model: claude-sonnet-4-6
+    max_tokens: 4096
+    supports_thinking: true
+```
+
+**Auth behavior for CLI-backed providers**:
+- `CodexChatModel` loads Codex CLI auth from `~/.codex/auth.json`
+- The Codex Responses endpoint currently rejects `max_tokens` and `max_output_tokens`, so `CodexChatModel` does not expose a request-level token cap
+- `ClaudeChatModel` accepts `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`, `CLAUDE_CODE_CREDENTIALS_PATH`, or plaintext `~/.claude/.credentials.json`
+- On macOS, MedrixFlow does not probe Keychain automatically. Use `scripts/export_claude_code_oauth.py` to export Claude Code auth explicitly when needed
+
+To use OpenAI's `/v1/responses` endpoint with LangChain, keep using `langchain_openai:ChatOpenAI` and set:
+
+```yaml
+models:
+  - name: gpt-5-responses
+    display_name: GPT-5 (Responses API)
+    use: langchain_openai:ChatOpenAI
+    model: gpt-5
+    api_key: $OPENAI_API_KEY
+    use_responses_api: true
+    output_version: responses/v1
+```
+
+For OpenAI-compatible gateways (for example Novita or OpenRouter), keep using `langchain_openai:ChatOpenAI` and set `base_url`:
+
+```yaml
+models:
+  - name: novita-deepseek-v3.2
+    display_name: Novita DeepSeek V3.2
+    use: langchain_openai:ChatOpenAI
+    model: deepseek/deepseek-v3.2
+    api_key: $NOVITA_API_KEY
+    base_url: https://api.novita.ai/openai
+    supports_thinking: true
+    when_thinking_enabled:
+      extra_body:
+        thinking:
+          type: enabled
+
+  - name: minimax-m2.5
+    display_name: MiniMax M2.5
+    use: langchain_openai:ChatOpenAI
+    model: MiniMax-M2.5
+    api_key: $MINIMAX_API_KEY
+    base_url: https://api.minimax.io/v1
+    max_tokens: 4096
+    temperature: 1.0  # MiniMax requires temperature in (0.0, 1.0]
+    supports_vision: true
+
+  - name: minimax-m2.5-highspeed
+    display_name: MiniMax M2.5 Highspeed
+    use: langchain_openai:ChatOpenAI
+    model: MiniMax-M2.5-highspeed
+    api_key: $MINIMAX_API_KEY
+    base_url: https://api.minimax.io/v1
+    max_tokens: 4096
+    temperature: 1.0  # MiniMax requires temperature in (0.0, 1.0]
+    supports_vision: true
+  - name: openrouter-gemini-2.5-flash
+    display_name: Gemini 2.5 Flash (OpenRouter)
+    use: langchain_openai:ChatOpenAI
+    model: google/gemini-2.5-flash-preview
+    api_key: $OPENAI_API_KEY
+    base_url: https://openrouter.ai/api/v1
+```
+
+If your OpenRouter key lives in a different environment variable name, point `api_key` at that variable explicitly (for example `api_key: $OPENROUTER_API_KEY`).
+
+**Thinking Models**:
+Some models support "thinking" mode for complex reasoning:
+
+```yaml
+models:
+  - name: deepseek-v3
+    supports_thinking: true
+    when_thinking_enabled:
+      extra_body:
+        thinking:
+          type: enabled
+```
+
+### Tool Groups
+
+Organize tools into logical groups:
+
+```yaml
+tool_groups:
+  - name: web          # Web browsing and search
+  - name: file:read    # Read-only file operations
+  - name: file:write   # Write file operations
+  - name: bash         # Shell command execution
+```
+
+### Tools
+
+Configure specific tools available to the agent:
+
+```yaml
+tools:
+  - name: web_search
+    group: web
+    use: medrix_flow.community.tavily.tools:web_search_tool
+    max_results: 5
+    # api_key: $TAVILY_API_KEY  # Optional
+```
+
+**Built-in Tools**:
+- `web_search` - Search the web (Tavily)
+- `web_fetch` - Fetch web pages (Jina AI)
+- `ls` - List directory contents
+- `read_file` - Read file contents
+- `write_file` - Write file contents
+- `str_replace` - String replacement in files
+- `bash` - Execute bash commands
+
+### Sandbox
+
+MedrixFlow supports multiple sandbox execution modes. Configure your preferred mode in `config.yaml`:
+
+**Local Execution** (runs sandbox code directly on the host machine):
+```yaml
+sandbox:
+   use: medrix_flow.sandbox.local:LocalSandboxProvider # Local execution
+```
+
+**Docker Execution** (runs sandbox code in isolated Docker containers):
+```yaml
+sandbox:
+   use: medrix_flow.community.aio_sandbox:AioSandboxProvider # Docker-based sandbox
+```
+
+**Docker Execution with Kubernetes** (runs sandbox code in Kubernetes pods via provisioner service):
+
+This mode runs each sandbox in an isolated Kubernetes Pod on your **host machine's cluster**. Requires Docker Desktop K8s, OrbStack, or similar local K8s setup.
+
+```yaml
+sandbox:
+   use: medrix_flow.community.aio_sandbox:AioSandboxProvider
+   provisioner_url: http://provisioner:8002
+```
+
+When using Docker development (`make docker-start`), MedrixFlow starts the `provisioner` service only if this provisioner mode is configured. In local or plain Docker sandbox modes, `provisioner` is skipped.
+
+See [Provisioner Setup Guide](docker/provisioner/README.md) for detailed configuration, prerequisites, and troubleshooting.
+
+Choose between local execution or Docker-based isolation:
+
+**Option 1: Local Sandbox** (default, simpler setup):
+```yaml
+sandbox:
+  use: medrix_flow.sandbox.local:LocalSandboxProvider
+```
+
+**Option 2: Docker Sandbox** (isolated, more secure):
+```yaml
+sandbox:
+  use: medrix_flow.community.aio_sandbox:AioSandboxProvider
+  port: 8080
+  auto_start: true
+  container_prefix: medrix-flow-sandbox
+
+  # Optional: Additional mounts
+  mounts:
+    - host_path: /path/on/host
+      container_path: /path/in/container
+      read_only: false
+```
+
+### Skills
+
+Configure the skills directory for specialized workflows:
+
+```yaml
+skills:
+  # Host path (optional, default: ../skills)
+  path: /custom/path/to/skills
+
+  # Container mount path (default: /mnt/skills)
+  container_path: /mnt/skills
+```
+
+**How Skills Work**:
+- Skills are stored in `medrix-flow/skills/{public,custom}/`
+- Each skill has a `SKILL.md` file with metadata
+- Skills are automatically discovered and loaded
+- Available in both local and Docker sandbox via path mapping
+
+### Title Generation
+
+Automatic conversation title generation:
+
+```yaml
+title:
+  enabled: true
+  max_words: 6
+  max_chars: 60
+  model_name: null  # Use first model in list
+```
+
+## Environment Variables
+
+MedrixFlow supports environment variable substitution using the `$` prefix:
+
+```yaml
+models:
+  - api_key: $OPENAI_API_KEY  # Reads from environment
+```
+
+**Common Environment Variables**:
+- `OPENAI_API_KEY` - OpenAI API key
+- `ANTHROPIC_API_KEY` - Anthropic API key
+- `DEEPSEEK_API_KEY` - DeepSeek API key
+- `NOVITA_API_KEY` - Novita API key (OpenAI-compatible endpoint)
+- `TAVILY_API_KEY` - Tavily search API key
+- `MEDRIX_FLOW_CONFIG_PATH` - Custom config file path
+
+## Configuration Location
+
+The configuration file should be placed in the **project root directory** (`medrix-flow/config.yaml`), not in the backend directory.
+
+## Configuration Priority
+
+MedrixFlow searches for configuration in this order:
+
+1. Path specified in code via `config_path` argument
+2. Path from `MEDRIX_FLOW_CONFIG_PATH` environment variable
+3. `config.yaml` in current working directory (typically `backend/` when running)
+4. `config.yaml` in parent directory (project root: `medrix-flow/`)
+
+## Best Practices
+
+1. **Place `config.yaml` in project root** - Not in `backend/` directory
+2. **Never commit `config.yaml`** - It's already in `.gitignore`
+3. **Use environment variables for secrets** - Don't hardcode API keys
+4. **Keep `config.example.yaml` updated** - Document all new options
+5. **Test configuration changes locally** - Before deploying
+6. **Use Docker sandbox for production** - Better isolation and security
+
+## Troubleshooting
+
+### "Config file not found"
+- Ensure `config.yaml` exists in the **project root** directory (`medrix-flow/config.yaml`)
+- The backend searches parent directory by default, so root location is preferred
+- Alternatively, set `MEDRIX_FLOW_CONFIG_PATH` environment variable to custom location
+
+### "Invalid API key"
+- Verify environment variables are set correctly
+- Check that `$` prefix is used for env var references
+
+### "Skills not loading"
+- Check that `medrix-flow/skills/` directory exists
+- Verify skills have valid `SKILL.md` files
+- Check `skills.path` configuration if using custom path
+
+### "Docker sandbox fails to start"
+- Ensure Docker is running
+- Check port 8080 (or configured port) is available
+- Verify Docker image is accessible
+
+## Examples
+
+See `config.example.yaml` for complete examples of all configuration options.
