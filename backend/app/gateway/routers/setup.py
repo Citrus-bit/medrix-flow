@@ -67,6 +67,29 @@ def _get_env_value(var_name: str) -> str | None:
     return os.getenv(var_name)
 
 
+_TOOL_KEY_ENV_MAP = {"tavily": "TAVILY_API_KEY", "jina": "JINA_API_KEY"}
+
+
+def _resolve_masked_model_key(masked: str, provider: str, model_id: str) -> str | None:
+    """If the api_key is a masked placeholder, resolve the real key from .env."""
+    raw = _read_raw_config()
+    for m in raw.get("models") or []:
+        if m.get("use") == provider and m.get("model") == model_id:
+            raw_key = m.get("api_key", "")
+            if isinstance(raw_key, str) and raw_key.startswith("$"):
+                return _get_env_value(raw_key[1:])
+            return raw_key if raw_key else None
+    return None
+
+
+def _resolve_masked_tool_key(service: str) -> str | None:
+    """Resolve real tool API key from .env by service name."""
+    env_var = _TOOL_KEY_ENV_MAP.get(service.lower())
+    if env_var:
+        return _get_env_value(env_var)
+    return None
+
+
 def _set_env_value(var_name: str, value: str) -> None:
     """Write an env var to the .env file and update current process env."""
     env_path = _find_env_path()
@@ -254,12 +277,20 @@ async def save_models(req: SaveModelsRequest) -> dict:
 )
 async def test_model(req: TestModelRequest) -> TestResult:
     try:
-        from medrix_flow.reflection.imports import resolve_variable  # noqa: E402
+        from medrix_flow.reflection import resolve_variable
 
         provider_class = resolve_variable(req.provider)
         kwargs: dict = {"model": req.model}
         if req.api_key:
-            kwargs["api_key"] = req.api_key
+            # If key looks masked (contains *), try to resolve the real key
+            # from the existing model config in config.yaml
+            if "*" in req.api_key:
+                real_key = _resolve_masked_model_key(req.api_key, req.provider, req.model)
+                if real_key:
+                    kwargs["api_key"] = real_key
+                # else: skip api_key, let provider use env default
+            else:
+                kwargs["api_key"] = req.api_key
         if req.base_url:
             kwargs["base_url"] = req.base_url
 
@@ -281,11 +312,17 @@ async def test_model(req: TestModelRequest) -> TestResult:
 )
 async def test_tool_key(req: TestToolKeyRequest) -> TestResult:
     service = req.service.lower()
+    api_key = req.api_key
+    if "*" in api_key:
+        resolved = _resolve_masked_tool_key(service)
+        if not resolved:
+            return TestResult(success=False, message="No API key configured. Please enter a key and save first.")
+        api_key = resolved
     try:
         if service == "tavily":
             from tavily import TavilyClient
 
-            client = TavilyClient(api_key=req.api_key)
+            client = TavilyClient(api_key=api_key)
             result = client.search("test", max_results=1)
             if "results" in result:
                 return TestResult(success=True, message="Tavily API key is valid.")
@@ -296,7 +333,7 @@ async def test_tool_key(req: TestToolKeyRequest) -> TestResult:
 
             headers = {
                 "Content-Type": "application/json",
-                "Authorization": f"Bearer {req.api_key}",
+                "Authorization": f"Bearer {api_key}",
                 "X-Return-Format": "html",
                 "X-Timeout": "10",
             }
