@@ -110,13 +110,13 @@ echo "✓ Frontend started on localhost:3000"
 
 echo "Starting Nginx reverse proxy..."
 nohup sh -c 'nginx -g "daemon off;" -c "$1/docker/nginx/nginx.local.conf" -p "$1" > logs/nginx.log 2>&1' _ "$REPO_ROOT" &
-./scripts/wait-for-port.sh 2026 10 "Nginx" || {
+./scripts/wait-for-port.sh 1000 10 "Nginx" || {
     echo "✗ Nginx failed to start. Last log output:"
     tail -60 logs/nginx.log
     cleanup_on_failure
     exit 1
 }
-echo "✓ Nginx started on localhost:2026"
+echo "✓ Nginx started on localhost:1000"
 
 # ── Ready ─────────────────────────────────────────────────────────────────────
 
@@ -125,9 +125,9 @@ echo "=========================================="
 echo " MedrixFlow is running in daemon mode!"
 echo "=========================================="
 echo ""
-echo " 🌐 Application: http://localhost:2026"
-echo " 📡 API Gateway: http://localhost:2026/api/*"
-echo " 🤖 LangGraph: http://localhost:2026/api/langgraph/*"
+echo " 🌐 Application: http://localhost:1000"
+echo " 📡 API Gateway: http://localhost:1000/api/*"
+echo " 🤖 LangGraph: http://localhost:1000/api/langgraph/*"
 echo ""
 echo " 📋 Logs:"
 echo " - LangGraph: logs/langgraph.log"

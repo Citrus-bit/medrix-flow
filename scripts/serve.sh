@@ -160,12 +160,12 @@ echo "✓ Frontend started on localhost:3000"
 echo "Starting Nginx reverse proxy..."
 nginx -g 'daemon off;' -c "$REPO_ROOT/docker/nginx/nginx.local.conf" -p "$REPO_ROOT" > logs/nginx.log 2>&1 &
 NGINX_PID=$!
-./scripts/wait-for-port.sh 2026 10 "Nginx" || {
+./scripts/wait-for-port.sh 1000 10 "Nginx" || {
     echo "  See logs/nginx.log for details"
     tail -10 logs/nginx.log
     cleanup
 }
-echo "✓ Nginx started on localhost:2026"
+echo "✓ Nginx started on localhost:1000"
 
 # ── Ready ─────────────────────────────────────────────────────────────────────
 
@@ -178,9 +178,9 @@ else
 fi
 echo "=========================================="
 echo ""
-echo "  🌐 Application: http://localhost:2026"
-echo "  📡 API Gateway: http://localhost:2026/api/*"
-echo "  🤖 LangGraph:   http://localhost:2026/api/langgraph/*"
+echo "  🌐 Application: http://localhost:1000"
+echo "  📡 API Gateway: http://localhost:1000/api/*"
+echo "  🤖 LangGraph:   http://localhost:1000/api/langgraph/*"
 echo ""
 echo "  📋 Logs:"
 echo "     - LangGraph: logs/langgraph.log"

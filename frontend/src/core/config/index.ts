@@ -22,6 +22,6 @@ export function getLangGraphBaseURL(isMock?: boolean) {
       return `${window.location.origin}/api/langgraph`;
     }
     // Fallback for SSR
-    return "http://localhost:2026/api/langgraph";
+    return "http://localhost:1000/api/langgraph";
   }
 }
