@@ -197,12 +197,8 @@ export const zhCN: Translations = {
 
   // Workspace
   workspace: {
-    officialWebsite: "访问 MedrixFlow 官方网站",
-    githubTooltip: "访问 MedrixFlow 的 Github 仓库",
+    visitGithub: "在 GitHub 上查看 MedrixFlow",
     settingsAndMore: "设置和更多",
-    visitGithub: "在 Github 上查看 MedrixFlow",
-    reportIssue: "报告问题",
-    contactUs: "联系我们",
     about: "关于 MedrixFlow",
   },
 

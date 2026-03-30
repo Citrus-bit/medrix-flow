@@ -208,12 +208,8 @@ export const enUS: Translations = {
 
   // Workspace
   workspace: {
-    officialWebsite: "MedrixFlow's official website",
-    githubTooltip: "MedrixFlow on Github",
-    settingsAndMore: "Settings and more",
     visitGithub: "MedrixFlow on GitHub",
-    reportIssue: "Report a issue",
-    contactUs: "Contact us",
+    settingsAndMore: "Settings and more",
     about: "About MedrixFlow",
   },
 
