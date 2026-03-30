@@ -237,7 +237,13 @@ export function hasContent(message: Message) {
     ).length > 0;
   }
   if (Array.isArray(message.content)) {
-    return message.content.length > 0;
+    // Only count as having content if there are actual text or image elements,
+    // not just thinking/reasoning blocks.
+    return message.content.some((part) => {
+      if (part.type === "text") return !!part.text?.trim();
+      if (part.type === "image_url") return true;
+      return false;
+    });
   }
   return false;
 }

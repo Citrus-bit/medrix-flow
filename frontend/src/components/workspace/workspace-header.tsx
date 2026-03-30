@@ -19,29 +19,29 @@ function MedrixLogo({ className }: { className?: string }) {
   return (
     <svg
       className={className}
-      viewBox="0 0 24 24"
+      viewBox="0 0 48 48"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
       <path
-        d="M12 2L3 7v10l9 5 9-5V7l-9-5z"
+        d="M24 4L42 14v20L24 44 6 34V14L24 4z"
         fill="url(#medrix-grad)"
-        opacity="0.15"
+        opacity="0.1"
       />
       <path
-        d="M12 2L3 7v10l9 5 9-5V7l-9-5z"
+        d="M24 4L42 14v20L24 44 6 34V14L24 4z"
         stroke="url(#medrix-grad)"
-        strokeWidth="1.5"
+        strokeWidth="2"
         fill="none"
       />
       <path
-        d="M12 8v8M9 11h6M8 14h8"
+        d="M24 16v16M18 24h12"
         stroke="url(#medrix-grad)"
-        strokeWidth="1.5"
+        strokeWidth="2.5"
         strokeLinecap="round"
       />
       <defs>
-        <linearGradient id="medrix-grad" x1="3" y1="2" x2="21" y2="22">
+        <linearGradient id="medrix-grad" x1="6" y1="4" x2="42" y2="44">
           <stop stopColor="#0891b2" />
           <stop offset="1" stopColor="#14b8a6" />
         </linearGradient>

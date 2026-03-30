@@ -182,12 +182,18 @@ export function useThreadStream({
     },
   });
 
-  // Optimistic messages shown before the server stream responds
   const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const sendInFlightRef = useRef(false);
-  // Track message count before sending so we know when server has responded
   const prevMsgCountRef = useRef(thread.messages.length);
+
+  // Clear isSubmitting when the stream actually starts loading
+  useEffect(() => {
+    if (thread.isLoading) {
+      setIsSubmitting(false);
+    }
+  }, [thread.isLoading]);
 
   // Clear optimistic when server messages arrive (count increases)
   useEffect(() => {
@@ -209,6 +215,7 @@ export function useThreadStream({
         return;
       }
       sendInFlightRef.current = true;
+      setIsSubmitting(true);
 
       const text = message.text.trim();
 
@@ -234,16 +241,27 @@ export function useThreadStream({
       };
 
       const newOptimistic: Message[] = [optimisticHumanMsg];
+
+      // Show an optimistic "thinking" AI placeholder so the user sees immediate
+      // feedback while the request reaches the backend and streaming begins.
       if (optimisticFiles.length > 0) {
-        // Mock AI message while files are being uploaded
         newOptimistic.push({
           type: "ai",
-          id: `opt-ai-${Date.now()}`,
+          id: `opt-ai-upload-${Date.now()}`,
           content: t.uploads.uploadingFiles,
           additional_kwargs: { element: "task" },
         });
+      } else if (text) {
+        newOptimistic.push({
+          type: "ai",
+          id: `opt-ai-thinking-${Date.now()}`,
+          content: t.common.thinking,
+          additional_kwargs: { element: "task", _thinking: true },
+        });
       }
+
       setOptimisticMessages(newOptimistic);
+      setIsSubmitting(true);
 
       _handleOnStart(threadId);
 
@@ -390,12 +408,13 @@ export function useThreadStream({
       } catch (error) {
         setOptimisticMessages([]);
         setIsUploading(false);
+        setIsSubmitting(false);
         throw error;
       } finally {
         sendInFlightRef.current = false;
       }
     },
-    [thread, _handleOnStart, t.uploads.uploadingFiles, context, queryClient],
+    [thread, _handleOnStart, t.uploads.uploadingFiles, t.common.thinking, context, queryClient],
   );
 
   // Merge thread with optimistic messages for display
@@ -407,7 +426,7 @@ export function useThreadStream({
         } as typeof thread)
       : thread;
 
-  return [mergedThread, sendMessage, isUploading] as const;
+  return [mergedThread, sendMessage, isUploading, isSubmitting] as const;
 }
 
 export function useThreads(
