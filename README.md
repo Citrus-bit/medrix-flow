@@ -1,6 +1,6 @@
 # 🧬 MedrixFlow - 2.0
 
-English | [中文](./README_zh.md) | [日本語](./README_ja.md)
+English | [中文](./README_zh.md) 
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](./backend/pyproject.toml)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](./Makefile)
@@ -12,9 +12,7 @@ MedrixFlow (**Med**ical **R**esearch **I**ntelligence and Data-driven e**X**plor
 
 ## Table of Contents
 
-- [🧬 MedrixFlow - 2.0](#-medrix_flow---20)
-  - [Official Website](#official-website)
-  - [InfoQuest](#infoquest)
+- [🧬 MedrixFlow - 2.0](#-medrixflow---20)
   - [Table of Contents](#table-of-contents)
   - [Quick Start](#quick-start)
     - [Configuration](#configuration)
@@ -39,7 +37,6 @@ MedrixFlow (**Med**ical **R**esearch **I**ntelligence and Data-driven e**X**plor
   - [Contributing](#contributing)
   - [License](#license)
   - [Acknowledgments](#acknowledgments)
-    - [Key Contributors](#key-contributors)
   - [Star History](#star-history)
 
 ## Quick Start
