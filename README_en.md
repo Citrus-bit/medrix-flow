@@ -49,7 +49,7 @@ MedrixFlow is a LangGraph-based AI super agent system with sandbox execution, pe
 
 ```
                         ┌──────────────────────────────────────┐
-                        │          Nginx (Port 2026)           │
+                        │          Nginx (Port 1000)           │
                         │      Unified reverse proxy           │
                         └───────┬──────────────────┬───────────┘
                                 │                  │
@@ -159,7 +159,7 @@ source ~/.bashrc  # or source ~/.zshrc
 make dev  # Starts LangGraph + Gateway + Frontend + Nginx
 ```
 
-Access at: http://localhost:2026
+Access at: http://localhost:1000
 
 **Running components separately:**
 
@@ -178,7 +178,7 @@ pnpm dev
 ```
 
 Direct access:
-- Main app: http://localhost:2026
+- Main app: http://localhost:1000
 - LangGraph: http://localhost:2024
 - Gateway: http://localhost:8001
 - Frontend: http://localhost:3000
@@ -315,12 +315,6 @@ MCP servers and skill states in a single file:
 - [Context Summarization](./backend/docs/summarization.md)
 - [Plan Mode](./backend/docs/plan_mode_usage.md)
 - [Setup Guide](./backend/docs/SETUP.md)
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](./CONTRIBUTING.md) to learn how to contribute.
 
 ---
 
