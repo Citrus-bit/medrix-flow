@@ -6,29 +6,9 @@ English | [中文](./README_zh.md) | [日本語](./README_ja.md)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](./Makefile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-<a href="https://trendshift.io/repositories/14699" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14699" alt="your-org%2Fmedrix-flow | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-> On February 28th, 2026, MedrixFlow claimed the 🏆 #1 spot on GitHub Trending following the launch of version 2. Thanks a million to our incredible community — you made this happen! 💪🔥
 
 MedrixFlow (**Med**ical **R**esearch **I**ntelligence and Data-driven e**X**ploration **Flow**) is an open-source **super agent harness** that orchestrates **sub-agents**, **memory**, and **sandboxes** to do almost anything — powered by **extensible skills**.
 
-https://github.com/user-attachments/assets/a8bcadc4-e040-4cf2-8fda-dd768b999c18
-
-> [!NOTE]
-> **MedrixFlow 2.0 is a ground-up rewrite.** It shares no code with v1. If you're looking for the original Deep Research framework, it's maintained on the [`1.x` branch](https://github.com/your-org/medrix-flow/tree/main-1.x) — contributions there are still welcome. Active development has moved to 2.0.
-
-## Official Website
-
-[<img width="2880" height="1600" alt="image" src="https://github.com/user-attachments/assets/a598c49f-3b2f-41ea-a052-05e21349188a" />](https://medrix_flow.tech)
-
-Learn more and see **real demos** on our [**official website**](https://medrix_flow.tech).
-
-## Coding Plan from ByteDance Volcengine
-
-<img width="4808" height="2400" alt="英文方舟" src="https://github.com/user-attachments/assets/2ecc7b9d-50be-4185-b1f7-5542d222fb2d" />
-
-- We strongly recommend using Doubao-Seed-2.0-Code, DeepSeek v3.2 and Kimi 2.5 to run MedrixFlow
-- [Learn more](https://www.byteplus.com/en/activity/codingplan?utm_campaign=medrix_flow&utm_content=medrix_flow&utm_medium=devrel&utm_source=OWO&utm_term=medrix_flow)
-- [中国大陆地区的开发者请点击这里](https://www.volcengine.com/activity/codingplan?utm_campaign=medrix_flow&utm_content=medrix_flow&utm_medium=devrel&utm_source=OWO&utm_term=medrix_flow)
 
 ## InfoQuest
 
@@ -214,9 +194,7 @@ make down   # Stop and remove containers
 > [!NOTE]
 > The LangGraph agent server currently runs via `langgraph dev` (the open-source CLI server).
 
-Access: http://localhost:2026
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed Docker development guide.
+Access: http://localhost:1000
 
 #### Option 2: Local Development
 
@@ -245,7 +223,7 @@ Prerequisite: complete the "Configuration" steps above first (`make config` and 
    make dev
    ```
 
-5. **Access**: http://localhost:2026
+5. **Access**: http://localhost:1000
 
 ### Advanced
 #### Sandbox Mode
@@ -544,15 +522,6 @@ We would like to extend our sincere appreciation to the following projects for t
 - **[LangGraph](https://github.com/langchain-ai/langgraph)**: Their innovative approach to multi-agent orchestration has been instrumental in enabling MedrixFlow's sophisticated workflows.
 
 These projects exemplify the transformative power of open-source collaboration, and we are proud to build upon their foundations.
-
-### Key Contributors
-
-A heartfelt thank you goes out to the core authors of `MedrixFlow`, whose vision, passion, and dedication have brought this project to life:
-
-- **[Daniel Walnut](https://github.com/hetaoBackend/)**
-- **[Henry Li](https://github.com/magiccube/)**
-
-Your unwavering commitment and expertise have been the driving force behind MedrixFlow's success. We are honored to have you at the helm of this journey.
 
 ## Star History
 
