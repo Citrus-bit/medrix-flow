@@ -10,18 +10,6 @@ English | [中文](./README_zh.md) | [日本語](./README_ja.md)
 MedrixFlow (**Med**ical **R**esearch **I**ntelligence and Data-driven e**X**ploration **Flow**) is an open-source **super agent harness** that orchestrates **sub-agents**, **memory**, and **sandboxes** to do almost anything — powered by **extensible skills**.
 
 
-## InfoQuest
-
-MedrixFlow has newly integrated the intelligent search and crawling toolset independently developed by BytePlus--[InfoQuest (supports free online experience)](https://docs.byteplus.com/en/docs/InfoQuest/What_is_Info_Quest)
-
-<a href="https://docs.byteplus.com/en/docs/InfoQuest/What_is_Info_Quest" target="_blank">
-  <img
-    src="https://sf16-sg.tiktokcdn.com/obj/eden-sg/hubseh7bsbps/20251208-160108.png"   alt="InfoQuest_banner"
-  />
-</a>
-
----
-
 ## Table of Contents
 
 - [🧬 MedrixFlow - 2.0](#-medrix_flow---20)
