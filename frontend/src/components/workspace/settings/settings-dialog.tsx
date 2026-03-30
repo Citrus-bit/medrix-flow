@@ -4,6 +4,7 @@ import {
   BellIcon,
   InfoIcon,
   BrainIcon,
+  CogIcon,
   PaletteIcon,
   SparklesIcon,
   WrenchIcon,
@@ -21,12 +22,14 @@ import { AboutSettingsPage } from "@/components/workspace/settings/about-setting
 import { AppearanceSettingsPage } from "@/components/workspace/settings/appearance-settings-page";
 import { MemorySettingsPage } from "@/components/workspace/settings/memory-settings-page";
 import { NotificationSettingsPage } from "@/components/workspace/settings/notification-settings-page";
+import { SetupSettingsPage } from "@/components/workspace/settings/setup-settings-page";
 import { SkillSettingsPage } from "@/components/workspace/settings/skill-settings-page";
 import { ToolSettingsPage } from "@/components/workspace/settings/tool-settings-page";
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
 
 type SettingsSection =
+  | "setup"
   | "appearance"
   | "memory"
   | "tools"
@@ -39,7 +42,7 @@ type SettingsDialogProps = React.ComponentProps<typeof Dialog> & {
 };
 
 export function SettingsDialog(props: SettingsDialogProps) {
-  const { defaultSection = "appearance", ...dialogProps } = props;
+  const { defaultSection = "setup", ...dialogProps } = props;
   const { t } = useI18n();
   const [activeSection, setActiveSection] =
     useState<SettingsSection>(defaultSection);
@@ -54,6 +57,11 @@ export function SettingsDialog(props: SettingsDialogProps) {
 
   const sections = useMemo(
     () => [
+      {
+        id: "setup",
+        label: t.settings.sections.setup,
+        icon: CogIcon,
+      },
       {
         id: "appearance",
         label: t.settings.sections.appearance,
@@ -74,6 +82,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
       { id: "about", label: t.settings.sections.about, icon: InfoIcon },
     ],
     [
+      t.settings.sections.setup,
       t.settings.sections.appearance,
       t.settings.sections.memory,
       t.settings.sections.tools,
@@ -124,6 +133,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
           </nav>
           <ScrollArea className="h-full min-h-0 rounded-lg border">
             <div className="space-y-8 p-6">
+              {activeSection === "setup" && <SetupSettingsPage />}
               {activeSection === "appearance" && <AppearanceSettingsPage />}
               {activeSection === "memory" && <MemorySettingsPage />}
               {activeSection === "tools" && <ToolSettingsPage />}

@@ -281,6 +281,7 @@ export const zhCN: Translations = {
     title: "设置",
     description: "根据你的偏好调整 MedrixFlow 的界面和行为。",
     sections: {
+      setup: "配置",
       appearance: "外观",
       memory: "记忆",
       tools: "工具",
@@ -365,5 +366,25 @@ export const zhCN: Translations = {
       emptyTitle: "致谢",
       emptyDescription: "相关的致谢信息会展示在这里。",
     },
+  },
+
+  setup: {
+    title: "配置",
+    description: "配置你的 LLM 模型和工具 API 密钥。",
+    modelsTitle: "模型配置",
+    modelsDescription:
+      "添加和管理 LLM 模型提供商。每个模型需要提供商类型、模型 ID 和 API 密钥。",
+    toolKeysTitle: "工具 API 密钥",
+    toolKeysDescription:
+      "配置网络搜索（Tavily）和网页抓取（Jina）工具的 API 密钥。",
+    addModel: "添加模型",
+    modelName: "模型名称",
+    displayName: "显示名称",
+    provider: "提供商",
+    modelId: "模型 ID",
+    testConnection: "测试",
+    saveAll: "保存配置",
+    saveSuccess: "配置保存成功。",
+    noChanges: "没有未保存的更改。",
   },
 };

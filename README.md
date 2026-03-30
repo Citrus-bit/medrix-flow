@@ -1,513 +1,337 @@
-# 🧬 MedrixFlow - 2.0
+# MedrixFlow
 
-English | [中文](./README_zh.md) 
+[English](./README_en.md) | **中文**
 
-[![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](./backend/pyproject.toml)
-[![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](./Makefile)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+<p align="center">
+  <img src="https://img.shields.io/badge/Made%20with-LangGraph-blue?style=for-the-badge&logo=python" alt="LangGraph">
+  <img src="https://img.shields.io/badge/Frontend-Next.js%2016-black?style=for-the-badge&logo=next.js" alt="Next.js">
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
+</p>
 
+MedrixFlow 是一个基于 LangGraph 构建的 AI 超级代理系统，具有沙箱执行、持久化记忆和可扩展工具集成能力。后端使 AI 代理能够执行代码、浏览网页、管理文件、将任务委托给子代理，并在隔离的每个线程环境中保留上下文。
 
-MedrixFlow (**Med**ical **R**esearch **I**ntelligence and Data-driven e**X**ploration **Flow**) is an open-source **super agent harness** that orchestrates **sub-agents**, **memory**, and **sandboxes** to do almost anything — powered by **extensible skills**.
+---
 
+## ✨ 特性
 
-## Table of Contents
+### 🤖 智能代理系统
+- **主代理 (Lead Agent)**: 基于 LangGraph 的核心代理，支持动态模型选择、思考模式和视觉理解
+- **子代理系统**: 支持并行任务执行，最多 3 个子代理并发，每个任务 15 分钟超时
+- **中间件链**: 9 个中间件组件，处理线程隔离、文件上传、沙箱管理、记忆提取等
 
-- [🧬 MedrixFlow - 2.0](#-medrixflow---20)
-  - [Table of Contents](#table-of-contents)
-  - [Quick Start](#quick-start)
-    - [Configuration](#configuration)
-    - [Running the Application](#running-the-application)
-      - [Option 1: Docker (Recommended)](#option-1-docker-recommended)
-      - [Option 2: Local Development](#option-2-local-development)
-    - [Advanced](#advanced)
-      - [Sandbox Mode](#sandbox-mode)
-      - [MCP Server](#mcp-server)
-      - [IM Channels](#im-channels)
-  - [From Deep Research to Super Agent Harness](#from-deep-research-to-super-agent-harness)
-  - [Core Features](#core-features)
-    - [Skills \& Tools](#skills--tools)
-      - [Claude Code Integration](#claude-code-integration)
-    - [Sub-Agents](#sub-agents)
-    - [Sandbox \& File System](#sandbox--file-system)
-    - [Context Engineering](#context-engineering)
-    - [Long-Term Memory](#long-term-memory)
-  - [Recommended Models](#recommended-models)
-  - [Embedded Python Client](#embedded-python-client)
-  - [Documentation](#documentation)
-  - [Contributing](#contributing)
-  - [License](#license)
-  - [Acknowledgments](#acknowledgments)
-  - [Star History](#star-history)
+### 🔒 沙箱执行
+- **线程隔离**: 每个对话线程拥有独立的文件系统空间
+- **虚拟路径**: `/mnt/user-data/{workspace,uploads,outputs}` 自动映射到线程目录
+- **工具集**: bash、ls、read_file、write_file、str_replace
 
-## Quick Start
+### 💾 持久化记忆
+- **自动提取**: AI 自动分析对话，提取用户背景、事实和偏好
+- **结构化存储**: 用户上下文、历史记录、带置信度评分的事实
+- **提示注入**: 顶级事实和上下文注入到代理提示中
 
-### Configuration
+### 🛠️ 工具生态系统
+| 类别 | 工具 |
+|------|------|
+| 沙箱 | bash, ls, read_file, write_file, str_replace |
+| 内置 | present_files, ask_clarification, view_image, task |
+| 社区 | Tavily (网页搜索), Jina AI (网页抓取), Firecrawl, DuckDuckGo (图片搜索) |
+| MCP | 支持任何 Model Context Protocol 服务器 |
+| Skills | 领域特定工作流，通过系统提示注入 |
 
-1. **Clone the MedrixFlow repository**
+### 📱 多渠道支持
+- **飞书**: 支持实时流式响应，卡片消息原地更新
+- **Slack**: 支持消息交互
+- **Telegram**: 支持机器人交互
 
-   ```bash
-   git clone https://github.com/your-org/medrix-flow.git
-   cd medrix-flow
-   ```
+---
 
-2. **Generate local configuration files**
+## 🏗️ 架构
 
-   From the project root directory (`medrix-flow/`), run:
-
-   ```bash
-   make config
-   ```
-
-   This command creates local configuration files based on the provided example templates.
-
-3. **Configure your preferred model(s)**
-
-   Edit `config.yaml` and define at least one model:
-
-   ```yaml
-   models:
-     - name: gpt-4                       # Internal identifier
-       display_name: GPT-4               # Human-readable name
-       use: langchain_openai:ChatOpenAI  # LangChain class path
-       model: gpt-4                      # Model identifier for API
-       api_key: $OPENAI_API_KEY          # API key (recommended: use env var)
-       max_tokens: 4096                  # Maximum tokens per request
-       temperature: 0.7                  # Sampling temperature
-
-     - name: openrouter-gemini-2.5-flash
-       display_name: Gemini 2.5 Flash (OpenRouter)
-       use: langchain_openai:ChatOpenAI
-       model: google/gemini-2.5-flash-preview
-       api_key: $OPENAI_API_KEY          # OpenRouter still uses the OpenAI-compatible field name here
-       base_url: https://openrouter.ai/api/v1
-
-     - name: gpt-5-responses
-       display_name: GPT-5 (Responses API)
-       use: langchain_openai:ChatOpenAI
-       model: gpt-5
-       api_key: $OPENAI_API_KEY
-       use_responses_api: true
-       output_version: responses/v1
-   ```
-
-   OpenRouter and similar OpenAI-compatible gateways should be configured with `langchain_openai:ChatOpenAI` plus `base_url`. If you prefer a provider-specific environment variable name, point `api_key` at that variable explicitly (for example `api_key: $OPENROUTER_API_KEY`).
-
-   To route OpenAI models through `/v1/responses`, keep using `langchain_openai:ChatOpenAI` and set `use_responses_api: true` with `output_version: responses/v1`.
-
-   CLI-backed provider examples:
-
-   ```yaml
-   models:
-     - name: gpt-5.4
-       display_name: GPT-5.4 (Codex CLI)
-       use: medrix_flow.models.openai_codex_provider:CodexChatModel
-       model: gpt-5.4
-       supports_thinking: true
-       supports_reasoning_effort: true
-
-     - name: claude-sonnet-4.6
-       display_name: Claude Sonnet 4.6 (Claude Code OAuth)
-       use: medrix_flow.models.claude_provider:ClaudeChatModel
-       model: claude-sonnet-4-6
-       max_tokens: 4096
-       supports_thinking: true
-   ```
-
-   - Codex CLI reads `~/.codex/auth.json`
-   - The Codex Responses endpoint currently rejects `max_tokens` and `max_output_tokens`, so `CodexChatModel` does not expose a request-level token cap
-   - Claude Code accepts `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`, `CLAUDE_CODE_CREDENTIALS_PATH`, or plaintext `~/.claude/.credentials.json`
-   - On macOS, MedrixFlow does not probe Keychain automatically. Export Claude Code auth explicitly if needed:
-
-   ```bash
-   eval "$(python3 scripts/export_claude_code_oauth.py --print-export)"
-   ```
-   
-4. **Set API keys for your configured model(s)**
-
-   Choose one of the following methods:
-
-- Option A: Edit the `.env` file in the project root (Recommended)
-
-
-   ```bash
-   TAVILY_API_KEY=your-tavily-api-key
-   OPENAI_API_KEY=your-openai-api-key
-   # OpenRouter also uses OPENAI_API_KEY when your config uses langchain_openai:ChatOpenAI + base_url.
-   # Add other provider keys as needed
-   INFOQUEST_API_KEY=your-infoquest-api-key
-   ```
-
-- Option B: Export environment variables in your shell
-
-   ```bash
-   export OPENAI_API_KEY=your-openai-api-key
-   ```
-
-   For CLI-backed providers:
-   - Codex CLI: `~/.codex/auth.json`
-   - Claude Code OAuth: explicit env/file handoff or `~/.claude/.credentials.json`
-
-- Option C: Edit `config.yaml` directly (Not recommended for production)
-
-   ```yaml
-   models:
-     - name: gpt-4
-       api_key: your-actual-api-key-here  # Replace placeholder
-   ```
-
-### Running the Application
-
-#### Option 1: Docker (Recommended)
-
-**Development** (hot-reload, source mounts):
-
-```bash
-make docker-init    # Pull sandbox image (only once or when image updates)
-make docker-start   # Start services (auto-detects sandbox mode from config.yaml)
+```
+                        ┌──────────────────────────────────────┐
+                        │          Nginx (端口 2026)          │
+                        │        统一反向代理服务器            │
+                        └───────┬──────────────────┬───────────┘
+                                │                  │
+              /api/langgraph/*  │                  │  /api/* (其他)
+                                ▼                  ▼
+               ┌────────────────────┐  ┌────────────────────────┐
+               │ LangGraph 服务器    │  │   网关 API (8001)      │
+               │    (端口 2024)     │  │   FastAPI REST         │
+               │                    │  │                        │
+               │ ┌────────────────┐ │  │ 模型、MCP、Skills、    │
+               │ │  主代理         │ │  │ 记忆、上传、产物        │
+               │ │  ┌──────────┐  │ │  │  └────────────────────────┘
+               │ │  │ 中间件链 │  │ │
+               │ │  └──────────┘  │ │
+               │ │  ┌──────────┐  │ │
+               │ │  │  工具集  │  │ │
+               │ │  └──────────┘  │ │
+               │ │  ┌──────────┐  │ │
+               │ │  │ 子代理   │  │ │
+               │ │  └──────────┘  │ │
+               │ └────────────────┘ │
+               └────────────────────┘
 ```
 
-`make docker-start` starts `provisioner` only when `config.yaml` uses provisioner mode (`sandbox.use: medrix_flow.community.aio_sandbox:AioSandboxProvider` with `provisioner_url`).
-Backend processes automatically pick up `config.yaml` changes on the next config access, so model metadata updates do not require a manual restart during development.
+**请求路由** (通过 Nginx):
+- `/api/langgraph/*` → LangGraph 服务器 - 代理交互、线程、流式传输
+- `/api/*` (其他) → 网关 API - 模型、MCP、skills、记忆、产物、上传
+- `/` (非 API) → 前端 - Next.js Web 界面
 
-**Production** (builds images locally, mounts runtime config and data):
+---
+
+## 🚀 快速开始
+
+### 前置要求
+
+**后端:**
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) 包管理器
+- 你所选 LLM 提供商的 API 密钥
+
+**前端:**
+- Node.js 22+
+- pnpm 10.26.2+
+
+### 安装
 
 ```bash
-make up     # Build images and start all production services
-make down   # Stop and remove containers
+# 1. 克隆项目
+git clone https://github.com/your-username/medrix-flow.git
+cd medrix-flow
+
+# 2. 复制配置文件
+cp config.example.yaml config.yaml
+
+# 3. 安装后端依赖
+cd backend
+make install
+
+# 4. 安装前端依赖 (新开终端)
+cd ../frontend
+pnpm install
+
+# 5. 复制前端环境变量
+cp .env.example .env
 ```
 
-> [!NOTE]
-> The LangGraph agent server currently runs via `langgraph dev` (the open-source CLI server).
+### 配置
 
-Access: http://localhost:1000
-
-#### Option 2: Local Development
-
-If you prefer running services locally:
-
-Prerequisite: complete the "Configuration" steps above first (`make config` and model API keys). `make dev` requires a valid configuration file (defaults to `config.yaml` in the project root; can be overridden via `MEDRIX_FLOW_CONFIG_PATH`).
-
-1. **Check prerequisites**:
-   ```bash
-   make check  # Verifies Node.js 22+, pnpm, uv, nginx
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   make install  # Install backend + frontend dependencies
-   ```
-
-3. **(Optional) Pre-pull sandbox image**:
-   ```bash
-   # Recommended if using Docker/Container-based sandbox
-   make setup-sandbox
-   ```
-
-4. **Start services**:
-   ```bash
-   make dev
-   ```
-
-5. **Access**: http://localhost:1000
-
-### Advanced
-#### Sandbox Mode
-
-MedrixFlow supports multiple sandbox execution modes:
-- **Local Execution** (runs sandbox code directly on the host machine)
-- **Docker Execution** (runs sandbox code in isolated Docker containers)
-- **Docker Execution with Kubernetes** (runs sandbox code in Kubernetes pods via provisioner service)
-
-For Docker development, service startup follows `config.yaml` sandbox mode. In Local/Docker modes, `provisioner` is not started.
-
-See the [Sandbox Configuration Guide](backend/docs/CONFIGURATION.md#sandbox) to configure your preferred mode.
-
-#### MCP Server
-
-MedrixFlow supports configurable MCP servers and skills to extend its capabilities.
-For HTTP/SSE MCP servers, OAuth token flows are supported (`client_credentials`, `refresh_token`).
-See the [MCP Server Guide](backend/docs/MCP_SERVER.md) for detailed instructions.
-
-#### IM Channels
-
-MedrixFlow supports receiving tasks from messaging apps. Channels auto-start when configured — no public IP required for any of them.
-
-| Channel | Transport | Difficulty |
-|---------|-----------|------------|
-| Telegram | Bot API (long-polling) | Easy |
-| Slack | Socket Mode | Moderate |
-| Feishu / Lark | WebSocket | Moderate |
-
-**Configuration in `config.yaml`:**
+编辑项目根目录下的 `config.yaml`:
 
 ```yaml
-channels:
-  # LangGraph Server URL (default: http://localhost:2024)
-  langgraph_url: http://localhost:2024
-  # Gateway API URL (default: http://localhost:8001)
-  gateway_url: http://localhost:8001
+models:
+  - name: gpt-4o
+    display_name: GPT-4o
+    use: langchain_openai:ChatOpenAI
+    model: gpt-4o
+    api_key: $OPENAI_API_KEY
+    supports_thinking: false
+    supports_vision: true
 
-  # Optional: global session defaults for all mobile channels
-  session:
-    assistant_id: lead_agent
-    config:
-      recursion_limit: 100
-    context:
-      thinking_enabled: true
-      is_plan_mode: false
-      subagent_enabled: false
-
-  feishu:
-    enabled: true
-    app_id: $FEISHU_APP_ID
-    app_secret: $FEISHU_APP_SECRET
-
-  slack:
-    enabled: true
-    bot_token: $SLACK_BOT_TOKEN     # xoxb-...
-    app_token: $SLACK_APP_TOKEN     # xapp-... (Socket Mode)
-    allowed_users: []               # empty = allow all
-
-  telegram:
-    enabled: true
-    bot_token: $TELEGRAM_BOT_TOKEN
-    allowed_users: []               # empty = allow all
-
-    # Optional: per-channel / per-user session settings
-    session:
-      assistant_id: mobile_agent
-      context:
-        thinking_enabled: false
-      users:
-        "123456789":
-          assistant_id: vip_agent
-          config:
-            recursion_limit: 150
-          context:
-            thinking_enabled: true
-            subagent_enabled: true
+  - name: claude-sonnet-4
+    display_name: Claude Sonnet 4
+    use: langchain_anthropic:ChatAnthropic
+    model: claude-sonnet-4-20250514
+    api_key: $ANTHROPIC_API_KEY
+    supports_thinking: true
+    supports_vision: true
 ```
 
-Set the corresponding API keys in your `.env` file:
+设置你的 API 密钥:
 
 ```bash
-# Telegram
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGHIjklMNOpqrSTUvwxYZ
+# 在 ~/.bashrc 或 ~/.zshrc 中添加
+export OPENAI_API_KEY="your-api-key-here"
+export ANTHROPIC_API_KEY="your-anthropic-key-here"
 
-# Slack
-SLACK_BOT_TOKEN=xoxb-...
-SLACK_APP_TOKEN=xapp-...
-
-# Feishu / Lark
-FEISHU_APP_ID=cli_xxxx
-FEISHU_APP_SECRET=your_app_secret
+# 然后重新加载
+source ~/.bashrc  # 或 source ~/.zshrc
 ```
 
-**Telegram Setup**
+### 运行
 
-1. Chat with [@BotFather](https://t.me/BotFather), send `/newbot`, and copy the HTTP API token.
-2. Set `TELEGRAM_BOT_TOKEN` in `.env` and enable the channel in `config.yaml`.
-
-**Slack Setup**
-
-1. Create a Slack App at [api.slack.com/apps](https://api.slack.com/apps) → Create New App → From scratch.
-2. Under **OAuth & Permissions**, add Bot Token Scopes: `app_mentions:read`, `chat:write`, `im:history`, `im:read`, `im:write`, `files:write`.
-3. Enable **Socket Mode** → generate an App-Level Token (`xapp-…`) with `connections:write` scope.
-4. Under **Event Subscriptions**, subscribe to bot events: `app_mention`, `message.im`.
-5. Set `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN` in `.env` and enable the channel in `config.yaml`.
-
-**Feishu / Lark Setup**
-
-1. Create an app on [Feishu Open Platform](https://open.feishu.cn/) → enable **Bot** capability.
-2. Add permissions: `im:message`, `im:message.p2p_msg:readonly`, `im:resource`.
-3. Under **Events**, subscribe to `im.message.receive_v1` and select **Long Connection** mode.
-4. Copy the App ID and App Secret. Set `FEISHU_APP_ID` and `FEISHU_APP_SECRET` in `.env` and enable the channel in `config.yaml`.
-
-**Commands**
-
-Once a channel is connected, you can interact with MedrixFlow directly from the chat:
-
-| Command | Description |
-|---------|-------------|
-| `/new` | Start a new conversation |
-| `/status` | Show current thread info |
-| `/models` | List available models |
-| `/memory` | View memory |
-| `/help` | Show help |
-
-> Messages without a command prefix are treated as regular chat — MedrixFlow creates a thread and responds conversationally.
-
-## From Deep Research to Super Agent Harness
-
-MedrixFlow started as a Deep Research framework — and the community ran with it. Since launch, developers have pushed it far beyond research: building data pipelines, generating slide decks, spinning up dashboards, automating content workflows. Things we never anticipated.
-
-That told us something important: MedrixFlow wasn't just a research tool. It was a **harness** — a runtime that gives agents the infrastructure to actually get work done.
-
-So we rebuilt it from scratch.
-
-MedrixFlow 2.0 is no longer a framework you wire together. It's a super agent harness — batteries included, fully extensible. Built on LangGraph and LangChain, it ships with everything an agent needs out of the box: a filesystem, memory, skills, sandboxed execution, and the ability to plan and spawn sub-agents for complex, multi-step tasks.
-
-Use it as-is. Or tear it apart and make it yours.
-
-## Core Features
-
-### Skills & Tools
-
-Skills are what make MedrixFlow do *almost anything*.
-
-A standard Agent Skill is a structured capability module — a Markdown file that defines a workflow, best practices, and references to supporting resources. MedrixFlow ships with built-in skills for research, report generation, slide creation, web pages, image and video generation, and more. But the real power is extensibility: add your own skills, replace the built-in ones, or combine them into compound workflows.
-
-Skills are loaded progressively — only when the task needs them, not all at once. This keeps the context window lean and makes MedrixFlow work well even with token-sensitive models.
-
-When you install `.skill` archives through the Gateway, MedrixFlow accepts standard optional frontmatter metadata such as `version`, `author`, and `compatibility` instead of rejecting otherwise valid external skills.
-
-Tools follow the same philosophy. MedrixFlow comes with a core toolset — web search, web fetch, file operations, bash execution — and supports custom tools via MCP servers and Python functions. Swap anything. Add anything.
-
-Gateway-generated follow-up suggestions now normalize both plain-string model output and block/list-style rich content before parsing the JSON array response, so provider-specific content wrappers do not silently drop suggestions.
-
-```
-# Paths inside the sandbox container
-/mnt/skills/public
-├── research/SKILL.md
-├── report-generation/SKILL.md
-├── slide-creation/SKILL.md
-├── web-page/SKILL.md
-└── image-generation/SKILL.md
-
-/mnt/skills/custom
-└── your-custom-skill/SKILL.md      ← yours
-```
-
-#### Claude Code Integration
-
-The `claude-to-medrix_flow` skill lets you interact with a running MedrixFlow instance directly from [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Send research tasks, check status, manage threads — all without leaving the terminal.
-
-**Install the skill**:
+**完整应用** (从项目根目录):
 
 ```bash
-npx skills add https://github.com/your-org/medrix-flow --skill claude-to-medrix_flow
+make dev  # 启动 LangGraph + 网关 + 前端 + Nginx
 ```
 
-Then make sure MedrixFlow is running (default at `http://localhost:2026`) and use the `/claude-to-medrix_flow` command in Claude Code.
+访问地址: http://localhost:2026
 
-**What you can do**:
-- Send messages to MedrixFlow and get streaming responses
-- Choose execution modes: flash (fast), standard, pro (planning), ultra (sub-agents)
-- Check MedrixFlow health, list models/skills/agents
-- Manage threads and conversation history
-- Upload files for analysis
-
-**Environment variables** (optional, for custom endpoints):
+**分别启动各组件:**
 
 ```bash
-MEDRIXFLOW_URL=http://localhost:2026            # Unified proxy base URL
-MEDRIXFLOW_GATEWAY_URL=http://localhost:2026    # Gateway API
-MEDRIXFLOW_LANGGRAPH_URL=http://localhost:2026/api/langgraph  # LangGraph API
+# 后端 - LangGraph 服务器 (终端 1)
+cd backend
+make dev
+
+# 后端 - 网关 API (终端 2)
+cd backend
+make gateway
+
+# 前端 (终端 3)
+cd frontend
+pnpm dev
 ```
 
-See [`skills/public/claude-to-medrix_flow/SKILL.md`](skills/public/claude-to-medrix_flow/SKILL.md) for the full API reference.
+直接访问:
+- 主应用: http://localhost:2026
+- LangGraph: http://localhost:2024
+- 网关: http://localhost:8001
+- 前端: http://localhost:3000
 
-### Sub-Agents
+---
 
-Complex tasks rarely fit in a single pass. MedrixFlow decomposes them.
-
-The lead agent can spawn sub-agents on the fly — each with its own scoped context, tools, and termination conditions. Sub-agents run in parallel when possible, report back structured results, and the lead agent synthesizes everything into a coherent output.
-
-This is how MedrixFlow handles tasks that take minutes to hours: a research task might fan out into a dozen sub-agents, each exploring a different angle, then converge into a single report — or a website — or a slide deck with generated visuals. One harness, many hands.
-
-### Sandbox & File System
-
-MedrixFlow doesn't just *talk* about doing things. It has its own computer.
-
-Each task runs inside an isolated Docker container with a full filesystem — skills, workspace, uploads, outputs. The agent reads, writes, and edits files. It executes bash commands and codes. It views images. All sandboxed, all auditable, zero contamination between sessions.
-
-This is the difference between a chatbot with tool access and an agent with an actual execution environment.
+## 📁 项目结构
 
 ```
-# Paths inside the sandbox container
-/mnt/user-data/
-├── uploads/          ← your files
-├── workspace/        ← agents' working directory
-└── outputs/          ← final deliverables
+medrix-flow/
+├── backend/                    # 后端服务
+│   ├── src/
+│   │   ├── agents/            # 代理系统
+│   │   │   ├── lead_agent/    # 主代理 (工厂、提示词)
+│   │   │   ├── middlewares/   # 9 个中间件组件
+│   │   │   ├── memory/        # 记忆提取与存储
+│   │   │   └── thread_state.py
+│   │   ├── gateway/           # FastAPI 网关
+│   │   │   ├── app.py
+│   │   │   └── routers/      # 路由模块
+│   │   ├── sandbox/          # 沙箱执行
+│   │   ├── subagents/        # 子代理系统
+│   │   ├── tools/            # 工具集
+│   │   ├── mcp/              # MCP 协议集成
+│   │   ├── models/           # 模型工厂
+│   │   ├── skills/           # Skill 发现与加载
+│   │   └── config/           # 配置系统
+│   ├── docs/                 # 文档
+│   ├── tests/                # 测试
+│   ├── pyproject.toml        # Python 依赖
+│   └── Makefile              # 开发命令
+│
+├── frontend/                  # 前端应用
+│   ├── src/
+│   │   ├── app/              # Next.js App Router
+│   │   ├── components/       # React 组件
+│   │   ├── core/             # 核心业务逻辑
+│   │   ├── hooks/            # 自定义 Hooks
+│   │   └── lib/              # 共享库
+│   ├── public/               # 静态资源
+│   ├── package.json          # Node 依赖
+│   └── README.md             # 前端文档
+│
+├── skills/                   # 技能系统
+│   ├── public/               # 公共技能
+│   └── custom/               # 自定义技能
+│
+├── scripts/                  # 脚本工具
+├── logs/                     # 日志文件
+├── docker/                   # Docker 配置
+├── config.example.yaml       # 配置示例
+├── Makefile                  # 根目录命令
+└── README.md                 # 本文件
 ```
 
-### Context Engineering
+---
 
-**Isolated Sub-Agent Context**: Each sub-agent runs in its own isolated context. This means that the sub-agent will not be able to see the context of the main agent or other sub-agents. This is important to ensure that the sub-agent is able to focus on the task at hand and not be distracted by the context of the main agent or other sub-agents.
+## ⚙️ 配置说明
 
-**Summarization**: Within a session, MedrixFlow manages context aggressively — summarizing completed sub-tasks, offloading intermediate results to the filesystem, compressing what's no longer immediately relevant. This lets it stay sharp across long, multi-step tasks without blowing the context window.
+### 主配置文件 (`config.yaml`)
 
-### Long-Term Memory
+放置在项目根目录。以 `$` 开头的配置值会解析为环境变量。
 
-Most agents forget everything the moment a conversation ends. MedrixFlow remembers.
+主要配置项:
+- `models` - LLM 模型配置 (类路径、API 密钥、思考/视觉支持)
+- `tools` - 工具定义 (模块路径和分组)
+- `tool_groups` - 逻辑工具分组
+- `sandbox` - 执行环境提供者
+- `skills` - Skills 目录路径
+- `title` - 自动标题生成设置
+- `summarization` - 上下文摘要设置
+- `subagents` - 子代理系统 (启用/禁用)
+- `memory` - 记忆系统设置
 
-Across sessions, MedrixFlow builds a persistent memory of your profile, preferences, and accumulated knowledge. The more you use it, the better it knows you — your writing style, your technical stack, your recurring workflows. Memory is stored locally and stays under your control.
+### 扩展配置 (`extensions_config.json`)
 
-Memory updates now skip duplicate fact entries at apply time, so repeated preferences and context do not accumulate endlessly across sessions.
+MCP 服务器和 skill 状态的统一配置:
 
-## Recommended Models
-
-MedrixFlow is model-agnostic — it works with any LLM that implements the OpenAI-compatible API. That said, it performs best with models that support:
-
-- **Long context windows** (100k+ tokens) for deep research and multi-step tasks
-- **Reasoning capabilities** for adaptive planning and complex decomposition
-- **Multimodal inputs** for image understanding and video comprehension
-- **Strong tool-use** for reliable function calling and structured outputs
-
-## Embedded Python Client
-
-MedrixFlow can be used as an embedded Python library without running the full HTTP services. The `MedrixFlowClient` provides direct in-process access to all agent and Gateway capabilities, returning the same response schemas as the HTTP Gateway API. The HTTP Gateway also exposes `DELETE /api/threads/{thread_id}` to remove MedrixFlow-managed local thread data after the LangGraph thread itself has been deleted:
-
-```python
-from medrix_flow.client import MedrixFlowClient
-
-client = MedrixFlowClient()
-
-# Chat
-response = client.chat("Analyze this paper for me", thread_id="my-thread")
-
-# Streaming (LangGraph SSE protocol: values, messages-tuple, end)
-for event in client.stream("hello"):
-    if event.type == "messages-tuple" and event.data.get("type") == "ai":
-        print(event.data["content"])
-
-# Configuration & management — returns Gateway-aligned dicts
-models = client.list_models()        # {"models": [...]}
-skills = client.list_skills()        # {"skills": [...]}
-client.update_skill("web-search", enabled=True)
-client.upload_files("thread-1", ["./report.pdf"])  # {"success": True, "files": [...]}
+```json
+{
+  "mcpServers": {
+    "github": {
+      "enabled": true,
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {"GITHUB_TOKEN": "$GITHUB_TOKEN"}
+    }
+  },
+  "skills": {
+    "pdf-processing": {"enabled": true}
+  }
+}
 ```
 
-All dict-returning methods are validated against Gateway Pydantic response models in CI (`TestGatewayConformance`), ensuring the embedded client stays in sync with the HTTP API schemas. See `backend/packages/harness/medrix_flow/client.py` for full API documentation.
+### 环境变量
 
-## Documentation
+- `MEDRIX_FLOW_CONFIG_PATH` - 覆盖 config.yaml 位置
+- `MEDRIX_FLOW_EXTENSIONS_CONFIG_PATH` - 覆盖 extensions_config.json 位置
+- 模型 API 密钥: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY` 等
+- 工具 API 密钥: `TAVILY_API_KEY`, `GITHUB_TOKEN` 等
 
-- [Contributing Guide](CONTRIBUTING.md) - Development environment setup and workflow
-- [Configuration Guide](backend/docs/CONFIGURATION.md) - Setup and configuration instructions
-- [Architecture Overview](backend/CLAUDE.md) - Technical architecture details
-- [Backend Architecture](backend/README.md) - Backend architecture and API reference
+---
 
-## Contributing
+## 🛠️ 技术栈
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, workflow, and guidelines.
+### 后端
+- **LangGraph** (1.0.6+) - 代理框架和多代理编排
+- **LangChain** (1.2.3+) - LLM 抽象和工具系统
+- **FastAPI** (0.115.0+) - 网关 REST API
+- **langchain-mcp-adapters** - Model Context Protocol 支持
+- **agent-sandbox** - 沙箱代码执行
+- **markitdown** - 多格式文档转换
+- **tavily-python** / **firecrawl-py** - 网页搜索和抓取
 
-Regression coverage includes Docker sandbox mode detection and provisioner kubeconfig-path handling tests in `backend/tests/`.
+### 前端
+- **Next.js 16** - React 框架 (App Router)
+- **React 19** - UI 库
+- **Tailwind CSS 4** - 样式框架
+- **Shadcn UI** - UI 组件库
+- **MagicUI** - 现代 UI 组件
+- **LangGraph SDK** - 代理交互
+- **Vercel AI Elements** - AI UI 元素
 
-## License
+---
 
-This project is open source and available under the [MIT License](./LICENSE).
+## 📖 文档
 
-## Acknowledgments
+- [配置指南](./backend/docs/CONFIGURATION.md)
+- [架构详解](./backend/docs/ARCHITECTURE.md)
+- [API 参考](./backend/docs/API.md)
+- [文件上传](./backend/docs/FILE_UPLOAD.md)
+- [路径示例](./backend/docs/PATH_EXAMPLES.md)
+- [上下文摘要](./backend/docs/summarization.md)
+- [计划模式](./backend/docs/plan_mode_usage.md)
+- [安装指南](./backend/docs/SETUP.md)
 
-MedrixFlow is built upon the incredible work of the open-source community. We are deeply grateful to all the projects and contributors whose efforts have made MedrixFlow possible. Truly, we stand on the shoulders of giants.
+---
 
-We would like to extend our sincere appreciation to the following projects for their invaluable contributions:
+## 🤝 贡献指南
 
-- **[LangChain](https://github.com/langchain-ai/langchain)**: Their exceptional framework powers our LLM interactions and chains, enabling seamless integration and functionality.
-- **[LangGraph](https://github.com/langchain-ai/langgraph)**: Their innovative approach to multi-agent orchestration has been instrumental in enabling MedrixFlow's sophisticated workflows.
+欢迎贡献！请阅读 [CONTRIBUTING.md](./CONTRIBUTING.md) 了解如何参与贡献。
 
-These projects exemplify the transformative power of open-source collaboration, and we are proud to build upon their foundations.
+---
 
-## Star History
+## 📄 许可证
 
-[![Star History Chart](https://api.star-history.com/svg?repos=your-org/medrix-flow&type=Date)](https://star-history.com/#your-org/medrix-flow&Date)
+MIT License - 查看 [LICENSE](./LICENSE) 文件了解更多详情。
+
+---
+
+## 🌟 鸣谢
+
+- [LangGraph](https://langchain-ai.github.io/langgraph/) - 强大的图状态机框架
+- [LangChain](https://www.langchain.com/) - LLM 应用开发框架
+- [Next.js](https://nextjs.org/) - React 元框架
+- 所有开源库的贡献者

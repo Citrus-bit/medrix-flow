@@ -231,6 +231,7 @@ export interface Translations {
     title: string;
     description: string;
     sections: {
+      setup: string;
       appearance: string;
       memory: string;
       tools: string;
@@ -311,5 +312,23 @@ export interface Translations {
       emptyTitle: string;
       emptyDescription: string;
     };
+  };
+
+  setup: {
+    title: string;
+    description: string;
+    modelsTitle: string;
+    modelsDescription: string;
+    toolKeysTitle: string;
+    toolKeysDescription: string;
+    addModel: string;
+    modelName: string;
+    displayName: string;
+    provider: string;
+    modelId: string;
+    testConnection: string;
+    saveAll: string;
+    saveSuccess: string;
+    noChanges: string;
   };
 }

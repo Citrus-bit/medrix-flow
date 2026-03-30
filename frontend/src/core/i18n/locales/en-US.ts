@@ -294,6 +294,7 @@ export const enUS: Translations = {
     title: "Settings",
     description: "Adjust how MedrixFlow looks and behaves for you.",
     sections: {
+      setup: "Setup",
       appearance: "Appearance",
       memory: "Memory",
       tools: "Tools",
@@ -380,5 +381,25 @@ export const enUS: Translations = {
       emptyTitle: "Acknowledgements",
       emptyDescription: "Credits and acknowledgements will show here.",
     },
+  },
+
+  setup: {
+    title: "Setup",
+    description: "Configure your LLM models and tool API keys.",
+    modelsTitle: "Model Configuration",
+    modelsDescription:
+      "Add and manage your LLM model providers. Each model needs a provider, model ID, and API key.",
+    toolKeysTitle: "Tool API Keys",
+    toolKeysDescription:
+      "Configure API keys for web search (Tavily) and web fetch (Jina) tools.",
+    addModel: "Add Model",
+    modelName: "Model Name",
+    displayName: "Display Name",
+    provider: "Provider",
+    modelId: "Model ID",
+    testConnection: "Test",
+    saveAll: "Save Configuration",
+    saveSuccess: "Configuration saved successfully.",
+    noChanges: "No unsaved changes.",
   },
 };
