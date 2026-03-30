@@ -223,21 +223,74 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 100);
-  --card: oklch(1 0 100);
-  --popover: oklch(1 0 100);
-  --popover-foreground: oklch(0.145 0 0);
-  --muted: oklch(0.97 8 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 8 0 0);
-  --accent-foreground: oklch(0.925 0 4);
-  --accent: oklch(0.97 8 0 0);
-  --sidebar-accent: oklch(0.925 0 4);
-  --sidebar-accent-foreground: oklch(0.925 0 4);
-  --sidebar-border: oklch(1 0 100);
-  --sidebar-ring: oklch(0.556 0 0);
+  --radius: 0.75rem;
+  /* MedrixFlow Medical Teal Theme */
+  --background: #f8fffe;
+  --foreground: #0f2b2e;
+  --card: #ffffff;
+  --card-foreground: #0f2b2e;
+  --popover: #ffffff;
+  --popover-foreground: #0f2b2e;
+  --primary: #0891b2;
+  --primary-foreground: #ffffff;
+  --secondary: #e0f7fa;
+  --secondary-foreground: #0e4a5a;
+  --muted: #eef8f9;
+  --muted-foreground: #4a7c82;
+  --accent: #e0f7fa;
+  --accent-foreground: #0e4a5a;
+  --destructive: #ef4444;
+  --border: #c8e6e9;
+  --input: #c8e6e9;
+  --ring: #0891b2;
+  --chart-1: #0891b2;
+  --chart-2: #22d3ee;
+  --chart-3: #06b6d4;
+  --chart-4: #14b8a6;
+  --chart-5: #10b981;
+  --sidebar: #f0fafb;
+  --sidebar-foreground: #0f2b2e;
+  --sidebar-primary: #0891b2;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ddf3f5;
+  --sidebar-accent-foreground: #0e4a5a;
+  --sidebar-border: #d1ecef;
+  --sidebar-ring: #0891b2;
   font-weight: 300;
+}
+
+.dark {
+  --background: #0b1e21;
+  --foreground: #e0f2f4;
+  --card: #0f2930;
+  --card-foreground: #e0f2f4;
+  --popover: #0f2930;
+  --popover-foreground: #e0f2f4;
+  --primary: #22d3ee;
+  --primary-foreground: #082f35;
+  --secondary: #132e33;
+  --secondary-foreground: #a7dbe3;
+  --muted: #132e33;
+  --muted-foreground: #7eb8c2;
+  --accent: #132e33;
+  --accent-foreground: #a7dbe3;
+  --destructive: #ef4444;
+  --border: #1c3f45;
+  --input: #1c3f45;
+  --ring: #22d3ee;
+  --chart-1: #22d3ee;
+  --chart-2: #06b6d4;
+  --chart-3: #14b8a6;
+  --chart-4: #10b981;
+  --chart-5: #34d399;
+  --sidebar: #0a1a1d;
+  --sidebar-foreground: #e0f2f4;
+  --sidebar-primary: #22d3ee;
+  --sidebar-primary-foreground: #082f35;
+  --sidebar-accent: #132e33;
+  --sidebar-accent-foreground: #a7dbe3;
+  --sidebar-border: #1c3f45;
+  --sidebar-ring: #22d3ee;
 }
 
 @layer base {
@@ -279,16 +332,16 @@
     top: 0;
     background: linear-gradient(
       45deg,
-      #fb0094,
-      #0000ff,
-      #00ff00,
-      #ffff00,
-      #ff0000,
-      #fb0094,
-      #0000ff,
-      #00ff00,
-      #ffff00,
-      #ff0000
+      #0891b2,
+      #06b6d4,
+      #22d3ee,
+      #14b8a6,
+      #10b981,
+      #0891b2,
+      #06b6d4,
+      #22d3ee,
+      #14b8a6,
+      #10b981
     );
     background-size: 400%;
     width: 100%;
@@ -324,11 +377,19 @@
   }
 
   .golden-text {
-    background: linear-gradient(135deg, #d19e1d 0%, #e9c665 50%, #e3a812 100%);
+    background: linear-gradient(135deg, #0891b2 0%, #22d3ee 50%, #06b6d4 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
     text-fill-color: transparent;
+  }
+
+  .medrix-gradient {
+    background: linear-gradient(135deg, #0891b2 0%, #06b6d4 40%, #14b8a6 100%);
+  }
+
+  .medrix-glow {
+    box-shadow: 0 0 20px rgba(8, 145, 178, 0.15), 0 0 40px rgba(8, 145, 178, 0.05);
   }
 }
 

@@ -8,15 +8,17 @@ export function Header() {
   return (
     <header className="container-md fixed top-0 right-0 left-0 z-20 mx-auto flex h-16 items-center justify-between backdrop-blur-xs">
       <div className="flex items-center gap-2">
-        <a href="https://github.com/bytedance/medrix-flow" target="_blank">
-          <h1 className="font-serif text-xl">MedrixFlow</h1>
+        <a href="https://github.com/Citrus-bit/medrix-flow" target="_blank">
+          <h1 className="bg-gradient-to-r from-[#0891b2] to-[#14b8a6] bg-clip-text text-xl font-semibold tracking-tight text-transparent">
+            MedrixFlow
+          </h1>
         </a>
       </div>
       <div className="relative">
         <div
           className="pointer-events-none absolute inset-0 z-0 h-full w-full rounded-full opacity-30 blur-2xl"
           style={{
-            background: "linear-gradient(90deg, #ff80b5 0%, #9089fc 100%)",
+            background: "linear-gradient(90deg, #0891b2 0%, #14b8a6 100%)",
             filter: "blur(16px)",
           }}
         />
@@ -26,7 +28,7 @@ export function Header() {
           asChild
           className="group relative z-10"
         >
-          <a href="https://github.com/bytedance/medrix-flow" target="_blank">
+          <a href="https://github.com/Citrus-bit/medrix-flow" target="_blank">
             <GitHubLogoIcon className="size-4" />
             Star on GitHub
             {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" &&
@@ -40,11 +42,11 @@ export function Header() {
 }
 
 async function StarCounter() {
-  let stars = 10000; // Default value
+  let stars = 10000;
 
   try {
     const response = await fetch(
-      "https://api.github.com/repos/bytedance/medrix-flow",
+      "https://api.github.com/repos/Citrus-bit/medrix-flow",
       {
         headers: env.GITHUB_OAUTH_TOKEN
           ? {
@@ -60,7 +62,7 @@ async function StarCounter() {
 
     if (response.ok) {
       const data = await response.json();
-      stars = data.stargazers_count ?? stars; // Update stars if API response is valid
+      stars = data.stargazers_count ?? stars;
     }
   } catch (error) {
     console.error("Error fetching GitHub stars:", error);

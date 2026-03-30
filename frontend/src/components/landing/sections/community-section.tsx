@@ -12,7 +12,7 @@ export function CommunitySection() {
   return (
     <Section
       title={
-        <AuroraText colors={["#60A5FA", "#A5FA60", "#A560FA"]}>
+        <AuroraText colors={["#0891b2", "#22d3ee", "#14b8a6"]}>
           Join the Community
         </AuroraText>
       }
@@ -20,7 +20,7 @@ export function CommunitySection() {
     >
       <div className="flex justify-center">
         <Button className="text-xl" size="lg" asChild>
-          <Link href="https://github.com/bytedance/medrix-flow" target="_blank">
+          <Link href="https://github.com/Citrus-bit/medrix-flow" target="_blank">
             <GitHubLogoIcon />
             Contribute Now
           </Link>

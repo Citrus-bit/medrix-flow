@@ -21,14 +21,14 @@ export function WorkspaceSidebar({
   return (
     <>
       <Sidebar variant="sidebar" collapsible="icon" {...props}>
-        <SidebarHeader className="py-0">
+        <SidebarHeader className="border-b border-[var(--sidebar-border)] py-0">
           <WorkspaceHeader />
         </SidebarHeader>
-        <SidebarContent>
+        <SidebarContent className="px-1">
           <WorkspaceNavChatList />
           {isSidebarOpen && <RecentChatList />}
         </SidebarContent>
-        <SidebarFooter>
+        <SidebarFooter className="border-t border-[var(--sidebar-border)]">
           <WorkspaceNavMenu />
         </SidebarFooter>
         <SidebarRail />

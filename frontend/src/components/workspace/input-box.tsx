@@ -375,7 +375,7 @@ export function InputBox({
     <div ref={promptRootRef} className="relative">
       <PromptInput
         className={cn(
-          "bg-background/85 rounded-2xl backdrop-blur-sm transition-all duration-300 ease-out *:data-[slot='input-group']:rounded-2xl",
+          "bg-background/90 rounded-2xl border border-[#c8e6e9] shadow-sm backdrop-blur-sm transition-all duration-300 ease-out focus-within:border-[#0891b2]/40 focus-within:shadow-[0_0_0_3px_rgba(8,145,178,0.08)] *:data-[slot='input-group']:rounded-2xl",
           className,
         )}
         disabled={disabled}
@@ -436,7 +436,7 @@ export function InputBox({
                     <GraduationCapIcon className="size-3" />
                   )}
                   {context.mode === "ultra" && (
-                    <RocketIcon className="size-3 text-[#dabb5e]" />
+                    <RocketIcon className="size-3 text-[#0891b2]" />
                   )}
                 </div>
                 <div
@@ -557,9 +557,9 @@ export function InputBox({
                     <div className="flex flex-col gap-2">
                       <div className="flex items-center gap-1 font-bold">
                         <RocketIcon
-                          className={cn(
-                            "mr-2 size-4",
-                            context.mode === "ultra" && "text-[#dabb5e]",
+                         className={cn(
+                             "mr-2 size-4",
+                             context.mode === "ultra" && "text-[#0891b2]",
                           )}
                         />
                         <div
