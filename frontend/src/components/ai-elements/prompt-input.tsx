@@ -829,11 +829,15 @@ export const PromptInputTextarea = ({
 }: PromptInputTextareaProps) => {
   const controller = useOptionalPromptInputController();
   const attachments = usePromptInputAttachments();
-  const [isComposing, setIsComposing] = useState(false);
+  // Use ref for IME composing state to handle Chrome's event ordering
+  // where compositionend fires BEFORE keydown when pressing Enter to
+  // confirm text in Chinese IME. A ref with delayed reset ensures the
+  // flag is still true when the subsequent keydown event fires.
+  const isComposingRef = useRef(false);
 
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
     if (e.key === "Enter") {
-      if (isComposing || e.nativeEvent.isComposing) {
+      if (isComposingRef.current || e.nativeEvent.isComposing) {
         return;
       }
       if (e.shiftKey) {
@@ -907,8 +911,14 @@ export const PromptInputTextarea = ({
     <InputGroupTextarea
       className={cn("field-sizing-content max-h-48 min-h-16", className)}
       name="message"
-      onCompositionEnd={() => setIsComposing(false)}
-      onCompositionStart={() => setIsComposing(true)}
+      onCompositionEnd={() => {
+        setTimeout(() => {
+          isComposingRef.current = false;
+        }, 0);
+      }}
+      onCompositionStart={() => {
+        isComposingRef.current = true;
+      }}
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
       placeholder={placeholder}
