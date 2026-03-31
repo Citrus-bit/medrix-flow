@@ -1,5 +1,6 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import {
   BellIcon,
   InfoIcon,
@@ -9,7 +10,7 @@ import {
   SparklesIcon,
   WrenchIcon,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   Dialog,
@@ -26,6 +27,10 @@ import { SetupSettingsPage } from "@/components/workspace/settings/setup-setting
 import { SkillSettingsPage } from "@/components/workspace/settings/skill-settings-page";
 import { ToolSettingsPage } from "@/components/workspace/settings/tool-settings-page";
 import { useI18n } from "@/core/i18n/hooks";
+import { mcpConfigQueryOptions } from "@/core/mcp/hooks";
+import { memoryQueryOptions } from "@/core/memory/hooks";
+import { setupQueryOptions } from "@/core/setup/hooks";
+import { skillsQueryOptions } from "@/core/skills/hooks";
 import { cn } from "@/lib/utils";
 
 type SettingsSection =
@@ -44,16 +49,24 @@ type SettingsDialogProps = React.ComponentProps<typeof Dialog> & {
 export function SettingsDialog(props: SettingsDialogProps) {
   const { defaultSection = "setup", ...dialogProps } = props;
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [activeSection, setActiveSection] =
     useState<SettingsSection>(defaultSection);
+  const prefetchedRef = useRef(false);
 
   useEffect(() => {
-    // When opening the dialog, ensure the active section follows the caller's intent.
-    // This allows triggers like "About" to open the dialog directly on that page.
     if (dialogProps.open) {
       setActiveSection(defaultSection);
+
+      if (!prefetchedRef.current) {
+        prefetchedRef.current = true;
+        void queryClient.prefetchQuery(setupQueryOptions);
+        void queryClient.prefetchQuery(mcpConfigQueryOptions);
+        void queryClient.prefetchQuery(skillsQueryOptions);
+        void queryClient.prefetchQuery(memoryQueryOptions);
+      }
     }
-  }, [defaultSection, dialogProps.open]);
+  }, [defaultSection, dialogProps.open, queryClient]);
 
   const sections = useMemo(
     () => [

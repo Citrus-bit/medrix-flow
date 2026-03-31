@@ -1,3 +1,4 @@
+import { fetchWithTimeout } from "@/core/api/fetch";
 import { getBackendBaseURL } from "@/core/config";
 
 import type {
@@ -11,13 +12,13 @@ import type {
 const base = () => getBackendBaseURL();
 
 export async function loadSetupConfig(): Promise<SetupConfig> {
-  const res = await fetch(`${base()}/api/setup/config`);
+  const res = await fetchWithTimeout(`${base()}/api/setup/config`);
   if (!res.ok) throw new Error(`Failed to load setup config: ${res.status}`);
   return res.json() as Promise<SetupConfig>;
 }
 
 export async function saveSetupModels(req: SaveModelsRequest): Promise<{ success: boolean; message: string }> {
-  const res = await fetch(`${base()}/api/setup/models`, {
+  const res = await fetchWithTimeout(`${base()}/api/setup/models`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
@@ -27,20 +28,22 @@ export async function saveSetupModels(req: SaveModelsRequest): Promise<{ success
 }
 
 export async function testModel(req: TestModelRequest): Promise<TestResult> {
-  const res = await fetch(`${base()}/api/setup/test-model`, {
+  const res = await fetchWithTimeout(`${base()}/api/setup/test-model`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
+    timeoutMs: 30_000,
   });
   if (!res.ok) throw new Error(`Test request failed: ${res.status}`);
   return res.json() as Promise<TestResult>;
 }
 
 export async function testToolKey(req: TestToolKeyRequest): Promise<TestResult> {
-  const res = await fetch(`${base()}/api/setup/test-tool-key`, {
+  const res = await fetchWithTimeout(`${base()}/api/setup/test-tool-key`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
+    timeoutMs: 30_000,
   });
   if (!res.ok) throw new Error(`Test request failed: ${res.status}`);
   return res.json() as Promise<TestResult>;

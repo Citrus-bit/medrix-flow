@@ -2,6 +2,7 @@
 
 import { Streamdown } from "streamdown";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/core/i18n/hooks";
 import { useMemory } from "@/core/memory/hooks";
 import type { UserMemory } from "@/core/memory/types";
@@ -9,6 +10,7 @@ import { streamdownPlugins } from "@/core/streamdown/plugins";
 import { pathOfThread } from "@/core/threads/utils";
 import { formatTimeAgo } from "@/core/utils/datetime";
 
+import { SettingsErrorState } from "./settings-error-state";
 import { SettingsSection } from "./settings-section";
 
 function confidenceToLevelKey(confidence: unknown): {
@@ -157,16 +159,22 @@ function memoryToMarkdown(
 
 export function MemorySettingsPage() {
   const { t } = useI18n();
-  const { memory, isLoading, error } = useMemory();
+  const { memory, isLoading, error, refetch } = useMemory();
   return (
     <SettingsSection
       title={t.settings.memory.title}
       description={t.settings.memory.description}
     >
       {isLoading ? (
-        <div className="text-muted-foreground text-sm">{t.common.loading}</div>
+        <div className="space-y-4 rounded-lg border p-4">
+          <Skeleton className="h-5 w-40 rounded" />
+          <Skeleton className="h-3 w-64 rounded" />
+          <Skeleton className="h-24 w-full rounded" />
+          <Skeleton className="h-5 w-32 rounded" />
+          <Skeleton className="h-16 w-full rounded" />
+        </div>
       ) : error ? (
-        <div>Error: {error.message}</div>
+        <SettingsErrorState error={error} onRetry={() => void refetch()} />
       ) : !memory ? (
         <div className="text-muted-foreground text-sm">
           {t.settings.memory.empty}

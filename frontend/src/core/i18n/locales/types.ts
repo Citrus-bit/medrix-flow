@@ -36,6 +36,9 @@ export interface Translations {
     exportAsMarkdown: string;
     exportAsJSON: string;
     exportSuccess: string;
+    backendUnavailable: string;
+    backendUnavailableHint: string;
+    retryNow: string;
   };
 
   // Welcome

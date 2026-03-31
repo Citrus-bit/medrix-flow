@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from app.gateway.path_utils import resolve_thread_virtual_path
 from medrix_flow.config.extensions_config import ExtensionsConfig, SkillStateConfig, get_extensions_config, reload_extensions_config
-from medrix_flow.skills import Skill, load_skills
+from medrix_flow.skills import Skill, invalidate_skills_cache, load_skills
 from medrix_flow.skills.loader import get_skills_root_path
 from medrix_flow.skills.validation import _validate_skill_frontmatter
 
@@ -314,6 +314,8 @@ async def update_skill(skill_name: str, request: SkillUpdateRequest) -> SkillRes
 
         # Reload the extensions config to update the global cache
         reload_extensions_config()
+
+        invalidate_skills_cache()
 
         # Reload the skills to get the updated status (for API response)
         skills = load_skills(enabled_only=False)

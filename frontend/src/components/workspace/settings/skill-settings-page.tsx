@@ -20,6 +20,7 @@ import {
   ItemContent,
   ItemDescription,
 } from "@/components/ui/item";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useI18n } from "@/core/i18n/hooks";
@@ -27,20 +28,35 @@ import { useEnableSkill, useSkills } from "@/core/skills/hooks";
 import type { Skill } from "@/core/skills/type";
 import { env } from "@/env";
 
+import { SettingsErrorState } from "./settings-error-state";
 import { SettingsSection } from "./settings-section";
 
 export function SkillSettingsPage({ onClose }: { onClose?: () => void } = {}) {
   const { t } = useI18n();
-  const { skills, isLoading, error } = useSkills();
+  const { skills, isLoading, error, refetch } = useSkills();
   return (
     <SettingsSection
       title={t.settings.skills.title}
       description={t.settings.skills.description}
     >
       {isLoading ? (
-        <div className="text-muted-foreground text-sm">{t.common.loading}</div>
+        <div className="space-y-4">
+          <div className="flex justify-between">
+            <Skeleton className="h-8 w-40 rounded" />
+            <Skeleton className="h-8 w-28 rounded" />
+          </div>
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-4 rounded-lg border p-4">
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-36 rounded" />
+                <Skeleton className="h-3 w-72 rounded" />
+              </div>
+              <Skeleton className="h-5 w-9 rounded-full" />
+            </div>
+          ))}
+        </div>
       ) : error ? (
-        <div>Error: {error.message}</div>
+        <SettingsErrorState error={error} onRetry={() => void refetch()} />
       ) : (
         <SkillSettingsList skills={skills} onClose={onClose} />
       )}

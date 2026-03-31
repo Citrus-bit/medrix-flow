@@ -14,14 +14,17 @@ import type {
 
 const SETUP_QUERY_KEY = ["setupConfig"] as const;
 
+export const setupQueryOptions = {
+  queryKey: SETUP_QUERY_KEY,
+  queryFn: loadSetupConfig,
+  staleTime: 30_000,
+  refetchOnWindowFocus: false,
+  retry: 2,
+  retryDelay: 1_000,
+} as const;
+
 export function useSetupConfig() {
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: SETUP_QUERY_KEY,
-    queryFn: loadSetupConfig,
-    refetchOnWindowFocus: false,
-    retry: 2,
-    retryDelay: 3000,
-  });
+  const { data, isLoading, error, refetch } = useQuery(setupQueryOptions);
   return { config: data, isLoading, error, refetch };
 }
 

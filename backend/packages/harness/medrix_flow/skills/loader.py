@@ -19,6 +19,67 @@ def get_skills_root_path() -> Path:
     return skills_dir
 
 
+class _SkillsCache:
+    """Mtime-based cache: skip filesystem walk when nothing changed."""
+
+    def __init__(self) -> None:
+        self._mtime_snapshot: dict[str, float] = {}
+        self._cached_skills: list[Skill] = []
+
+    def _collect_mtimes(self, skills_path: Path) -> dict[str, float]:
+        mtimes: dict[str, float] = {}
+        for category in ["public", "custom"]:
+            category_path = skills_path / category
+            if not category_path.exists():
+                continue
+            try:
+                mtimes[str(category_path)] = category_path.stat().st_mtime
+            except OSError:
+                continue
+            for current_root, dir_names, file_names in os.walk(category_path):
+                dir_names[:] = sorted(name for name in dir_names if not name.startswith("."))
+                if "SKILL.md" in file_names:
+                    p = os.path.join(current_root, "SKILL.md")
+                    try:
+                        mtimes[p] = os.stat(p).st_mtime
+                    except OSError:
+                        continue
+        ext_path = self._extensions_config_path()
+        if ext_path and ext_path.exists():
+            try:
+                mtimes[str(ext_path)] = ext_path.stat().st_mtime
+            except OSError:
+                pass
+        return mtimes
+
+    @staticmethod
+    def _extensions_config_path() -> Path | None:
+        from medrix_flow.config.extensions_config import ExtensionsConfig
+
+        return ExtensionsConfig.resolve_config_path()
+
+    def get(self, skills_path: Path) -> list[Skill] | None:
+        mtimes = self._collect_mtimes(skills_path)
+        if mtimes == self._mtime_snapshot and self._cached_skills:
+            return self._cached_skills
+        return None
+
+    def put(self, skills_path: Path, skills: list[Skill]) -> None:
+        self._mtime_snapshot = self._collect_mtimes(skills_path)
+        self._cached_skills = skills
+
+    def invalidate(self) -> None:
+        self._mtime_snapshot = {}
+        self._cached_skills = []
+
+
+_skills_cache = _SkillsCache()
+
+
+def invalidate_skills_cache() -> None:
+    _skills_cache.invalidate()
+
+
 def load_skills(skills_path: Path | None = None, use_config: bool = True, enabled_only: bool = False) -> list[Skill]:
     """
     Load all skills from the skills directory.
@@ -51,6 +112,12 @@ def load_skills(skills_path: Path | None = None, use_config: bool = True, enable
 
     if not skills_path.exists():
         return []
+
+    cached = _skills_cache.get(skills_path)
+    if cached is not None:
+        if enabled_only:
+            return [skill for skill in cached if skill.enabled]
+        return list(cached)
 
     skills = []
 
@@ -88,11 +155,13 @@ def load_skills(skills_path: Path | None = None, use_config: bool = True, enable
         # If config loading fails, default to all enabled
         print(f"Warning: Failed to load extensions config: {e}")
 
-    # Filter by enabled status if requested
-    if enabled_only:
-        skills = [skill for skill in skills if skill.enabled]
-
     # Sort by name for consistent ordering
     skills.sort(key=lambda s: s.name)
 
-    return skills
+    _skills_cache.put(skills_path, skills)
+
+    # Filter by enabled status if requested
+    if enabled_only:
+        return [skill for skill in skills if skill.enabled]
+
+    return list(skills)

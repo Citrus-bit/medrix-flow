@@ -4,12 +4,17 @@ import { enableSkill } from "./api";
 
 import { loadSkills } from ".";
 
+export const skillsQueryOptions = {
+  queryKey: ["skills"],
+  queryFn: () => loadSkills(),
+  staleTime: 30_000,
+  retry: 2,
+  retryDelay: 1_000,
+} as const;
+
 export function useSkills() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["skills"],
-    queryFn: () => loadSkills(),
-  });
-  return { skills: data ?? [], isLoading, error };
+  const { data, isLoading, error, refetch } = useQuery(skillsQueryOptions);
+  return { skills: data ?? [], isLoading, error, refetch };
 }
 
 export function useEnableSkill() {

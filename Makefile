@@ -108,10 +108,12 @@ stop:
 	@-pkill -f "next dev" 2>/dev/null || true
 	@-pkill -f "next start" 2>/dev/null || true
 	@-pkill -f "next-server" 2>/dev/null || true
-	@-pkill -f "next-server" 2>/dev/null || true
 	@-nginx -c $(PWD)/docker/nginx/nginx.local.conf -p $(PWD) -s quit 2>/dev/null || true
 	@sleep 1
 	@-pkill -9 nginx 2>/dev/null || true
+	@-lsof -ti :2024 | xargs kill -9 2>/dev/null || true
+	@-lsof -ti :8001 | xargs kill -9 2>/dev/null || true
+	@-lsof -ti :3000 | xargs kill -9 2>/dev/null || true
 	@echo "Cleaning up sandbox containers..."
 	@-./scripts/cleanup-containers.sh medrix-flow-sandbox 2>/dev/null || true
 	@echo "✓ All services stopped"

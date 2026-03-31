@@ -47,6 +47,9 @@ export const zhCN: Translations = {
     exportAsMarkdown: "导出为 Markdown",
     exportAsJSON: "导出为 JSON",
     exportSuccess: "对话已导出",
+    backendUnavailable: "无法连接后端服务",
+    backendUnavailableHint: "请点击重试。如问题持续，请在终端执行：make stop && make dev",
+    retryNow: "重试",
   },
 
   // Welcome

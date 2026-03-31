@@ -47,6 +47,9 @@ export const enUS: Translations = {
     exportAsMarkdown: "Export as Markdown",
     exportAsJSON: "Export as JSON",
     exportSuccess: "Conversation exported",
+    backendUnavailable: "Cannot connect to the backend service",
+    backendUnavailableHint: "Try clicking Retry. If the problem persists, restart the server with: make stop && make dev",
+    retryNow: "Retry",
   },
 
   // Welcome

@@ -155,6 +155,18 @@ function MessageContent_({
       <RichFilesList files={files} threadId={thread_id} />
     ) : null;
 
+  // Optimistic thinking state: show Reasoning block with elapsed timer
+  if (message.additional_kwargs?._thinking) {
+    return (
+      <AIElementMessageContent className={className}>
+        <Reasoning isStreaming={true}>
+          <ReasoningTrigger />
+          <ReasoningContent>{""}</ReasoningContent>
+        </Reasoning>
+      </AIElementMessageContent>
+    );
+  }
+
   // Uploading state: mock AI message shown while files upload
   if (message.additional_kwargs?.element === "task") {
     return (

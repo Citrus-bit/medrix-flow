@@ -2,12 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { loadMCPConfig, updateMCPConfig } from "./api";
 
+export const mcpConfigQueryOptions = {
+  queryKey: ["mcpConfig"],
+  queryFn: () => loadMCPConfig(),
+  staleTime: 30_000,
+  retry: 2,
+  retryDelay: 1_000,
+} as const;
+
 export function useMCPConfig() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["mcpConfig"],
-    queryFn: () => loadMCPConfig(),
-  });
-  return { config: data, isLoading, error };
+  const { data, isLoading, error, refetch } = useQuery(mcpConfigQueryOptions);
+  return { config: data, isLoading, error, refetch };
 }
 
 export function useEnableMCPServer() {

@@ -119,6 +119,29 @@ export function useThreadStream({
     onCreated(meta) {
       handleStreamStart(meta.thread_id);
       setOnStreamThreadId(meta.thread_id);
+      // Optimistically add the new thread to the sidebar list so it's visible
+      // immediately, even before the backend's threads.search returns it.
+      queryClient.setQueriesData(
+        { queryKey: ["threads", "search"], exact: false },
+        (oldData: Array<AgentThread> | undefined) => {
+          if (!oldData) return oldData;
+          // Avoid duplicates
+          if (oldData.some((t) => t.thread_id === meta.thread_id)) {
+            return oldData;
+          }
+          const optimisticThread: AgentThread = {
+            thread_id: meta.thread_id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            state_updated_at: new Date().toISOString(),
+            metadata: {},
+            status: "busy",
+            values: { title: "", messages: [], artifacts: [] },
+            interrupts: {},
+          };
+          return [optimisticThread, ...oldData];
+        },
+      );
     },
     onLangChainEvent(event) {
       if (event.event === "on_tool_end") {
@@ -188,12 +211,25 @@ export function useThreadStream({
   const sendInFlightRef = useRef(false);
   const prevMsgCountRef = useRef(thread.messages.length);
 
-  // Clear isSubmitting when the stream actually starts loading
   useEffect(() => {
     if (thread.isLoading) {
       setIsSubmitting(false);
     }
   }, [thread.isLoading]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void queryClient.invalidateQueries({
+          queryKey: ["threads", "search"],
+        });
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [queryClient]);
 
   // Clear optimistic when server messages arrive (count increases)
   useEffect(() => {
@@ -256,7 +292,7 @@ export function useThreadStream({
           type: "ai",
           id: `opt-ai-thinking-${Date.now()}`,
           content: t.common.thinking,
-          additional_kwargs: { element: "task", _thinking: true },
+          additional_kwargs: { _thinking: true },
         });
       }
 
@@ -434,7 +470,7 @@ export function useThreads(
     limit: 50,
     sortBy: "updated_at",
     sortOrder: "desc",
-    select: ["thread_id", "updated_at", "values"],
+    select: ["thread_id", "updated_at", "values", "status"],
   },
 ) {
   const apiClient = getAPIClient();
@@ -491,7 +527,8 @@ export function useThreads(
 
       return threads;
     },
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    staleTime: 30_000,
   });
 }
 

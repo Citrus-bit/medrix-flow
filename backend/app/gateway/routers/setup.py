@@ -11,10 +11,9 @@ from pathlib import Path
 
 import yaml
 from dotenv import load_dotenv, set_key
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from medrix_flow.config import get_app_config
 from medrix_flow.config.app_config import AppConfig, reload_app_config
 
 logger = logging.getLogger(__name__)
@@ -143,7 +142,6 @@ class TestResult(BaseModel):
     description="Read current model configs and tool API key status.",
 )
 async def get_setup_config() -> SetupConfigResponse:
-    _refresh_env()
     raw = _read_raw_config()
     models_raw: list[dict] = raw.get("models") or []
 
