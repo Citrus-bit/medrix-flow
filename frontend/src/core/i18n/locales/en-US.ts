@@ -388,18 +388,19 @@ export const enUS: Translations = {
     description: "Configure your LLM models and tool API keys.",
     modelsTitle: "Model Configuration",
     modelsDescription:
-      "Add and manage your LLM model providers. Each model needs a provider, model ID, and API key.",
+      "Add and manage your LLM model providers. Each model needs a provider, model name, and API key.",
     toolKeysTitle: "Tool API Keys",
     toolKeysDescription:
       "Configure API keys for web search (Tavily) and web fetch (Jina) tools.",
     addModel: "Add Model",
-    modelName: "Model Name",
-    displayName: "Display Name",
+    model: "Model",
     provider: "Provider",
-    modelId: "Model ID",
     testConnection: "Test",
     saveAll: "Save Configuration",
     saveSuccess: "Configuration saved successfully.",
     noChanges: "No unsaved changes.",
+    loadingSlow: "Loading is taking longer than expected",
+    loadingSlowHint: "The backend service may still be starting up. You can wait or try again.",
+    retry: "Retry",
   },
 };

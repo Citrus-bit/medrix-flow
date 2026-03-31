@@ -15,12 +15,14 @@ import type {
 const SETUP_QUERY_KEY = ["setupConfig"] as const;
 
 export function useSetupConfig() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: SETUP_QUERY_KEY,
     queryFn: loadSetupConfig,
     refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: 3000,
   });
-  return { config: data, isLoading, error };
+  return { config: data, isLoading, error, refetch };
 }
 
 export function useSaveSetup() {

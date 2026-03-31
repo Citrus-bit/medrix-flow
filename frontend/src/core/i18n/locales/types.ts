@@ -322,13 +322,14 @@ export interface Translations {
     toolKeysTitle: string;
     toolKeysDescription: string;
     addModel: string;
-    modelName: string;
-    displayName: string;
+    model: string;
     provider: string;
-    modelId: string;
     testConnection: string;
     saveAll: string;
     saveSuccess: string;
     noChanges: string;
+    loadingSlow: string;
+    loadingSlowHint: string;
+    retry: string;
   };
 }

@@ -84,104 +84,54 @@ MedrixFlow 是一个基于 LangGraph 构建的 AI 超级代理系统，具有沙
 
 ## 🚀 快速开始
 
-### 前置要求
+只需 4 步即可运行 MedrixFlow，**无需手动编辑任何配置文件**。
 
-**后端:**
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/) 包管理器
-- 你所选 LLM 提供商的 API 密钥
+### 1. 安装前置工具
 
-**前端:**
-- Node.js 22+
-- pnpm 10.26.2+
+| 工具 | 版本要求 | 安装方式 |
+|------|---------|---------|
+| Python | 3.12+ | [python.org](https://www.python.org/) |
+| uv | 最新版 | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| Node.js | 22+ | [nodejs.org](https://nodejs.org/) |
+| pnpm | 10+ | `npm install -g pnpm` |
+| nginx | - | macOS: `brew install nginx`，Linux: `sudo apt install nginx` |
 
-### 安装
+### 2. 克隆 & 安装依赖
 
 ```bash
-# 1. 克隆项目
-git clone https://github.com/your-username/medrix-flow.git
+git clone https://github.com/Citrus-bit/medrix-flow.git
 cd medrix-flow
-
-# 2. 复制配置文件
-cp config.example.yaml config.yaml
-
-# 3. 安装后端依赖
-cd backend
-make install
-
-# 4. 安装前端依赖 (新开终端)
-cd ../frontend
-pnpm install
-
-# 5. 复制前端环境变量
-cp .env.example .env
+make config    # 自动生成配置文件（首次运行）
+make install   # 一键安装前后端依赖
 ```
 
-### 配置
-
-编辑项目根目录下的 `config.yaml`:
-
-```yaml
-models:
-  - name: gpt-4o
-    display_name: GPT-4o
-    use: langchain_openai:ChatOpenAI
-    model: gpt-4o
-    api_key: $OPENAI_API_KEY
-    supports_thinking: false
-    supports_vision: true
-
-  - name: claude-sonnet-4
-    display_name: Claude Sonnet 4
-    use: langchain_anthropic:ChatAnthropic
-    model: claude-sonnet-4-20250514
-    api_key: $ANTHROPIC_API_KEY
-    supports_thinking: true
-    supports_vision: true
-```
-
-设置你的 API 密钥:
+### 3. 启动
 
 ```bash
-# 在 ~/.bashrc 或 ~/.zshrc 中添加
-export OPENAI_API_KEY="your-api-key-here"
-export ANTHROPIC_API_KEY="your-anthropic-key-here"
-
-# 然后重新加载
-source ~/.bashrc  # 或 source ~/.zshrc
+make stop && make dev       # 启动所有服务（LangGraph + 网关 + 前端 + Nginx）
 ```
 
-### 运行
+启动完成后，浏览器会自动打开 **http://localhost:1000**。
 
-**完整应用** (从项目根目录):
+### 4. 配置模型 & API 密钥
 
-```bash
-make dev  # 启动 LangGraph + 网关 + 前端 + Nginx
-```
+首次打开页面时，设置面板会自动弹出，引导你完成配置：
 
-访问地址: http://localhost:1000
+1. 在「配置」页面添加你的 LLM 模型（支持 OpenAI、Anthropic、Google Gemini、DeepSeek 等）
+2. 填入模型 API Key，点击「测试」验证连通性
+3. 如需网页搜索/抓取功能，填入 Tavily / Jina 的 API Key
+4. 点击「保存配置」—— 完成！
 
-**分别启动各组件:**
+> 你也可以随时通过左下角的「设置和更多」→「设置」重新打开配置面板。
 
-```bash
-# 后端 - LangGraph 服务器 (终端 1)
-cd backend
-make dev
+### 常用命令
 
-# 后端 - 网关 API (终端 2)
-cd backend
-make gateway
-
-# 前端 (终端 3)
-cd frontend
-pnpm dev
-```
-
-直接访问:
-- 主应用: http://localhost:1000
-- LangGraph: http://localhost:2024
-- 网关: http://localhost:8001
-- 前端: http://localhost:3000
+| 命令 | 说明 |
+|------|------|
+| `make dev` | 启动所有服务（开发模式，支持热重载） |
+| `make stop` | 停止所有服务 |
+| `make check` | 检查前置工具是否已安装 |
+| `make clean` | 停止服务并清理临时文件 |
 
 ---
 
@@ -238,9 +188,19 @@ medrix-flow/
 
 ## ⚙️ 配置说明
 
-### 主配置文件 (`config.yaml`)
+### 前端配置（推荐）
 
-放置在项目根目录。以 `$` 开头的配置值会解析为环境变量。
+MedrixFlow 支持通过 Web 界面直接管理模型和 API 密钥，无需手动编辑配置文件：
+
+- **模型配置**：添加/编辑/删除 LLM 模型，支持一键测试连通性
+- **工具 API Key**：配置 Tavily（网页搜索）和 Jina（网页抓取）的密钥
+- **保存即生效**：所有更改自动持久化到 `config.yaml` 和 `.env`，服务自动热重载
+
+打开方式：左下角「设置和更多」→「设置」→「配置」标签页。
+
+### 手动配置（高级用户）
+
+如需更精细的控制，可以直接编辑项目根目录下的 `config.yaml`：
 
 主要配置项:
 - `models` - LLM 模型配置 (类路径、API 密钥、思考/视觉支持)

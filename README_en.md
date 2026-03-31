@@ -84,104 +84,54 @@ MedrixFlow is a LangGraph-based AI super agent system with sandbox execution, pe
 
 ## 🚀 Quick Start
 
-### Prerequisites
+Get MedrixFlow running in 4 steps — **no manual config file editing required**.
 
-**Backend:**
-- Python 3.12+
-- [uv](https://docs.astral.sh/uv/) package manager
-- API keys for your chosen LLM provider
+### 1. Install Prerequisites
 
-**Frontend:**
-- Node.js 22+
-- pnpm 10.26.2+
+| Tool | Version | Install |
+|------|---------|---------|
+| Python | 3.12+ | [python.org](https://www.python.org/) |
+| uv | Latest | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
+| Node.js | 22+ | [nodejs.org](https://nodejs.org/) |
+| pnpm | 10+ | `npm install -g pnpm` |
+| nginx | - | macOS: `brew install nginx`, Linux: `sudo apt install nginx` |
 
-### Installation
+### 2. Clone & Install
 
 ```bash
-# 1. Clone the project
-git clone https://github.com/your-username/medrix-flow.git
+git clone https://github.com/Citrus-bit/medrix-flow.git
 cd medrix-flow
-
-# 2. Copy configuration files
-cp config.example.yaml config.yaml
-
-# 3. Install backend dependencies
-cd backend
-make install
-
-# 4. Install frontend dependencies (new terminal)
-cd ../frontend
-pnpm install
-
-# 5. Copy frontend environment variables
-cp .env.example .env
+make config    # Generate config files (first time only)
+make install   # Install all frontend & backend dependencies
 ```
 
-### Configuration
-
-Edit `config.yaml` in the project root:
-
-```yaml
-models:
-  - name: gpt-4o
-    display_name: GPT-4o
-    use: langchain_openai:ChatOpenAI
-    model: gpt-4o
-    api_key: $OPENAI_API_KEY
-    supports_thinking: false
-    supports_vision: true
-
-  - name: claude-sonnet-4
-    display_name: Claude Sonnet 4
-    use: langchain_anthropic:ChatAnthropic
-    model: claude-sonnet-4-20250514
-    api_key: $ANTHROPIC_API_KEY
-    supports_thinking: true
-    supports_vision: true
-```
-
-Set your API keys:
+### 3. Start
 
 ```bash
-# Add to ~/.bashrc or ~/.zshrc
-export OPENAI_API_KEY="your-api-key-here"
-export ANTHROPIC_API_KEY="your-anthropic-key-here"
-
-# Then reload
-source ~/.bashrc  # or source ~/.zshrc
+make stop && make dev       # Start all services (LangGraph + Gateway + Frontend + Nginx)
 ```
 
-### Running
+Once started, your browser will open **http://localhost:1000** automatically.
 
-**Full Application** (from project root):
+### 4. Configure Models & API Keys
 
-```bash
-make dev  # Starts LangGraph + Gateway + Frontend + Nginx
-```
+On first visit, the setup panel opens automatically to guide you through configuration:
 
-Access at: http://localhost:1000
+1. Add your LLM models on the "Setup" page (supports OpenAI, Anthropic, Google Gemini, DeepSeek, etc.)
+2. Enter your model API Key and click "Test" to verify connectivity
+3. Optionally configure Tavily / Jina API keys for web search & fetch
+4. Click "Save Configuration" — done!
 
-**Running components separately:**
+> You can reopen the setup panel anytime via the bottom-left "Settings and More" → "Settings" menu.
 
-```bash
-# Backend - LangGraph Server (terminal 1)
-cd backend
-make dev
+### Common Commands
 
-# Backend - Gateway API (terminal 2)
-cd backend
-make gateway
-
-# Frontend (terminal 3)
-cd frontend
-pnpm dev
-```
-
-Direct access:
-- Main app: http://localhost:1000
-- LangGraph: http://localhost:2024
-- Gateway: http://localhost:8001
-- Frontend: http://localhost:3000
+| Command | Description |
+|---------|-------------|
+| `make dev` | Start all services (dev mode with hot-reload) |
+| `make stop` | Stop all services |
+| `make check` | Check if prerequisites are installed |
+| `make clean` | Stop services and clean temp files |
 
 ---
 
@@ -238,9 +188,19 @@ medrix-flow/
 
 ## ⚙️ Configuration
 
-### Main Configuration (`config.yaml`)
+### Web UI Configuration (Recommended)
 
-Place in project root. Config values starting with `$` resolve as environment variables.
+MedrixFlow lets you manage models and API keys directly from the web interface — no config files to edit:
+
+- **Model Configuration**: Add/edit/remove LLM models with one-click connectivity testing
+- **Tool API Keys**: Configure Tavily (web search) and Jina (web fetch) keys
+- **Instant Apply**: All changes are persisted to `config.yaml` and `.env` automatically, with live hot-reload
+
+Access via: bottom-left "Settings and More" → "Settings" → "Setup" tab.
+
+### Manual Configuration (Advanced)
+
+For finer-grained control, edit `config.yaml` in the project root directly.
 
 Key sections:
 - `models` - LLM configurations with class paths, API keys, thinking/vision flags

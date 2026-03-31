@@ -1,6 +1,5 @@
 export interface ModelSetupItem {
   name: string;
-  display_name: string | null;
   provider: string;
   model: string;
   base_url: string | null;

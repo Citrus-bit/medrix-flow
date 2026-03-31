@@ -373,18 +373,19 @@ export const zhCN: Translations = {
     description: "配置你的 LLM 模型和工具 API 密钥。",
     modelsTitle: "模型配置",
     modelsDescription:
-      "添加和管理 LLM 模型提供商。每个模型需要提供商类型、模型 ID 和 API 密钥。",
+      "添加和管理 LLM 模型提供商。每个模型需要提供商类型、模型名称和 API 密钥。",
     toolKeysTitle: "工具 API 密钥",
     toolKeysDescription:
       "配置网络搜索（Tavily）和网页抓取（Jina）工具的 API 密钥。",
     addModel: "添加模型",
-    modelName: "模型名称",
-    displayName: "显示名称",
+    model: "模型",
     provider: "提供商",
-    modelId: "模型 ID",
     testConnection: "测试",
     saveAll: "保存配置",
     saveSuccess: "配置保存成功。",
     noChanges: "没有未保存的更改。",
+    loadingSlow: "加载时间较长",
+    loadingSlowHint: "后端服务可能还在启动中，你可以稍等片刻或重试。",
+    retry: "重试",
   },
 };

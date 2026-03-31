@@ -2,8 +2,11 @@
 
 import {
   CheckCircle2Icon,
+  EyeIcon,
+  EyeOffIcon,
   Loader2Icon,
   PlusIcon,
+  RefreshCwIcon,
   Trash2Icon,
   XCircleIcon,
   ZapIcon,
@@ -20,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useI18n } from "@/core/i18n/hooks";
 import {
@@ -32,37 +36,47 @@ import type { ModelSetupItem, ToolKeyItem } from "@/core/setup/types";
 
 import { SettingsSection } from "./settings-section";
 
-const PROVIDER_PRESETS: { label: string; value: string; base_url?: string }[] =
-  [
-    { label: "OpenAI", value: "langchain_openai:ChatOpenAI" },
-    {
-      label: "OpenAI (Responses API)",
-      value: "langchain_openai:ChatOpenAI",
-      base_url: undefined,
-    },
-    {
-      label: "Anthropic",
-      value: "langchain_anthropic:ChatAnthropic",
-    },
-    {
-      label: "Google Gemini",
-      value: "langchain_google_genai:ChatGoogleGenerativeAI",
-    },
-    {
-      label: "DeepSeek",
-      value: "medrix_flow.models.patched_deepseek:PatchedChatDeepSeek",
-    },
-    {
-      label: "OpenAI Compatible",
-      value: "langchain_openai:ChatOpenAI",
-      base_url: "",
-    },
-  ];
+const PROVIDER_PRESETS: {
+  key: string;
+  label: string;
+  provider: string;
+}[] = [
+  { key: "openai", label: "OpenAI", provider: "langchain_openai:ChatOpenAI" },
+  {
+    key: "anthropic",
+    label: "Anthropic",
+    provider: "langchain_anthropic:ChatAnthropic",
+  },
+  {
+    key: "google",
+    label: "Google Gemini",
+    provider: "langchain_google_genai:ChatGoogleGenerativeAI",
+  },
+  {
+    key: "deepseek",
+    label: "DeepSeek",
+    provider: "medrix_flow.models.patched_deepseek:PatchedChatDeepSeek",
+  },
+  {
+    key: "openai-compatible",
+    label: "OpenAI Compatible",
+    provider: "langchain_openai:ChatOpenAI",
+  },
+];
+
+function inferPresetKey(provider: string, baseUrl: string | null): string {
+  if (provider === "langchain_openai:ChatOpenAI" && baseUrl) {
+    return "openai-compatible";
+  }
+  const match = PROVIDER_PRESETS.find(
+    (p) => p.provider === provider && p.key !== "openai-compatible",
+  );
+  return match?.key ?? "openai";
+}
 
 function emptyModel(): ModelSetupItem {
   return {
     name: "",
-    display_name: null,
     provider: "langchain_openai:ChatOpenAI",
     model: "",
     base_url: null,
@@ -77,12 +91,21 @@ function emptyModel(): ModelSetupItem {
 
 export function SetupSettingsPage() {
   const { t } = useI18n();
-  const { config, isLoading, error } = useSetupConfig();
+  const { config, isLoading, error, refetch } = useSetupConfig();
   const saveMutation = useSaveSetup();
 
   const [models, setModels] = useState<ModelSetupItem[]>([]);
   const [toolKeys, setToolKeys] = useState<ToolKeyItem[]>([]);
   const [dirty, setDirty] = useState(false);
+  const [loadingSlow, setLoadingSlow] = useState(false);
+
+  useEffect(() => {
+    if (isLoading) {
+      const timer = setTimeout(() => setLoadingSlow(true), 10_000);
+      return () => clearTimeout(timer);
+    }
+    setLoadingSlow(false);
+  }, [isLoading]);
 
   useEffect(() => {
     if (config) {
@@ -135,9 +158,51 @@ export function SetupSettingsPage() {
 
   if (isLoading) {
     return (
-      <SettingsSection title={t.setup.title} description={t.setup.description}>
-        <div className="text-muted-foreground text-sm">{t.common.loading}</div>
-      </SettingsSection>
+      <div className="space-y-8">
+        <SettingsSection title={t.setup.modelsTitle} description={t.setup.modelsDescription}>
+          <div className="space-y-4">
+            {[1, 2].map((i) => (
+              <div key={i} className="bg-muted/40 space-y-3 rounded-lg border p-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <Skeleton className="h-9 w-full rounded-md" />
+                  <Skeleton className="h-9 w-full rounded-md" />
+                  <Skeleton className="h-9 w-full rounded-md" />
+                  <Skeleton className="h-9 w-full rounded-md" />
+                </div>
+                <Skeleton className="h-8 w-24 rounded-md" />
+              </div>
+            ))}
+          </div>
+        </SettingsSection>
+
+        <SettingsSection title={t.setup.toolKeysTitle} description={t.setup.toolKeysDescription}>
+          <div className="space-y-4">
+            {[1, 2].map((i) => (
+              <div key={i} className="bg-muted/40 space-y-3 rounded-lg border p-4">
+                <Skeleton className="h-9 w-full rounded-md" />
+              </div>
+            ))}
+          </div>
+        </SettingsSection>
+
+        {loadingSlow && (
+          <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+            <Loader2Icon className="text-amber-600 dark:text-amber-400 size-4 animate-spin" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                {t.setup.loadingSlow}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {t.setup.loadingSlowHint}
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <RefreshCwIcon className="size-3.5" />
+              {t.setup.retry}
+            </Button>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -218,6 +283,10 @@ function ModelCard({
     "idle" | "loading" | "success" | "error"
   >("idle");
   const [testMsg, setTestMsg] = useState("");
+  const [showKey, setShowKey] = useState(false);
+  const [presetKey, setPresetKey] = useState(() =>
+    inferPresetKey(model.provider, model.base_url),
+  );
 
   const handleTest = () => {
     setTestStatus("loading");
@@ -246,48 +315,36 @@ function ModelCard({
       <div className="flex items-start justify-between">
         <div className="grid flex-1 grid-cols-2 gap-3">
           <div>
-            <label className="text-xs font-medium">{t.setup.modelName}</label>
+            <label className="text-xs font-medium">{t.setup.model}</label>
             <Input
-              value={model.name}
-              onChange={(e) => onChange({ name: e.target.value })}
-              placeholder="my-model"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-medium">
-              {t.setup.displayName}
-            </label>
-            <Input
-              value={model.display_name ?? ""}
-              onChange={(e) => onChange({ display_name: e.target.value || null })}
-              placeholder="My Model"
+              value={model.model}
+              onChange={(e) => onChange({ model: e.target.value, name: e.target.value })}
+              placeholder="gpt-4o"
             />
           </div>
           <div>
             <label className="text-xs font-medium">{t.setup.provider}</label>
             <Select
-              value={model.provider}
-              onValueChange={(v) => onChange({ provider: v })}
+              value={presetKey}
+              onValueChange={(key) => {
+                setPresetKey(key);
+                const preset = PROVIDER_PRESETS.find((p) => p.key === key);
+                if (preset) {
+                  onChange({ provider: preset.provider });
+                }
+              }}
             >
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {PROVIDER_PRESETS.map((p) => (
-                  <SelectItem key={p.label} value={p.value}>
+                  <SelectItem key={p.key} value={p.key}>
                     {p.label}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div>
-            <label className="text-xs font-medium">{t.setup.modelId}</label>
-            <Input
-              value={model.model}
-              onChange={(e) => onChange({ model: e.target.value })}
-              placeholder="gpt-4"
-            />
           </div>
           <div>
             <label className="text-xs font-medium">Base URL</label>
@@ -299,12 +356,25 @@ function ModelCard({
           </div>
           <div>
             <label className="text-xs font-medium">API Key</label>
-            <Input
-              type="password"
-              value={model.api_key ?? ""}
-              onChange={(e) => onChange({ api_key: e.target.value || null })}
-              placeholder="sk-..."
-            />
+            <div className="flex items-center gap-1.5">
+              <Input
+                type={showKey ? "text" : "password"}
+                value={model.api_key ?? ""}
+                onChange={(e) => onChange({ api_key: e.target.value || null })}
+                placeholder="sk-..."
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey((v) => !v)}
+                className="text-muted-foreground hover:text-foreground shrink-0 p-1 transition-colors"
+              >
+                {showKey ? (
+                  <EyeOffIcon className="size-4" />
+                ) : (
+                  <EyeIcon className="size-4" />
+                )}
+              </button>
+            </div>
           </div>
           <div>
             <label className="text-xs font-medium">Max Tokens</label>
@@ -405,6 +475,7 @@ function ToolKeyCard({
     "idle" | "loading" | "success" | "error"
   >("idle");
   const [testMsg, setTestMsg] = useState("");
+  const [showKey, setShowKey] = useState(false);
 
   const handleTest = () => {
     if (!item.api_key) return;
@@ -433,12 +504,25 @@ function ToolKeyCard({
           <label className="text-xs font-medium">
             {label} API Key ({item.env_var})
           </label>
-          <Input
-            type="password"
-            value={item.api_key ?? ""}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={`Enter ${label} API key`}
-          />
+          <div className="flex items-center gap-1.5">
+            <Input
+              type={showKey ? "text" : "password"}
+              value={item.api_key ?? ""}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={`Enter ${label} API key`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey((v) => !v)}
+              className="text-muted-foreground hover:text-foreground shrink-0 p-1 transition-colors"
+            >
+              {showKey ? (
+                <EyeOffIcon className="size-4" />
+              ) : (
+                <EyeIcon className="size-4" />
+              )}
+            </button>
+          </div>
         </div>
         <Button
           variant="outline"

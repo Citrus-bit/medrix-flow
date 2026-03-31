@@ -47,10 +47,12 @@ function NavMenuButtonContent({
   );
 }
 
+const SETUP_PROMPT_SESSION_KEY = "medrix_flow.setup-prompted";
+
 export function WorkspaceNavMenu() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDefaultSection, setSettingsDefaultSection] = useState<
-    "appearance" | "memory" | "tools" | "skills" | "notification" | "about"
+    "setup" | "appearance" | "memory" | "tools" | "skills" | "notification" | "about"
   >("appearance");
   const [mounted, setMounted] = useState(false);
   const { open: isSidebarOpen } = useSidebar();
@@ -59,6 +61,22 @@ export function WorkspaceNavMenu() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Auto-open settings on "setup" tab to remind users to configure model/API
+  // Triggers once per browser session (tracked via sessionStorage)
+  // Delayed by 600ms so users see the main UI first (less jarring)
+  useEffect(() => {
+    if (!mounted) return;
+    const alreadyPrompted = sessionStorage.getItem(SETUP_PROMPT_SESSION_KEY);
+    if (!alreadyPrompted) {
+      const timer = setTimeout(() => {
+        sessionStorage.setItem(SETUP_PROMPT_SESSION_KEY, "1");
+        setSettingsDefaultSection("setup");
+        setSettingsOpen(true);
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+  }, [mounted]);
 
   return (
     <>

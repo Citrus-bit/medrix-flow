@@ -38,15 +38,6 @@ def _find_config_path() -> Path:
     return AppConfig.resolve_config_path()
 
 
-def _mask_key(value: str | None) -> str:
-    """Return a masked version of an API key for safe display."""
-    if not value:
-        return ""
-    if len(value) <= 8:
-        return "*" * len(value)
-    return value[:4] + "*" * (len(value) - 8) + value[-4:]
-
-
 def _read_raw_config() -> dict:
     """Read config.yaml as raw dict (before env-var resolution)."""
     config_path = _find_config_path()
@@ -63,31 +54,15 @@ def _write_raw_config(data: dict) -> None:
 
 def _get_env_value(var_name: str) -> str | None:
     """Get env var value, refreshing from .env first."""
-    load_dotenv(_find_env_path(), override=True)
     return os.getenv(var_name)
 
 
+def _refresh_env() -> None:
+    """Reload .env file into process environment. Call once per request."""
+    load_dotenv(_find_env_path(), override=True)
+
+
 _TOOL_KEY_ENV_MAP = {"tavily": "TAVILY_API_KEY", "jina": "JINA_API_KEY"}
-
-
-def _resolve_masked_model_key(masked: str, provider: str, model_id: str) -> str | None:
-    """If the api_key is a masked placeholder, resolve the real key from .env."""
-    raw = _read_raw_config()
-    for m in raw.get("models") or []:
-        if m.get("use") == provider and m.get("model") == model_id:
-            raw_key = m.get("api_key", "")
-            if isinstance(raw_key, str) and raw_key.startswith("$"):
-                return _get_env_value(raw_key[1:])
-            return raw_key if raw_key else None
-    return None
-
-
-def _resolve_masked_tool_key(service: str) -> str | None:
-    """Resolve real tool API key from .env by service name."""
-    env_var = _TOOL_KEY_ENV_MAP.get(service.lower())
-    if env_var:
-        return _get_env_value(env_var)
-    return None
 
 
 def _set_env_value(var_name: str, value: str) -> None:
@@ -108,7 +83,6 @@ class ModelSetupItem(BaseModel):
     """A single model configuration as seen by the setup UI."""
 
     name: str = Field(..., description="Unique model identifier")
-    display_name: str | None = Field(None, description="Human-readable name")
     provider: str = Field("langchain_openai:ChatOpenAI", description="Provider class path (use field)")
     model: str = Field(..., description="Model ID sent to the provider")
     base_url: str | None = Field(None, description="Custom API base URL")
@@ -166,9 +140,10 @@ class TestResult(BaseModel):
     "/config",
     response_model=SetupConfigResponse,
     summary="Get Setup Configuration",
-    description="Read current model configs and tool API key status (keys are masked).",
+    description="Read current model configs and tool API key status.",
 )
 async def get_setup_config() -> SetupConfigResponse:
+    _refresh_env()
     raw = _read_raw_config()
     models_raw: list[dict] = raw.get("models") or []
 
@@ -176,23 +151,21 @@ async def get_setup_config() -> SetupConfigResponse:
     for m in models_raw:
         api_key_raw = m.get("api_key", "")
         env_var: str | None = None
-        masked_key = ""
+        actual_key = ""
 
         if isinstance(api_key_raw, str) and api_key_raw.startswith("$"):
             env_var = api_key_raw[1:]
-            actual = _get_env_value(env_var)
-            masked_key = _mask_key(actual)
+            actual_key = _get_env_value(env_var) or ""
         elif api_key_raw:
-            masked_key = _mask_key(str(api_key_raw))
+            actual_key = str(api_key_raw)
 
         items.append(
             ModelSetupItem(
                 name=m.get("name", ""),
-                display_name=m.get("display_name"),
                 provider=m.get("use", "langchain_openai:ChatOpenAI"),
                 model=m.get("model", ""),
                 base_url=m.get("base_url"),
-                api_key=masked_key,
+                api_key=actual_key,
                 api_key_env_var=env_var,
                 max_tokens=m.get("max_tokens"),
                 temperature=m.get("temperature"),
@@ -203,11 +176,11 @@ async def get_setup_config() -> SetupConfigResponse:
 
     tool_keys: list[ToolKeyItem] = []
     for svc, env in [("tavily", "TAVILY_API_KEY"), ("jina", "JINA_API_KEY")]:
-        actual = _get_env_value(env)
+        actual = _get_env_value(env) or ""
         tool_keys.append(
             ToolKeyItem(
                 service=svc,
-                api_key=_mask_key(actual),
+                api_key=actual,
                 env_var=env,
             )
         )
@@ -226,15 +199,15 @@ async def save_models(req: SaveModelsRequest) -> dict:
     new_models: list[dict] = []
     for m in req.models:
         entry: dict = {
-            "name": m.name,
-            "display_name": m.display_name or m.name,
+            "name": m.name or m.model,
+            "display_name": m.model,
             "use": m.provider,
             "model": m.model,
         }
 
         env_var = m.api_key_env_var or f"{m.name.upper().replace('-', '_')}_API_KEY"
 
-        if m.api_key and not m.api_key.startswith("*") and m.api_key.strip():
+        if m.api_key and m.api_key.strip():
             _set_env_value(env_var, m.api_key.strip())
 
         entry["api_key"] = f"${env_var}"
@@ -256,7 +229,7 @@ async def save_models(req: SaveModelsRequest) -> dict:
 
     if req.tool_keys:
         for tk in req.tool_keys:
-            if tk.api_key and not tk.api_key.startswith("*") and tk.api_key.strip():
+            if tk.api_key and tk.api_key.strip():
                 _set_env_value(tk.env_var, tk.api_key.strip())
 
     _write_raw_config(raw)
@@ -276,21 +249,14 @@ async def save_models(req: SaveModelsRequest) -> dict:
     description="Send a lightweight request to verify the model provider is reachable.",
 )
 async def test_model(req: TestModelRequest) -> TestResult:
+    _refresh_env()
     try:
         from medrix_flow.reflection import resolve_variable
 
         provider_class = resolve_variable(req.provider)
         kwargs: dict = {"model": req.model}
         if req.api_key:
-            # If key looks masked (contains *), try to resolve the real key
-            # from the existing model config in config.yaml
-            if "*" in req.api_key:
-                real_key = _resolve_masked_model_key(req.api_key, req.provider, req.model)
-                if real_key:
-                    kwargs["api_key"] = real_key
-                # else: skip api_key, let provider use env default
-            else:
-                kwargs["api_key"] = req.api_key
+            kwargs["api_key"] = req.api_key
         if req.base_url:
             kwargs["base_url"] = req.base_url
 
@@ -311,13 +277,9 @@ async def test_model(req: TestModelRequest) -> TestResult:
     description="Verify that a Tavily or Jina API key is valid.",
 )
 async def test_tool_key(req: TestToolKeyRequest) -> TestResult:
+    _refresh_env()
     service = req.service.lower()
     api_key = req.api_key
-    if "*" in api_key:
-        resolved = _resolve_masked_tool_key(service)
-        if not resolved:
-            return TestResult(success=False, message="No API key configured. Please enter a key and save first.")
-        api_key = resolved
     try:
         if service == "tavily":
             from tavily import TavilyClient
