@@ -237,7 +237,7 @@ make install   # 一键安装前后端所有依赖
 make dev       # 启动所有服务（LangGraph + Gateway + Frontend + Nginx）
 ```
 
-启动完成后浏览器自动打开 **http://localhost:1000**。
+启动完成后浏览器自动打开 http://localhost:1000
 
 > 也可以使用 `make dev-daemon` 在后台启动，或双击 `start.command` 一键启动。
 

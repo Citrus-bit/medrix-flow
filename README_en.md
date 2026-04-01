@@ -238,7 +238,7 @@ make install   # One-command install for all frontend and backend dependencies
 make dev       # Start all services (LangGraph + Gateway + Frontend + Nginx)
 ```
 
-Once started, your browser will automatically open **http://localhost:1000**.
+Once started, your browser will automatically open http://localhost:1000
 
 > You can also use `make dev-daemon` to start in the background, or double-click `start.command` for one-click launch.
 
