@@ -5,217 +5,381 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Made%20with-LangGraph-blue?style=for-the-badge&logo=python" alt="LangGraph">
   <img src="https://img.shields.io/badge/Frontend-Next.js%2016-black?style=for-the-badge&logo=next.js" alt="Next.js">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react" alt="React 19">
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python" alt="Python">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
 </p>
 
-MedrixFlow is a LangGraph-based AI super agent system with sandbox execution, persistent memory, and extensible tool integration. The backend enables AI agents to execute code, browse the web, manage files, delegate tasks to subagents, and retain context across conversations - all in isolated, per-thread environments.
+<p align="center">
+  <b>AI Super Agent System Built on LangGraph</b><br/>
+  Sandbox Execution · Persistent Memory · Multi-Agent Collaboration · Extensible Tool Ecosystem
+</p>
 
 ---
 
-## ✨ Features
+MedrixFlow is a full-stack AI agent orchestration platform. The backend leverages LangGraph for multi-agent collaboration and state management, while the frontend is built with Next.js 16 to deliver a modern interactive interface. The system supports code execution, web browsing, and file management within isolated thread-level sandboxes, and retains user context across conversations through persistent memory.
 
-### 🤖 Intelligent Agent System
-- **Lead Agent**: LangGraph-powered core agent with dynamic model selection, thinking mode, and visual understanding support
-- **Subagent System**: Parallel task execution support with up to 3 concurrent subagents, 15-minute timeout per task
-- **Middleware Chain**: 9 middleware components handling thread isolation, file uploads, sandbox management, memory extraction, and more
+## Key Features
 
-### 🔒 Sandbox Execution
-- **Thread Isolation**: Each conversation thread has its own isolated filesystem space
-- **Virtual Paths**: `/mnt/user-data/{workspace,uploads,outputs}` automatically maps to thread-specific directories
-- **Toolset**: bash, ls, read_file, write_file, str_replace
+### 1. LangGraph-Powered Multi-Agent Orchestration
 
-### 💾 Persistent Memory
-- **Automatic Extraction**: AI automatically analyzes conversations to extract user context, facts, and preferences
-- **Structured Storage**: User context (work, personal, top-of-mind), history, and confidence-scored facts
-- **Prompt Injection**: Top facts and context injected into agent prompts
+Unlike simple LLM chain-of-thought calls, MedrixFlow uses a **LangGraph directed graph state machine** as its core orchestration engine:
 
-### 🛠️ Tool Ecosystem
-| Category | Tools |
-|----------|-------|
-| **Sandbox** | bash, ls, read_file, write_file, str_replace |
-| **Built-in** | present_files, ask_clarification, view_image, task |
-| **Community** | Tavily (web search), Jina AI (web fetch), Firecrawl, DuckDuckGo (image search) |
-| **MCP** | Any Model Context Protocol server |
-| **Skills** | Domain-specific workflows injected via system prompt |
+- **Lead Agent + Subagent Hierarchical Architecture**: The lead agent handles task understanding and decomposition, delegating to up to 3 subagents that execute in parallel, each with an independent 15-minute timeout
+- **14-Layer Middleware Chain**: A strictly ordered middleware pipeline covering cross-cutting concerns including thread isolation, file upload injection, sandbox lifecycle, context summarization, memory extraction, image vision, loop detection, tool error degradation, and more
+- **Dynamic Model Hot-Swapping**: Switch between different LLMs within the same conversation, with runtime toggling of Thinking mode and Vision mode
 
-### 📱 Multi-Channel Support
-- **Feishu**: Real-time streaming responses with in-thread card message updates
-- **Slack**: Message interaction support
-- **Telegram**: Bot interaction support
+### 2. Thread-Level Sandbox Isolation
 
----
+Each conversation thread has a fully isolated execution environment:
 
-## 🏗️ Architecture
+- **Virtual Filesystem Mapping**: `/mnt/user-data/{workspace,uploads,outputs}` is automatically mapped to thread-specific physical directories, preventing cross-thread data leakage
+- **Dual Sandbox Engine**: Supports both local direct execution (LocalSandboxProvider) and Docker container isolation (AioSandboxProvider), with the option to switch to K3s Pod-level isolation in production
+- **Complete Toolchain Coverage**: bash execution, file read/write, string replacement, directory browsing — agents have full filesystem operation capabilities
+
+### 3. LLM-Driven Persistent Memory
+
+Unlike simple conversation history concatenation, MedrixFlow implements a structured long-term memory system:
+
+- **Automatic Knowledge Extraction**: The LLM analyzes conversation content to automatically extract user backgrounds (profession, preferences), facts (with confidence scores), and context
+- **Debounced Batch Processing**: Aggregates multi-turn conversation changes through a configurable debounce mechanism (default 30s) to reduce LLM call overhead
+- **System Prompt Injection**: High-confidence facts and user context are automatically injected into the agent's prompt, enabling personalized responses across conversations
+
+### 4. Streaming & Disconnection Recovery
+
+A production-grade streaming experience built on the LangGraph SDK's `useStream`:
+
+- **SSE Streaming Rendering**: Agent responses, Thinking process, and subagent task progress are all streamed in real time
+- **Automatic Disconnection Recovery**: `reconnectOnMount` + `streamResumable` mechanisms ensure automatic reconnection after page refresh or network disconnection, while the backend continues running uninterrupted
+- **Optimistic UI Updates**: Messages appear instantly upon sending, and thread lists are optimistically inserted, eliminating perceived network latency
+
+### 5. Zero-Config Frontend UX
+
+Model and API Key configuration is entirely handled through the frontend UI — no manual config file editing required:
+
+- **First-Visit Auto-Guidance**: The configuration panel automatically pops up in a new tab, using `sessionStorage` to ensure it only triggers once per browser session
+- **One-Click Connectivity Test**: Dynamically instantiates the Provider class and sends `ainvoke("Hi")` to verify model availability
+- **Hot-Reload Activation**: Saved configuration is automatically written to `config.yaml` + `.env`, and takes effect immediately via `reload_app_config()` — no service restart needed
+
+### 6. Multi-Channel Access
+
+In addition to the web interface, MedrixFlow supports IM channel integration:
+
+- **Feishu (Lark)**: Real-time streaming responses with in-place card message updates (stores `message_id` to patch the same card incrementally)
+- **Slack**: Socket Mode WebSocket connection — no public IP required
+- **Telegram**: Bot interaction with per-user independent session configuration
+
+## Technical Challenges & Solutions
+
+### Middleware Orchestration Order Dependencies
+
+**Challenge**: 14 middleware components each handle different cross-cutting concerns but have implicit dependencies on one another. For example, `SandboxMiddleware` must run after `UploadsMiddleware` (it needs the thread directory to be created), and `ClarificationMiddleware` must run last (it needs to interrupt graph execution).
+
+**Solution**: An explicit ordered middleware chain pattern where each middleware declares its execution phase, and the runtime executes them serially in a fixed order. The middleware pipeline is: ThreadData → Uploads → Sandbox → Summarization → TodoList → Title → Memory → ViewImage → LoopDetection → ToolErrorHandling → SubagentLimit → DeferredToolFilter → DanglingToolCall → Clarification.
+
+### Streaming State Consistency
+
+**Challenge**: During SSE streaming, the frontend must simultaneously handle multiple stream types (messages, Thinking reasoning, subagent task events, tool calls) and recover stream state after page refresh. Safari browsers exhibit inconsistent SSE reconnection behavior.
+
+**Solution**:
+- Use `sessionStorage` to store `lg:stream:{threadId}` → `runId` mappings, enabling `reconnectOnMount` stream resumption
+- Backend sets `onDisconnect: "continue"` to ensure the run continues after client disconnection
+- Thread list adds `refetchOnWindowFocus`, `staleTime: 30s`, and `visibilitychange` listeners to fix Safari compatibility
+- Subagent tasks trigger `useUpdateSubtask()` via `onCustomEvent` to update the SubtaskCard in real time
+
+### Configuration Hot-Reload Consistency
+
+**Challenge**: `config.yaml` and `.env` are modified by the frontend UI and need to take effect immediately, but the LangGraph Server, Gateway API, and frontend each maintain their own configuration caches.
+
+**Solution**: The `AppConfig` singleton uses mtime-based file modification detection with automatic hot-reload. The Gateway API checks for file changes on every request via `get_app_config()`. The LangGraph Server monitors YAML file changes and auto-restarts in the Gateway's `--reload` mode. Environment variables are resolved through `load_dotenv` + `resolve_env_variables` with recursive `$VAR` reference substitution.
+
+### Long Conversation Context Management
+
+**Challenge**: Long conversations can easily exceed the model's token limit, causing request failures or context loss.
+
+**Solution**: A configurable `SummarizationMiddleware` supporting three trigger strategies (token threshold, message count, model limit percentage). When triggered, a lightweight model generates a summary, and the most recent N messages + summary become the new context.
+
+## Performance Optimizations
+
+### Startup Speed Optimizations
+
+| Optimization | Measure | Impact |
+|--------|------|------|
+| Parallel Service Startup | LangGraph, Gateway, and Frontend start simultaneously; only Nginx waits for all three ports to be ready | 40–60% faster startup |
+| Config Upgrade Fast Skip | `config-upgrade.sh` uses bash-level `grep` to compare `config_version`, exiting immediately if versions match without starting Python | Reduces cold start by 1–2s |
+| Unused Dependency Cleanup | Removed zero-reference `kubernetes` and `duckdb` packages (~130MB); removed mistakenly included `nuxt-og-image` from the Nuxt project | Smaller install size, faster CI |
+
+### Frontend Runtime Optimizations
+
+| Optimization | Measure | Impact |
+|--------|------|------|
+| Shiki Syntax Highlighting Lazy Load | Changed `codeToHtml` to `await import("shiki")` dynamic import; type imports remain static | First-screen JS reduced by ~200KB |
+| CodeMirror Editor Lazy Load | 10 CodeMirror packages (7 languages + 2 themes + react-codemirror) wrapped with `next/dynamic` + `ssr: false`, internally loaded via `Promise.all()` | First-screen JS reduced by ~500KB |
+| Optimistic UI Updates | Messages appear instantly on send; thread creation uses optimistic query cache insertion | Eliminates perceived network latency |
+| TanStack Query Caching Strategy | `staleTime: 30s` + `refetchOnWindowFocus` + `visibilitychange` listener | Reduces unnecessary API requests |
+
+### Stability Improvements from Bug Fixes
+
+| Issue | Root Cause | Fix |
+|------|------|------|
+| `max_tokens` 400 Error | GLM-5 via Huawei ModelArts supports a maximum of 131072; the original config of 200000 caused a `BadRequest` silently swallowed by the frontend | Corrected to 131072 |
+| UI Freeze When Appending During Send | `sendMessage` with `sendInFlightRef` set to `true` would directly `return` and discard the second message | Changed to first `await thread.stop()` to cancel the current run before sending a new message |
+| Thread List Disappearing (Safari) | `useThreads` lacked a refetch strategy; cache expired after tab switching | Added `refetchOnWindowFocus`, `staleTime`, `visibilitychange` listener, and `onCreated` optimistic insertion |
+| Thinking State Display Glitch | Optimistic thinking placeholder used a static spinner, causing a flash when switching to actual reasoning content | Replaced with Reasoning component (brain icon + shimmer animation + real-time seconds counter) |
+
+## System Architecture
 
 ```
-                        ┌──────────────────────────────────────┐
-                        │          Nginx (Port 1000)           │
-                        │      Unified reverse proxy           │
-                        └───────┬──────────────────┬───────────┘
-                                │                  │
-              /api/langgraph/*  │                  │  /api/* (other)
-                                ▼                  ▼
-               ┌────────────────────┐  ┌────────────────────────┐
-               │ LangGraph Server   │  │   Gateway API (8001)   │
-               │    (Port 2024)     │  │   FastAPI REST         │
-               │                    │  │                        │
-               │ ┌────────────────┐ │  │ Models, MCP, Skills,   │
-               │ │  Lead Agent    │ │  │ Memory, Uploads,       │
-               │ │  ┌──────────┐  │ │  │ Artifacts              │
-               │ │  │Middleware│  │ │  └────────────────────────┘
-               │ │  │  Chain   │  │ │
-               │ │  └──────────┘  │ │
-               │ │  ┌──────────┐  │ │
-               │ │  │  Tools   │  │ │
-               │ │  └──────────┘  │ │
-               │ │  ┌──────────┐  │ │
-               │ │  │Subagents │  │ │
-               │ │  └──────────┘  │ │
-               │ └────────────────┘ │
-               └────────────────────┘
+                     ┌─────────────────────────────────────────────┐
+                     │            Nginx (Port 1000)                │
+                     │        Unified Reverse Proxy Entry          │
+                     └──────┬────────────────────┬─────────────────┘
+                            │                    │
+          /api/langgraph/*  │                    │  /api/* (other)
+                            v                    v
+          ┌──────────────────────┐  ┌──────────────────────────────┐
+          │  LangGraph Server    │  │   Gateway API (Port 8001)    │
+          │    (Port 2024)       │  │   FastAPI REST               │
+          │                      │  │                              │
+          │ ┌──────────────────┐ │  │  /api/models      Models     │
+          │ │    Lead Agent    │ │  │  /api/mcp/config  MCP Config │
+          │ │                  │ │  │  /api/skills      Skills     │
+          │ │  14-Layer        │ │  │  /api/memory      Memory     │
+          │ │  Middleware Chain │ │  │  /api/setup/*     Config     │
+          │ │       |          │ │  │  /api/threads/*   Threads    │
+          │ │   Tool System    │ │  │                              │
+          │ │       |          │ │  └──────────────────────────────┘
+          │ │  Subagents(x3)   │ │
+          │ └──────────────────┘ │
+          └──────────────────────┘
+                            │
+          ┌──────────────────────┐
+          │   Frontend (Port 3000)│
+          │   Next.js 16         │
+          │   React 19           │
+          │   TailwindCSS 4      │
+          │   Shadcn UI          │
+          └──────────────────────┘
 ```
 
 **Request Routing** (via Nginx):
-- `/api/langgraph/*` → LangGraph Server - agent interactions, threads, streaming
-- `/api/*` (other) → Gateway API - models, MCP, skills, memory, artifacts, uploads
-- `/` (non-API) → Frontend - Next.js web interface
+- `/api/langgraph/*` → LangGraph Server: Agent interaction, thread management, SSE streaming
+- `/api/*` (other) → Gateway API: Models, MCP, Skills, Memory, file uploads, artifacts
+- `/` (non-API) → Frontend: Next.js web interface
 
----
+### Middleware Chain Details
 
-## 🚀 Quick Start
+| # | Middleware | Responsibility |
+|---|-----------|---------------|
+| 1 | ThreadDataMiddleware | Creates thread-specific isolation directories (workspace/uploads/outputs) |
+| 2 | UploadsMiddleware | Injects newly uploaded files into the conversation context |
+| 3 | SandboxMiddleware | Acquires and manages the sandbox execution environment lifecycle |
+| 4 | SummarizationMiddleware | Auto-summarizes and compresses context when approaching token limits |
+| 5 | TodoListMiddleware | Tracks multi-step task progress in plan mode |
+| 6 | TitleMiddleware | Auto-generates conversation title after the first message exchange |
+| 7 | MemoryMiddleware | Enqueues conversations for asynchronous memory extraction |
+| 8 | ViewImageMiddleware | Injects image data for vision-capable models |
+| 9 | LoopDetectionMiddleware | Detects and interrupts infinite agent loop calls |
+| 10 | ToolErrorHandlingMiddleware | Graceful error degradation for failed tool calls |
+| 11 | SubagentLimitMiddleware | Controls the maximum number of concurrent subagents |
+| 12 | DeferredToolFilterMiddleware | Defers tool loading to reduce context usage |
+| 13 | DanglingToolCallMiddleware | Cleans up dangling incomplete tool calls |
+| 14 | ClarificationMiddleware | Intercepts clarification requests and interrupts graph execution (must be last) |
 
-Get MedrixFlow running in 4 steps — **no manual config file editing required**.
+### Tool Ecosystem
 
-### 1. Install Prerequisites
+| Category | Tools | Description |
+|----------|-------|-------------|
+| Sandbox | bash, ls, read_file, write_file, str_replace | Thread-isolated filesystem operations |
+| Built-in | present_files, ask_clarification, view_image, task | File presentation, interactive clarification, image understanding, subagent delegation |
+| Community | Tavily, Jina AI, Firecrawl, DuckDuckGo | Web search, web scraping, image search |
+| MCP | Any MCP-compatible server | Supports stdio/SSE/HTTP transport protocols |
+| Skills | Domain-specific workflows | Configurable skill packs injected via System Prompt |
 
-| Tool | Version | Install |
-|------|---------|---------|
+## Quick Start
+
+Get MedrixFlow running in just 4 steps — **no manual config file editing required**.
+
+### Step 1: Install Prerequisites
+
+| Tool | Version | Installation |
+|------|---------|-------------|
 | Python | 3.12+ | [python.org](https://www.python.org/) |
 | uv | Latest | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | Node.js | 22+ | [nodejs.org](https://nodejs.org/) |
 | pnpm | 10+ | `npm install -g pnpm` |
-| nginx | - | macOS: `brew install nginx`, Linux: `sudo apt install nginx` |
+| nginx | - | macOS: `brew install nginx` / Linux: `sudo apt install nginx` |
 
-### 2. Clone & Install
+### Step 2: Clone & Install
 
 ```bash
 git clone https://github.com/Citrus-bit/medrix-flow.git
 cd medrix-flow
-make config    # Generate config files (first time only)
-make install   # Install all frontend & backend dependencies
+make config    # Auto-generate config.yaml and .env (first time only)
+make install   # One-command install for all frontend and backend dependencies
 ```
 
-### 3. Start
+### Step 3: Start Services
 
 ```bash
-make stop && make dev       # Start all services (LangGraph + Gateway + Frontend + Nginx)
+make dev       # Start all services (LangGraph + Gateway + Frontend + Nginx)
 ```
 
-Once started, your browser will open **http://localhost:1000** automatically.
+Once started, your browser will automatically open **http://localhost:1000**.
 
-### 4. Configure Models & API Keys
+> You can also use `make dev-daemon` to start in the background, or double-click `start.command` for one-click launch.
 
-On first visit, the setup panel opens automatically to guide you through configuration:
+### Step 4: Configure Models & API Keys in the UI
 
-1. Add your LLM models on the "Setup" page (supports OpenAI, Anthropic, Google Gemini, DeepSeek, etc.)
-2. Enter your model API Key and click "Test" to verify connectivity
-3. Optionally configure Tavily / Jina API keys for web search & fetch
-4. Click "Save Configuration" — done!
+When you first open the page, the setup panel will **automatically pop up** to guide you through configuration:
 
-> You can reopen the setup panel anytime via the bottom-left "Settings and More" → "Settings" menu.
+1. **Add a Model**: On the "Configuration" page, select a provider (OpenAI / Anthropic / Google Gemini / DeepSeek / OpenAI Compatible) and enter the model name
+2. **Enter API Key**: Input your API Key and click the "Test" button to verify connectivity
+3. **Configure Tool Keys** (optional): If you need web search capabilities, enter Tavily / Jina API Keys
+4. **Save Configuration** — Done! Configuration is automatically persisted and the service hot-reloads
+
+> You can reopen the configuration panel at any time via the bottom-left "Settings & More" → "Settings" → "Configuration" tab.
 
 ### Common Commands
 
 | Command | Description |
 |---------|-------------|
-| `make dev` | Start all services (dev mode with hot-reload) |
+| `make dev` | Start in development mode (with hot-reload) |
+| `make start` | Start in production mode (performance-optimized) |
+| `make dev-daemon` | Start as background daemon |
 | `make stop` | Stop all services |
 | `make check` | Check if prerequisites are installed |
-| `make clean` | Stop services and clean temp files |
+| `make clean` | Stop services and clean up temporary files |
+| `make up` | Docker production deployment |
+| `make down` | Stop Docker containers |
 
----
+## Tech Stack
 
-## 📁 Project Structure
+### Backend
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **LangGraph** | 1.0.6+ | Multi-agent orchestration engine, directed graph state machine |
+| **LangChain** | 1.2.3+ | LLM abstraction layer, tool system, MCP adapters |
+| **FastAPI** | 0.115.0+ | Gateway REST API, async high-performance |
+| **Python** | 3.12+ | Backend runtime |
+| **uv** | Latest | Package manager, replacing pip/poetry |
+| **agent-sandbox** | - | Sandbox code execution |
+| **markitdown** | - | Multi-format document to Markdown conversion |
+
+### Frontend
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Next.js** | 16 | React meta-framework, App Router + Turbopack |
+| **React** | 19 | UI library |
+| **TypeScript** | 5.x | Type safety |
+| **TailwindCSS** | 4 | Utility-first CSS framework |
+| **Shadcn UI** | - | Base component library |
+| **MagicUI** | - | Modern animation components |
+| **TanStack Query** | - | Server state management |
+| **LangGraph SDK** | - | Agent interaction |
+
+## Project Structure
 
 ```
 medrix-flow/
-├── backend/                    # Backend service
+├── backend/                        # Backend services
+│   ├── packages/harness/medrix_flow/
+│   │   ├── agents/                 # Agent system
+│   │   │   ├── lead_agent/         #   Lead agent (factory + prompts)
+│   │   │   ├── middlewares/        #   14 middleware components
+│   │   │   ├── memory/             #   Memory extraction & storage
+│   │   │   └── thread_state.py     #   Thread state Schema
+│   │   ├── sandbox/                # Sandbox execution engine
+│   │   ├── subagents/              # Subagent system (registry + executor)
+│   │   ├── tools/                  # Tool collection
+│   │   ├── mcp/                    # MCP protocol integration
+│   │   ├── models/                 # Model factory + Provider patches
+│   │   ├── skills/                 # Skill discovery & loading
+│   │   ├── community/              # Community tools (Tavily/Jina/Firecrawl)
+│   │   └── config/                 # Config system (hot-reload + env var resolution)
+│   ├── app/gateway/                # FastAPI gateway
+│   │   ├── app.py                  #   Application entry point
+│   │   └── routers/                #   Route modules (models/mcp/skills/memory/setup)
+│   ├── tests/                      # Test suite (277 test cases)
+│   ├── langgraph.json              # LangGraph entry configuration
+│   └── pyproject.toml              # Python dependencies
+│
+├── frontend/                       # Frontend application
 │   ├── src/
-│   │   ├── agents/            # Agent system
-│   │   │   ├── lead_agent/   # Main agent (factory, prompts)
-│   │   │   ├── middlewares/  # 9 middleware components
-│   │   │   ├── memory/       # Memory extraction & storage
-│   │   │   └── thread_state.py
-│   │   ├── gateway/          # FastAPI Gateway
-│   │   │   ├── app.py
-│   │   │   └── routers/      # Route modules
-│   │   ├── sandbox/          # Sandbox execution
-│   │   ├── subagents/        # Subagent system
-│   │   ├── tools/            # Toolset
-│   │   ├── mcp/              # MCP protocol integration
-│   │   ├── models/           # Model factory
-│   │   ├── skills/           # Skill discovery & loading
-│   │   └── config/           # Configuration system
-│   ├── docs/                 # Documentation
-│   ├── tests/                # Tests
-│   ├── pyproject.toml        # Python dependencies
-│   └── Makefile              # Development commands
+│   │   ├── app/                    # Next.js App Router routes
+│   │   ├── components/
+│   │   │   ├── ui/                 #   Base UI components
+│   │   │   ├── workspace/          #   Workspace components (chat/settings/sidebar)
+│   │   │   └── ai-elements/        #   AI components (reasoning/code block/model selector)
+│   │   ├── core/                   # Core business logic
+│   │   │   ├── threads/            #   Thread management + streaming
+│   │   │   ├── setup/              #   Configuration management (types/API/Hooks)
+│   │   │   ├── i18n/               #   Internationalization (ZH/EN)
+│   │   │   └── settings/           #   Local settings (localStorage)
+│   │   └── hooks/                  # Custom React Hooks
+│   └── package.json
 │
-├── frontend/                  # Frontend application
-│   ├── src/
-│   │   ├── app/              # Next.js App Router
-│   │   ├── components/       # React components
-│   │   ├── core/             # Core business logic
-│   │   ├── hooks/            # Custom React hooks
-│   │   └── lib/              # Shared libraries
-│   ├── public/               # Static assets
-│   ├── package.json          # Node dependencies
-│   └── README.md             # Frontend documentation
+├── skills/                         # Skill system
+│   ├── public/                     #   Public skill packs
+│   └── custom/                     #   Custom skills
 │
-├── skills/                   # Skills system
-│   ├── public/               # Public skills
-│   └── custom/               # Custom skills
+├── scripts/                        # Script utilities
+│   ├── serve.sh                    #   Service startup (parallel + health check)
+│   ├── start-daemon.sh             #   Daemon startup
+│   ├── config-upgrade.sh           #   Config version upgrade
+│   └── deploy.sh                   #   Docker deployment
 │
-├── scripts/                  # Utility scripts
-├── logs/                     # Log files
-├── docker/                   # Docker configuration
-├── config.example.yaml       # Configuration template
-├── Makefile                  # Root-level commands
-└── README.md                 # This file
+├── docker/                         # Docker configuration
+│   ├── nginx/                      #   Nginx reverse proxy config
+│   ├── docker-compose.yaml         #   Production deployment orchestration
+│   └── docker-compose-dev.yaml     #   Development environment orchestration
+│
+├── config.example.yaml             # Configuration template (with full field examples)
+├── Makefile                        # Root command entry point
+└── README.md                       # This file
 ```
 
----
+## Configuration
 
-## ⚙️ Configuration
+### Frontend UI Configuration (Recommended)
 
-### Web UI Configuration (Recommended)
+MedrixFlow supports managing all model and API key configurations directly through the web interface:
 
-MedrixFlow lets you manage models and API keys directly from the web interface — no config files to edit:
+- **Model Management**: Add / edit / delete LLM models, supporting 5 preset providers + OpenAI Compatible mode
+- **Connectivity Testing**: Each model configuration has a "Test" button that dynamically instantiates the Provider to verify availability
+- **Tool API Keys**: Configure Tavily (web search) and Jina (web scraping) keys
+- **Instant Effect**: Saving automatically writes to `config.yaml` and `.env`, and the service hot-reloads
 
-- **Model Configuration**: Add/edit/remove LLM models with one-click connectivity testing
-- **Tool API Keys**: Configure Tavily (web search) and Jina (web fetch) keys
-- **Instant Apply**: All changes are persisted to `config.yaml` and `.env` automatically, with live hot-reload
+**How to open**: Bottom-left "Settings & More" → "Settings" → "Configuration" tab
 
-Access via: bottom-left "Settings and More" → "Settings" → "Setup" tab.
+### Manual Configuration (Advanced Users)
 
-### Manual Configuration (Advanced)
+Edit `config.yaml` in the project root directory directly. Main configuration sections:
 
-For finer-grained control, edit `config.yaml` in the project root directly.
+| Section | Description |
+|---------|-------------|
+| `models` | LLM model definitions (class paths, API Keys, Thinking/Vision support) |
+| `tools` | Tool definitions (module paths, groups) |
+| `sandbox` | Execution environment (local / Docker / K3s) |
+| `skills` | Skill directory paths |
+| `memory` | Memory system (enabled, storage, debounce, fact limit) |
+| `summarization` | Context summarization (trigger strategy, retention policy) |
+| `subagents` | Subagents (timeout configuration) |
+| `channels` | IM channels (Feishu/Slack/Telegram) |
+| `guardrails` | Tool call authorization guards |
+| `checkpointer` | State persistence (memory/sqlite/postgres) |
 
-Key sections:
-- `models` - LLM configurations with class paths, API keys, thinking/vision flags
-- `tools` - Tool definitions with module paths and groups
-- `tool_groups` - Logical tool groupings
-- `sandbox` - Execution environment provider
-- `skills` - Skills directory paths
-- `title` - Auto-title generation settings
-- `summarization` - Context summarization settings
-- `subagents` - Subagent system (enabled/disabled)
-- `memory` - Memory system settings
+### Environment Variables
 
-### Extensions Configuration (`extensions_config.json`)
+Configuration values prefixed with `$` are automatically resolved as environment variables. Common variables:
 
-MCP servers and skill states in a single file:
+- Model API Keys: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `GOOGLE_API_KEY`
+- Tool API Keys: `TAVILY_API_KEY`, `JINA_API_KEY`, `GITHUB_TOKEN`
+- Config overrides: `MEDRIX_FLOW_CONFIG_PATH`, `MEDRIX_FLOW_EXTENSIONS_CONFIG_PATH`
+
+### MCP Server Configuration (extensions_config.json)
 
 ```json
 {
@@ -225,50 +389,26 @@ MCP servers and skill states in a single file:
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {"GITHUB_TOKEN": "$GITHUB_TOKEN"}
+      "env": { "GITHUB_TOKEN": "$GITHUB_TOKEN" }
     }
-  },
-  "skills": {
-    "pdf-processing": {"enabled": true}
   }
 }
 ```
 
-### Environment Variables
+## Supported Model Providers
 
-- `MEDRIX_FLOW_CONFIG_PATH` - Override config.yaml location
-- `MEDRIX_FLOW_EXTENSIONS_CONFIG_PATH` - Override extensions_config.json location
-- Model API keys: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, etc.
-- Tool API keys: `TAVILY_API_KEY`, `GITHUB_TOKEN`, etc.
+| Provider | Provider Class Path | Notes |
+|----------|---------------------|-------|
+| OpenAI | `langchain_openai:ChatOpenAI` | GPT-4o / GPT-5 / o1 etc. |
+| Anthropic | `langchain_anthropic:ChatAnthropic` | Claude 3.5/4 series |
+| Google Gemini | `langchain_google_genai:ChatGoogleGenerativeAI` | Gemini 2.5 Pro/Flash |
+| DeepSeek | `medrix_flow.models.patched_deepseek:PatchedChatDeepSeek` | DeepSeek V3 / Reasoner |
+| OpenAI Compatible | `langchain_openai:ChatOpenAI` + custom base_url | Huawei ModelArts, Novita, MiniMax, OpenRouter etc. |
 
----
-
-## 🛠️ Tech Stack
-
-### Backend
-- **LangGraph** (1.0.6+) - Agent framework and multi-agent orchestration
-- **LangChain** (1.2.3+) - LLM abstractions and tool system
-- **FastAPI** (0.115.0+) - Gateway REST API
-- **langchain-mcp-adapters** - Model Context Protocol support
-- **agent-sandbox** - Sandboxed code execution
-- **markitdown** - Multi-format document conversion
-- **tavily-python** / **firecrawl-py** - Web search and scraping
-
-### Frontend
-- **Next.js 16** - React framework (App Router)
-- **React 19** - UI library
-- **Tailwind CSS 4** - Styling framework
-- **Shadcn UI** - UI component library
-- **MagicUI** - Modern UI components
-- **LangGraph SDK** - Agent interaction
-- **Vercel AI Elements** - AI UI elements
-
----
-
-## 📖 Documentation
+## Documentation
 
 - [Configuration Guide](./backend/docs/CONFIGURATION.md)
-- [Architecture Details](./backend/docs/ARCHITECTURE.md)
+- [Architecture Deep Dive](./backend/docs/ARCHITECTURE.md)
 - [API Reference](./backend/docs/API.md)
 - [File Upload](./backend/docs/FILE_UPLOAD.md)
 - [Path Examples](./backend/docs/PATH_EXAMPLES.md)
@@ -276,17 +416,14 @@ MCP servers and skill states in a single file:
 - [Plan Mode](./backend/docs/plan_mode_usage.md)
 - [Setup Guide](./backend/docs/SETUP.md)
 
----
+## License
 
-## 📄 License
+MIT License — See the [LICENSE](./LICENSE) file for details.
 
-MIT License - See the [LICENSE](./LICENSE) file for more details.
+## Acknowledgements
 
----
-
-## 🌟 Acknowledgments
-
-- [LangGraph](https://langchain-ai.github.io/langgraph/) - Powerful graph state machine framework
-- [LangChain](https://www.langchain.com/) - LLM application development framework
-- [Next.js](https://nextjs.org/) - React meta-framework
+- [LangGraph](https://langchain-ai.github.io/langgraph/) — Graph state machine agent framework
+- [LangChain](https://www.langchain.com/) — LLM application development framework
+- [Next.js](https://nextjs.org/) — React meta-framework
+- [Shadcn UI](https://ui.shadcn.com/) — UI component library
 - All open-source library contributors

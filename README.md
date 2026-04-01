@@ -5,88 +5,201 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Made%20with-LangGraph-blue?style=for-the-badge&logo=python" alt="LangGraph">
   <img src="https://img.shields.io/badge/Frontend-Next.js%2016-black?style=for-the-badge&logo=next.js" alt="Next.js">
+  <img src="https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react" alt="React 19">
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python" alt="Python">
   <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
 </p>
 
-MedrixFlow 是一个基于 LangGraph 构建的 AI 超级代理系统，具有沙箱执行、持久化记忆和可扩展工具集成能力。后端使 AI 代理能够执行代码、浏览网页、管理文件、将任务委托给子代理，并在隔离的每个线程环境中保留上下文。
+<p align="center">
+  <b>基于 LangGraph 构建的 AI 超级代理系统</b><br/>
+  沙箱执行 · 持久化记忆 · 多代理协作 · 可扩展工具生态
+</p>
 
 ---
 
-## ✨ 特性
+MedrixFlow 是一个全栈 AI 代理编排平台，后端基于 LangGraph 实现多代理协作与状态管理，前端基于 Next.js 16 提供现代化交互界面。系统支持在隔离的线程级沙箱中执行代码、浏览网页、管理文件，并通过持久化记忆在跨对话间保留用户上下文。
 
-### 🤖 智能代理系统
-- **主代理 (Lead Agent)**: 基于 LangGraph 的核心代理，支持动态模型选择、思考模式和视觉理解
-- **子代理系统**: 支持并行任务执行，最多 3 个子代理并发，每个任务 15 分钟超时
-- **中间件链**: 9 个中间件组件，处理线程隔离、文件上传、沙箱管理、记忆提取等
+## 技术亮点
 
-### 🔒 沙箱执行
-- **线程隔离**: 每个对话线程拥有独立的文件系统空间
-- **虚拟路径**: `/mnt/user-data/{workspace,uploads,outputs}` 自动映射到线程目录
-- **工具集**: bash、ls、read_file、write_file、str_replace
+### 1. LangGraph 驱动的多代理编排
 
-### 💾 持久化记忆
-- **自动提取**: AI 自动分析对话，提取用户背景、事实和偏好
-- **结构化存储**: 用户上下文、历史记录、带置信度评分的事实
-- **提示注入**: 顶级事实和上下文注入到代理提示中
+区别于简单的 LLM 链式调用，MedrixFlow 采用 **LangGraph 有向图状态机** 作为核心编排引擎：
 
-### 🛠️ 工具生态系统
-| 类别 | 工具 |
-|------|------|
-| 沙箱 | bash, ls, read_file, write_file, str_replace |
-| 内置 | present_files, ask_clarification, view_image, task |
-| 社区 | Tavily (网页搜索), Jina AI (网页抓取), Firecrawl, DuckDuckGo (图片搜索) |
-| MCP | 支持任何 Model Context Protocol 服务器 |
-| Skills | 领域特定工作流，通过系统提示注入 |
+- **Lead Agent + Subagent 分层架构**：主代理负责任务理解与拆分，最多 3 个子代理并行执行，每个任务独立 15 分钟超时控制
+- **12 层中间件链**：按严格顺序执行的中间件流水线，覆盖线程隔离、文件上传注入、沙箱生命周期、上下文摘要、记忆提取、图像视觉、循环检测、工具错误降级等横切关注点
+- **动态模型热切换**：同一对话内可在不同 LLM 之间切换，支持 Thinking 模式、Vision 模式的运行时启停
 
-### 📱 多渠道支持
-- **飞书**: 支持实时流式响应，卡片消息原地更新
-- **Slack**: 支持消息交互
-- **Telegram**: 支持机器人交互
+### 2. 线程级沙箱隔离
 
----
+每个对话线程拥有完全隔离的执行环境：
 
-## 🏗️ 架构
+- **虚拟文件系统映射**：`/mnt/user-data/{workspace,uploads,outputs}` 自动映射到线程专属物理目录，杜绝跨线程数据泄露
+- **双沙箱引擎**：支持本地直接执行（LocalSandboxProvider）和 Docker 容器隔离（AioSandboxProvider），生产环境可切换至 K3s Pod 级别隔离
+- **工具链完整覆盖**：bash 执行、文件读写、字符串替换、目录浏览 - 代理拥有完整的文件系统操作能力
+
+### 3. LLM 驱动的持久化记忆
+
+不同于简单的对话历史拼接，MedrixFlow 实现了结构化的长期记忆系统：
+
+- **自动知识抽取**：由 LLM 分析对话内容，自动提取用户背景（职业、偏好）、事实（带置信度评分）和上下文
+- **防抖批处理**：通过可配置的 debounce 机制（默认 30s）聚合多轮对话变化，减少 LLM 调用开销
+- **System Prompt 注入**：高置信度事实与用户上下文自动注入代理提示词，实现跨对话的个性化响应
+
+### 4. 流式传输与断连恢复
+
+基于 LangGraph SDK 的 useStream 实现生产级流式体验：
+
+- **SSE 流式渲染**：Agent 响应、Thinking 过程、子代理任务进度全部实时流式展示
+- **断连自动恢复**：reconnectOnMount + streamResumable 机制确保页面刷新或网络断连后自动重连，后端继续运行不中断
+- **乐观 UI 更新**：消息发送即刻展示，线程列表 optimistic 插入，消除网络延迟感知
+
+### 5. 前端配置即用（Zero-Config UX）
+
+模型和 API Key 配置完全在前端 UI 完成，无需手动编辑任何配置文件：
+
+- **首次访问自动引导**：新标签页自动弹出配置面板，通过 sessionStorage 确保同一浏览器会话只触发一次
+- **一键测试连通性**：动态实例化 Provider 类发送 ainvoke("Hi") 验证模型可用性
+- **热重载生效**：配置保存后自动写入 config.yaml + .env，调用 reload_app_config() 即时生效，无需重启服务
+
+### 6. 多渠道接入
+
+除 Web 界面外，还支持 IM 渠道接入：
+
+- **飞书**：实时流式响应，卡片消息原地更新（存储 message_id 逐块 patch 同一卡片）
+- **Slack**：Socket Mode WebSocket 连接，无需公网 IP
+- **Telegram**：Bot 交互，支持每用户独立会话配置
+
+## 技术难点与解决方案
+
+### 中间件编排的顺序依赖
+
+**难点**：12 个中间件各自处理不同的横切关注点，但彼此存在隐式依赖。例如 SandboxMiddleware 必须在 UploadsMiddleware 之后（需要线程目录已创建），ClarificationMiddleware 必须在最后（需要中断图执行）。
+
+**方案**：采用显式有序中间件链模式，每个中间件声明其执行阶段，运行时按固定顺序串行执行。中间件列表包括：ThreadData -> Uploads -> Sandbox -> Summarization -> TodoList -> Title -> Memory -> ViewImage -> LoopDetection -> ToolErrorHandling -> SubagentLimit -> DeferredToolFilter -> DanglingToolCall -> Clarification。
+
+### 流式传输的状态一致性
+
+**难点**：SSE 流式传输中，前端需要同时处理多种流类型（消息、Thinking 推理、子代理任务事件、工具调用），且页面刷新后需要恢复流状态。Safari 浏览器对 SSE 重连行为不一致。
+
+**方案**：
+- 使用 sessionStorage 存储 `lg:stream:{threadId}` 到 `runId` 的映射，实现 `reconnectOnMount` 断点续传
+- 后端设置 `onDisconnect: "continue"` 确保客户端断连后运行不中断
+- 线程列表添加 `refetchOnWindowFocus`、`staleTime: 30s`、`visibilitychange` 监听器修复 Safari 兼容性
+- 子代理任务通过 `onCustomEvent` 触发 `useUpdateSubtask()` 实时更新 SubtaskCard
+
+### 配置热重载的一致性
+
+**难点**：config.yaml 和 .env 由前端 UI 修改后需要立即生效，但 LangGraph Server、Gateway API、前端三个进程各自持有配置缓存。
+
+**方案**：AppConfig 单例采用 mtime 文件修改时间检测 + 自动热重载机制。Gateway API 每次请求通过 `get_app_config()` 获取配置时自动检查文件变更，LangGraph Server 在 Gateway 的 `--reload` 模式下监听 yaml 文件变化自动重启。环境变量通过 `load_dotenv` + `resolve_env_variables` 递归替换 `$VAR` 引用。
+
+### 长对话的上下文管理
+
+**难点**：长对话容易超出模型的 token 上限，导致请求失败或上下文丢失。
+
+**方案**：实现可配置的 SummarizationMiddleware，支持三种触发策略（token 阈值、消息数量、模型上限百分比），触发后由轻量模型生成摘要，保留最近 N 条消息 + 摘要作为新的上下文。
+
+## 性能优化
+
+### 启动速度优化
+
+| 优化项 | 措施 | 效果 |
+|--------|------|------|
+| 服务并行启动 | LangGraph、Gateway、Frontend 三个服务同时启动，仅 Nginx 在三端口就绪后启动 | 启动提速 40-60% |
+| 配置升级快速跳过 | config-upgrade.sh 添加 bash 级 grep 对比 config_version，版本一致时直接退出不启动 Python | 减少冷启动 1-2s |
+| 无用依赖清理 | 移除零引用的 kubernetes 和 duckdb 包（约 130MB），移除 Nuxt 项目中误引入的 nuxt-og-image | 安装体积缩减，加速 CI |
+
+### 前端运行时优化
+
+| 优化项 | 措施 | 效果 |
+|--------|------|------|
+| Shiki 代码高亮懒加载 | codeToHtml 改为 `await import("shiki")` 动态导入，类型 import 保持静态 | 首屏 JS 体积减少 ~200KB |
+| CodeMirror 编辑器懒加载 | 10 个 CodeMirror 包（7 语言 + 2 主题 + react-codemirror）用 `next/dynamic` + `ssr: false` 包裹，内部通过 `Promise.all()` 并行加载 | 首屏 JS 体积减少 ~500KB |
+| 乐观 UI 更新 | 消息发送即时显示，线程创建 optimistic 插入 query cache | 消除网络延迟感知 |
+| TanStack Query 缓存策略 | `staleTime: 30s` + `refetchOnWindowFocus` + `visibilitychange` 监听 | 减少不必要的 API 请求 |
+
+### Bug 修复带来的稳定性提升
+
+| 问题 | 根因 | 修复 |
+|------|------|------|
+| max_tokens 400 错误 | GLM-5 通过华为 ModelArts 最大支持 131072，原配置 200000 导致 BadRequest 被前端静默吞掉 | 修正为 131072 |
+| 消息发送期间追加导致 UI 卡死 | sendMessage 中 sendInFlightRef 为 true 时直接 return 丢弃第二条消息 | 改为先 `await thread.stop()` 取消当前运行再发送新消息 |
+| 线程列表消失（Safari） | useThreads 缺少 refetch 策略，tab 切换后缓存过期 | 添加 refetchOnWindowFocus、staleTime、visibilitychange 监听、onCreated optimistic 插入 |
+| Thinking 状态显示异常 | 乐观 thinking 占位消息使用静态 spinner，与实际推理内容切换时闪烁 | 改用 Reasoning 组件（脑图标 + shimmer 动画 + 实时计秒器） |
+
+## 系统架构
 
 ```
-                        ┌──────────────────────────────────────┐
-                        │          Nginx (端口 1000)           │
-                        │        统一反向代理服务器               │
-                        └───────┬──────────────────┬───────────┘
-                                │                  │
-              /api/langgraph/*  │                  │  /api/* (其他)
-                                ▼                  ▼
-               ┌────────────────────┐  ┌────────────────────────┐
-               │ LangGraph 服务器    │  │   网关 API (8001)       │
-               │    (端口 2024)      │  │   FastAPI REST         │
-               │                    │  │                        │
-               │ ┌────────────────┐ │  │   模型、MCP、Skills、    │
-               │ │     主代理      │ │  │   记忆、上传、产物        │
-               │ │  ┌──────────┐  │ │  │                        │
-               │ │  │          │  │ │  └────────────────────────┘
-               │ │  │ 中间件链  │  │ │
-               │ │  └──────────┘  │ │
-               │ │  ┌──────────┐  │ │
-               │ │  │  工具集   │  │ │
-               │ │  └──────────┘  │ │
-               │ │  ┌──────────┐  │ │
-               │ │  │ 子代理    │  │ │
-               │ │  └──────────┘  │ │
-               │ └────────────────┘ │
-               └────────────────────┘
+                     ┌─────────────────────────────────────────────┐
+                     │            Nginx (端口 1000)                │
+                     │           统一反向代理入口                   │
+                     └──────┬────────────────────┬─────────────────┘
+                            │                    │
+          /api/langgraph/*  │                    │  /api/* (其他)
+                            v                    v
+          ┌──────────────────────┐  ┌──────────────────────────────┐
+          │  LangGraph Server    │  │   Gateway API (端口 8001)    │
+          │    (端口 2024)       │  │   FastAPI REST               │
+          │                      │  │                              │
+          │ ┌──────────────────┐ │  │  /api/models      模型列表   │
+          │ │    Lead Agent    │ │  │  /api/mcp/config  MCP 配置   │
+          │ │                  │ │  │  /api/skills      技能管理   │
+          │ │  12 层中间件链    │ │  │  /api/memory      记忆数据   │
+          │ │       |          │ │  │  /api/setup/*     配置管理   │
+          │ │   工具系统        │ │  │  /api/threads/*   线程管理   │
+          │ │       |          │ │  │                              │
+          │ │  子代理(x3并行)   │ │  └──────────────────────────────┘
+          │ └──────────────────┘ │
+          └──────────────────────┘
+                            │
+          ┌──────────────────────┐
+          │   Frontend (端口 3000)│
+          │   Next.js 16         │
+          │   React 19           │
+          │   TailwindCSS 4      │
+          │   Shadcn UI          │
+          └──────────────────────┘
 ```
 
-**请求路由** (通过 Nginx):
-- `/api/langgraph/*` → LangGraph 服务器 - 代理交互、线程、流式传输
-- `/api/*` (其他) → 网关 API - 模型、MCP、skills、记忆、产物、上传
-- `/` (非 API) → 前端 - Next.js Web 界面
+**请求路由**（通过 Nginx）：
+- `/api/langgraph/*` -> LangGraph Server：代理交互、线程管理、SSE 流式传输
+- `/api/*`（其他）-> Gateway API：模型、MCP、Skills、记忆、文件上传、产物
+- `/`（非 API）-> Frontend：Next.js Web 界面
 
----
+### 中间件链详解
 
-## 🚀 快速开始
+| 序号 | 中间件 | 职责 |
+|------|--------|------|
+| 1 | ThreadDataMiddleware | 创建线程专属隔离目录（workspace/uploads/outputs） |
+| 2 | UploadsMiddleware | 将新上传的文件注入到对话上下文 |
+| 3 | SandboxMiddleware | 获取并管理沙箱执行环境生命周期 |
+| 4 | SummarizationMiddleware | 接近 token 上限时自动摘要压缩上下文 |
+| 5 | TodoListMiddleware | 计划模式下跟踪多步骤任务进度 |
+| 6 | TitleMiddleware | 首轮对话后自动生成会话标题 |
+| 7 | MemoryMiddleware | 将对话排入异步记忆抽取队列 |
+| 8 | ViewImageMiddleware | 为视觉模型注入图像数据 |
+| 9 | LoopDetectionMiddleware | 检测并中断代理的无限循环调用 |
+| 10 | ToolErrorHandlingMiddleware | 工具调用失败时的错误降级处理 |
+| 11 | SubagentLimitMiddleware | 控制子代理并发数量上限 |
+| 12 | DeferredToolFilterMiddleware | 延迟工具加载，减少上下文占用 |
+| 13 | DanglingToolCallMiddleware | 清理悬挂的未完成工具调用 |
+| 14 | ClarificationMiddleware | 拦截澄清请求并中断图执行（必须在最后） |
+
+### 工具生态
+
+| 类别 | 工具 | 说明 |
+|------|------|------|
+| 沙箱 | bash, ls, read_file, write_file, str_replace | 线程隔离的文件系统操作 |
+| 内置 | present_files, ask_clarification, view_image, task | 文件展示、交互澄清、图像理解、子代理委派 |
+| 社区 | Tavily, Jina AI, Firecrawl, DuckDuckGo | 网页搜索、网页抓取、图片搜索 |
+| MCP | 任意 MCP 兼容服务器 | 支持 stdio/SSE/HTTP 传输协议 |
+| Skills | 领域专属工作流 | 通过 System Prompt 注入的可配置技能包 |
+
+## 快速开始
 
 只需 4 步即可运行 MedrixFlow，**无需手动编辑任何配置文件**。
 
-### 1. 安装前置工具
+### 第 1 步：安装前置工具
 
 | 工具 | 版本要求 | 安装方式 |
 |------|---------|---------|
@@ -94,128 +207,178 @@ MedrixFlow 是一个基于 LangGraph 构建的 AI 超级代理系统，具有沙
 | uv | 最新版 | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 | Node.js | 22+ | [nodejs.org](https://nodejs.org/) |
 | pnpm | 10+ | `npm install -g pnpm` |
-| nginx | - | macOS: `brew install nginx`，Linux: `sudo apt install nginx` |
+| nginx | - | macOS: `brew install nginx` / Linux: `sudo apt install nginx` |
 
-### 2. 克隆 & 安装依赖
+### 第 2 步：克隆与安装
 
 ```bash
 git clone https://github.com/Citrus-bit/medrix-flow.git
 cd medrix-flow
-make config    # 自动生成配置文件（首次运行）
-make install   # 一键安装前后端依赖
+make config    # 自动生成 config.yaml 和 .env（仅首次需要）
+make install   # 一键安装前后端所有依赖
 ```
 
-### 3. 启动
+### 第 3 步：启动服务
 
 ```bash
-make stop && make dev       # 启动所有服务（LangGraph + 网关 + 前端 + Nginx）
+make dev       # 启动所有服务（LangGraph + Gateway + Frontend + Nginx）
 ```
 
-启动完成后，浏览器会自动打开 **http://localhost:1000**。
+启动完成后浏览器自动打开 **http://localhost:1000**。
 
-### 4. 配置模型 & API 密钥
+> 也可以使用 `make dev-daemon` 在后台启动，或双击 `start.command` 一键启动。
 
-首次打开页面时，设置面板会自动弹出，引导你完成配置：
+### 第 4 步：在页面配置模型与 API Key
 
-1. 在「配置」页面添加你的 LLM 模型（支持 OpenAI、Anthropic、Google Gemini、DeepSeek 等）
-2. 填入模型 API Key，点击「测试」验证连通性
-3. 如需网页搜索/抓取功能，填入 Tavily / Jina 的 API Key
-4. 点击「保存配置」—— 完成！
+首次打开页面时，设置面板会**自动弹出**引导你完成配置：
 
-> 你也可以随时通过左下角的「设置和更多」→「设置」重新打开配置面板。
+1. **添加模型**：在「配置」页面选择提供商（OpenAI / Anthropic / Google Gemini / DeepSeek / OpenAI Compatible），填入模型名称
+2. **填入 API Key**：输入对应的 API Key，点击「测试」按钮验证连通性
+3. **配置工具密钥**（可选）：如需网页搜索功能，填入 Tavily / Jina 的 API Key
+4. **保存配置** - 完成！配置自动持久化，服务自动热重载
+
+> 后续可随时通过左下角「设置和更多」->「设置」->「配置」重新打开配置面板。
 
 ### 常用命令
 
 | 命令 | 说明 |
 |------|------|
-| `make dev` | 启动所有服务（开发模式，支持热重载） |
+| `make dev` | 开发模式启动（支持热重载） |
+| `make start` | 生产模式启动（性能优化） |
+| `make dev-daemon` | 后台守护进程启动 |
 | `make stop` | 停止所有服务 |
 | `make check` | 检查前置工具是否已安装 |
 | `make clean` | 停止服务并清理临时文件 |
+| `make up` | Docker 生产部署 |
+| `make down` | 停止 Docker 容器 |
 
----
+## 技术栈
 
-## 📁 项目结构
+### 后端
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| **LangGraph** | 1.0.6+ | 多代理编排引擎，有向图状态机 |
+| **LangChain** | 1.2.3+ | LLM 抽象层、工具系统、MCP 适配器 |
+| **FastAPI** | 0.115.0+ | Gateway REST API，异步高性能 |
+| **Python** | 3.12+ | 后端运行时 |
+| **uv** | 最新版 | 包管理器，替代 pip/poetry |
+| **agent-sandbox** | - | 沙箱代码执行 |
+| **markitdown** | - | 多格式文档转 Markdown |
+
+### 前端
+
+| 技术 | 版本 | 用途 |
+|------|------|------|
+| **Next.js** | 16 | React 元框架，App Router + Turbopack |
+| **React** | 19 | UI 库 |
+| **TypeScript** | 5.x | 类型安全 |
+| **TailwindCSS** | 4 | 原子化 CSS 框架 |
+| **Shadcn UI** | - | 基础组件库 |
+| **MagicUI** | - | 现代动效组件 |
+| **TanStack Query** | - | 服务端状态管理 |
+| **LangGraph SDK** | - | Agent 交互 |
+
+## 项目结构
 
 ```
 medrix-flow/
-├── backend/                    # 后端服务
+├── backend/                        # 后端服务
+│   ├── packages/harness/medrix_flow/
+│   │   ├── agents/                 # 代理系统
+│   │   │   ├── lead_agent/         #   主代理（工厂 + 提示词）
+│   │   │   ├── middlewares/        #   14 个中间件组件
+│   │   │   ├── memory/             #   记忆抽取与存储
+│   │   │   └── thread_state.py     #   线程状态 Schema
+│   │   ├── sandbox/                # 沙箱执行引擎
+│   │   ├── subagents/              # 子代理系统（注册 + 执行器）
+│   │   ├── tools/                  # 工具集
+│   │   ├── mcp/                    # MCP 协议集成
+│   │   ├── models/                 # 模型工厂 + Provider 补丁
+│   │   ├── skills/                 # Skill 发现与加载
+│   │   ├── community/              # 社区工具（Tavily/Jina/Firecrawl）
+│   │   └── config/                 # 配置系统（热重载 + 环境变量解析）
+│   ├── app/gateway/                # FastAPI 网关
+│   │   ├── app.py                  #   应用入口
+│   │   └── routers/                #   路由模块（models/mcp/skills/memory/setup）
+│   ├── tests/                      # 测试套件（277 个用例）
+│   ├── langgraph.json              # LangGraph 入口配置
+│   └── pyproject.toml              # Python 依赖
+│
+├── frontend/                       # 前端应用
 │   ├── src/
-│   │   ├── agents/            # 代理系统
-│   │   │   ├── lead_agent/    # 主代理 (工厂、提示词)
-│   │   │   ├── middlewares/   # 9 个中间件组件
-│   │   │   ├── memory/        # 记忆提取与存储
-│   │   │   └── thread_state.py
-│   │   ├── gateway/           # FastAPI 网关
-│   │   │   ├── app.py
-│   │   │   └── routers/      # 路由模块
-│   │   ├── sandbox/          # 沙箱执行
-│   │   ├── subagents/        # 子代理系统
-│   │   ├── tools/            # 工具集
-│   │   ├── mcp/              # MCP 协议集成
-│   │   ├── models/           # 模型工厂
-│   │   ├── skills/           # Skill 发现与加载
-│   │   └── config/           # 配置系统
-│   ├── docs/                 # 文档
-│   ├── tests/                # 测试
-│   ├── pyproject.toml        # Python 依赖
-│   └── Makefile              # 开发命令
+│   │   ├── app/                    # Next.js App Router 路由
+│   │   ├── components/
+│   │   │   ├── ui/                 #   基础 UI 组件
+│   │   │   ├── workspace/          #   工作区组件（聊天/设置/侧边栏）
+│   │   │   └── ai-elements/        #   AI 组件（推理/代码块/模型选择器）
+│   │   ├── core/                   # 核心业务逻辑
+│   │   │   ├── threads/            #   线程管理 + 流式传输
+│   │   │   ├── setup/              #   配置管理（类型/API/Hooks）
+│   │   │   ├── i18n/               #   国际化（中/英）
+│   │   │   └── settings/           #   本地设置（localStorage）
+│   │   └── hooks/                  # 自定义 React Hooks
+│   └── package.json
 │
-├── frontend/                  # 前端应用
-│   ├── src/
-│   │   ├── app/              # Next.js App Router
-│   │   ├── components/       # React 组件
-│   │   ├── core/             # 核心业务逻辑
-│   │   ├── hooks/            # 自定义 Hooks
-│   │   └── lib/              # 共享库
-│   ├── public/               # 静态资源
-│   ├── package.json          # Node 依赖
-│   └── README.md             # 前端文档
+├── skills/                         # 技能系统
+│   ├── public/                     #   公共技能包
+│   └── custom/                     #   自定义技能
 │
-├── skills/                   # 技能系统
-│   ├── public/               # 公共技能
-│   └── custom/               # 自定义技能
+├── scripts/                        # 脚本工具
+│   ├── serve.sh                    #   服务启动（并行 + 健康检查）
+│   ├── start-daemon.sh             #   守护进程启动
+│   ├── config-upgrade.sh           #   配置版本升级
+│   └── deploy.sh                   #   Docker 部署
 │
-├── scripts/                  # 脚本工具
-├── logs/                     # 日志文件
-├── docker/                   # Docker 配置
-├── config.example.yaml       # 配置示例
-├── Makefile                  # 根目录命令
-└── README.md                 # 本文件
+├── docker/                         # Docker 配置
+│   ├── nginx/                      #   Nginx 反向代理配置
+│   ├── docker-compose.yaml         #   生产部署编排
+│   └── docker-compose-dev.yaml     #   开发环境编排
+│
+├── config.example.yaml             # 配置模板（含完整字段示例）
+├── Makefile                        # 根目录命令入口
+└── README.md                       # 本文件
 ```
 
----
+## 配置说明
 
-## ⚙️ 配置说明
+### 前端 UI 配置（推荐）
 
-### 前端配置（推荐）
+MedrixFlow 支持通过 Web 界面直接管理所有模型和 API 密钥配置：
 
-MedrixFlow 支持通过 Web 界面直接管理模型和 API 密钥，无需手动编辑配置文件：
-
-- **模型配置**：添加/编辑/删除 LLM 模型，支持一键测试连通性
+- **模型管理**：添加 / 编辑 / 删除 LLM 模型，支持 5 种预设提供商 + OpenAI Compatible 兼容模式
+- **连通性测试**：每个模型配置旁的「测试」按钮，动态实例化 Provider 验证可用性
 - **工具 API Key**：配置 Tavily（网页搜索）和 Jina（网页抓取）的密钥
-- **保存即生效**：所有更改自动持久化到 `config.yaml` 和 `.env`，服务自动热重载
+- **即时生效**：保存后自动写入 config.yaml 和 .env，服务自动热重载
 
-打开方式：左下角「设置和更多」→「设置」→「配置」标签页。
+**打开方式**：左下角「设置和更多」->「设置」->「配置」标签页
 
 ### 手动配置（高级用户）
 
-如需更精细的控制，可以直接编辑项目根目录下的 `config.yaml`：
+直接编辑项目根目录的 `config.yaml`，主要配置段：
 
-主要配置项:
-- `models` - LLM 模型配置 (类路径、API 密钥、思考/视觉支持)
-- `tools` - 工具定义 (模块路径和分组)
-- `tool_groups` - 逻辑工具分组
-- `sandbox` - 执行环境提供者
-- `skills` - Skills 目录路径
-- `title` - 自动标题生成设置
-- `summarization` - 上下文摘要设置
-- `subagents` - 子代理系统 (启用/禁用)
-- `memory` - 记忆系统设置
+| 配置段 | 说明 |
+|--------|------|
+| `models` | LLM 模型定义（类路径、API Key、Thinking/Vision 支持） |
+| `tools` | 工具定义（模块路径、分组） |
+| `sandbox` | 执行环境（本地 / Docker / K3s） |
+| `skills` | 技能目录路径 |
+| `memory` | 记忆系统（启用、存储、防抖、事实上限） |
+| `summarization` | 上下文摘要（触发策略、保留策略） |
+| `subagents` | 子代理（超时配置） |
+| `channels` | IM 渠道（飞书/Slack/Telegram） |
+| `guardrails` | 工具调用授权守卫 |
+| `checkpointer` | 状态持久化（memory/sqlite/postgres） |
 
-### 扩展配置 (`extensions_config.json`)
+### 环境变量
 
-MCP 服务器和 skill 状态的统一配置:
+配置值以 `$` 开头会自动解析为环境变量。常用变量：
+
+- 模型 API Key：`OPENAI_API_KEY`、`ANTHROPIC_API_KEY`、`DEEPSEEK_API_KEY`、`GOOGLE_API_KEY`
+- 工具 API Key：`TAVILY_API_KEY`、`JINA_API_KEY`、`GITHUB_TOKEN`
+- 配置覆盖：`MEDRIX_FLOW_CONFIG_PATH`、`MEDRIX_FLOW_EXTENSIONS_CONFIG_PATH`
+
+### MCP 服务器配置（extensions_config.json）
 
 ```json
 {
@@ -225,47 +388,23 @@ MCP 服务器和 skill 状态的统一配置:
       "type": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {"GITHUB_TOKEN": "$GITHUB_TOKEN"}
+      "env": { "GITHUB_TOKEN": "$GITHUB_TOKEN" }
     }
-  },
-  "skills": {
-    "pdf-processing": {"enabled": true}
   }
 }
 ```
 
-### 环境变量
+## 支持的模型提供商
 
-- `MEDRIX_FLOW_CONFIG_PATH` - 覆盖 config.yaml 位置
-- `MEDRIX_FLOW_EXTENSIONS_CONFIG_PATH` - 覆盖 extensions_config.json 位置
-- 模型 API 密钥: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY` 等
-- 工具 API 密钥: `TAVILY_API_KEY`, `GITHUB_TOKEN` 等
+| 提供商 | Provider 类路径 | 备注 |
+|--------|-----------------|------|
+| OpenAI | `langchain_openai:ChatOpenAI` | GPT-4o / GPT-5 / o1 等 |
+| Anthropic | `langchain_anthropic:ChatAnthropic` | Claude 3.5/4 系列 |
+| Google Gemini | `langchain_google_genai:ChatGoogleGenerativeAI` | Gemini 2.5 Pro/Flash |
+| DeepSeek | `medrix_flow.models.patched_deepseek:PatchedChatDeepSeek` | DeepSeek V3 / Reasoner |
+| OpenAI Compatible | `langchain_openai:ChatOpenAI` + 自定义 base_url | 华为 ModelArts、Novita、MiniMax、OpenRouter 等 |
 
----
-
-## 🛠️ 技术栈
-
-### 后端
-- **LangGraph** (1.0.6+) - 代理框架和多代理编排
-- **LangChain** (1.2.3+) - LLM 抽象和工具系统
-- **FastAPI** (0.115.0+) - 网关 REST API
-- **langchain-mcp-adapters** - Model Context Protocol 支持
-- **agent-sandbox** - 沙箱代码执行
-- **markitdown** - 多格式文档转换
-- **tavily-python** / **firecrawl-py** - 网页搜索和抓取
-
-### 前端
-- **Next.js 16** - React 框架 (App Router)
-- **React 19** - UI 库
-- **Tailwind CSS 4** - 样式框架
-- **Shadcn UI** - UI 组件库
-- **MagicUI** - 现代 UI 组件
-- **LangGraph SDK** - 代理交互
-- **Vercel AI Elements** - AI UI 元素
-
----
-
-## 📖 文档
+## 文档
 
 - [配置指南](./backend/docs/CONFIGURATION.md)
 - [架构详解](./backend/docs/ARCHITECTURE.md)
@@ -276,17 +415,14 @@ MCP 服务器和 skill 状态的统一配置:
 - [计划模式](./backend/docs/plan_mode_usage.md)
 - [安装指南](./backend/docs/SETUP.md)
 
----
-
-## 📄 许可证
+## 许可证
 
 MIT License - 查看 [LICENSE](./LICENSE) 文件了解更多详情。
 
----
+## 鸣谢
 
-## 🌟 鸣谢
-
-- [LangGraph](https://langchain-ai.github.io/langgraph/) - 强大的图状态机框架
+- [LangGraph](https://langchain-ai.github.io/langgraph/) - 图状态机代理框架
 - [LangChain](https://www.langchain.com/) - LLM 应用开发框架
 - [Next.js](https://nextjs.org/) - React 元框架
+- [Shadcn UI](https://ui.shadcn.com/) - UI 组件库
 - 所有开源库的贡献者
