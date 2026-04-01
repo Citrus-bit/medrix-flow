@@ -8,9 +8,11 @@ from medrix_flow.agents.lead_agent.prompt import apply_prompt_template
 from medrix_flow.agents.middlewares.clarification_middleware import ClarificationMiddleware
 from medrix_flow.agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware
 from medrix_flow.agents.middlewares.memory_middleware import MemoryMiddleware
+from medrix_flow.agents.middlewares.sandbox_audit_middleware import SandboxAuditMiddleware
 from medrix_flow.agents.middlewares.subagent_limit_middleware import SubagentLimitMiddleware
 from medrix_flow.agents.middlewares.title_middleware import TitleMiddleware
 from medrix_flow.agents.middlewares.todo_middleware import TodoMiddleware
+from medrix_flow.agents.middlewares.token_usage_middleware import TokenUsageMiddleware
 from medrix_flow.agents.middlewares.tool_error_handling_middleware import build_lead_runtime_middlewares
 from medrix_flow.agents.middlewares.view_image_middleware import ViewImageMiddleware
 from medrix_flow.agents.thread_state import ThreadState
@@ -243,6 +245,7 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
     # Add DeferredToolFilterMiddleware to hide deferred tool schemas from model binding
     if app_config.tool_search.enabled:
         from medrix_flow.agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
+
         middlewares.append(DeferredToolFilterMiddleware())
 
     # Add SubagentLimitMiddleware to truncate excess parallel task calls
@@ -253,6 +256,12 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
 
     # LoopDetectionMiddleware — detect and break repetitive tool call loops
     middlewares.append(LoopDetectionMiddleware())
+
+    # SandboxAuditMiddleware — bash command security auditing (block/warn/pass)
+    middlewares.append(SandboxAuditMiddleware())
+
+    # TokenUsageMiddleware — log LLM token usage per turn
+    middlewares.append(TokenUsageMiddleware())
 
     # ClarificationMiddleware should always be last
     middlewares.append(ClarificationMiddleware())

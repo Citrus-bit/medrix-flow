@@ -291,6 +291,30 @@ export interface Translations {
     tools: {
       title: string;
       description: string;
+      addServer: string;
+      deleteServer: string;
+      deleteConfirm: string;
+      testConnection: string;
+      saveChanges: string;
+      serverName: string;
+      serverNamePlaceholder: string;
+      transportType: string;
+      command: string;
+      commandPlaceholder: string;
+      arguments: string;
+      argumentsPlaceholder: string;
+      serverUrl: string;
+      serverUrlPlaceholder: string;
+      envVars: string;
+      envVarsPlaceholder: string;
+      httpHeaders: string;
+      headersPlaceholder: string;
+      descriptionLabel: string;
+      descriptionPlaceholder: string;
+      emptyTitle: string;
+      emptyDescription: string;
+      noChanges: string;
+      saveSuccess: string;
     };
     skills: {
       title: string;

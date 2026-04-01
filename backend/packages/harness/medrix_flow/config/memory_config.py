@@ -55,6 +55,10 @@ class MemoryConfig(BaseModel):
         le=8000,
         description="Maximum tokens to use for memory injection",
     )
+    storage_class: str = Field(
+        default="medrix_flow.agents.memory.storage.FileMemoryStorage",
+        description="Dotted path to the MemoryStorage implementation class",
+    )
 
 
 # Global configuration instance

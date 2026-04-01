@@ -1,20 +1,55 @@
 """Middleware for memory mechanism."""
 
+import logging
 import re
 from typing import Any, override
 
 from langchain.agents import AgentState
 from langchain.agents.middleware import AgentMiddleware
+from langgraph.config import get_config
 from langgraph.runtime import Runtime
 
 from medrix_flow.agents.memory.queue import get_memory_queue
 from medrix_flow.config.memory_config import get_memory_config
+
+logger = logging.getLogger(__name__)
+
+_UPLOAD_BLOCK_RE = re.compile(r"<uploaded_files>[\s\S]*?</uploaded_files>\n*", re.IGNORECASE)
+_CORRECTION_PATTERNS = (
+    re.compile(r"\bthat(?:'s| is) (?:wrong|incorrect)\b", re.IGNORECASE),
+    re.compile(r"\byou misunderstood\b", re.IGNORECASE),
+    re.compile(r"\btry again\b", re.IGNORECASE),
+    re.compile(r"\bredo\b", re.IGNORECASE),
+    re.compile(r"不对"),
+    re.compile(r"你理解错了"),
+    re.compile(r"你理解有误"),
+    re.compile(r"重试"),
+    re.compile(r"重新来"),
+    re.compile(r"换一种"),
+    re.compile(r"改用"),
+)
 
 
 class MemoryMiddlewareState(AgentState):
     """Compatible with the `ThreadState` schema."""
 
     pass
+
+
+def _extract_message_text(message: Any) -> str:
+    """Extract plain text from message content for filtering and signal detection."""
+    content = getattr(message, "content", "")
+    if isinstance(content, list):
+        text_parts: list[str] = []
+        for part in content:
+            if isinstance(part, str):
+                text_parts.append(part)
+            elif isinstance(part, dict):
+                text_val = part.get("text")
+                if isinstance(text_val, str):
+                    text_parts.append(text_val)
+        return " ".join(text_parts)
+    return str(content)
 
 
 def _filter_messages_for_memory(messages: list[Any]) -> list[Any]:
@@ -40,18 +75,13 @@ def _filter_messages_for_memory(messages: list[Any]) -> list[Any]:
     Returns:
         Filtered list containing only user inputs and final assistant responses.
     """
-    _UPLOAD_BLOCK_RE = re.compile(r"<uploaded_files>[\s\S]*?</uploaded_files>\n*", re.IGNORECASE)
-
     filtered = []
     skip_next_ai = False
     for msg in messages:
         msg_type = getattr(msg, "type", None)
 
         if msg_type == "human":
-            content = getattr(msg, "content", "")
-            if isinstance(content, list):
-                content = " ".join(p.get("text", "") for p in content if isinstance(p, dict))
-            content_str = str(content)
+            content_str = _extract_message_text(msg)
             if "<uploaded_files>" in content_str:
                 # Strip the ephemeral upload block; keep the user's real question.
                 stripped = _UPLOAD_BLOCK_RE.sub("", content_str).strip()
@@ -81,6 +111,24 @@ def _filter_messages_for_memory(messages: list[Any]) -> list[Any]:
         # Skip tool messages and AI messages with tool_calls
 
     return filtered
+
+
+def detect_correction(messages: list[Any]) -> bool:
+    """Detect explicit user corrections in recent conversation turns.
+
+    Checks only the last 6 messages for correction signals to avoid
+    stale matches from long histories.
+    """
+    recent_user_msgs = [msg for msg in messages[-6:] if getattr(msg, "type", None) == "human"]
+
+    for msg in recent_user_msgs:
+        content = _extract_message_text(msg).strip()
+        if not content:
+            continue
+        if any(pattern.search(content) for pattern in _CORRECTION_PATTERNS):
+            return True
+
+    return False
 
 
 class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
@@ -119,16 +167,19 @@ class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
         if not config.enabled:
             return None
 
-        # Get thread ID from runtime context
-        thread_id = runtime.context.get("thread_id")
+        # Get thread ID from runtime context first, then fall back to LangGraph's configurable metadata
+        thread_id = runtime.context.get("thread_id") if runtime.context else None
+        if thread_id is None:
+            config_data = get_config()
+            thread_id = config_data.get("configurable", {}).get("thread_id")
         if not thread_id:
-            print("MemoryMiddleware: No thread_id in context, skipping memory update")
+            logger.debug("No thread_id in context, skipping memory update")
             return None
 
         # Get messages from state
         messages = state.get("messages", [])
         if not messages:
-            print("MemoryMiddleware: No messages in state, skipping memory update")
+            logger.debug("No messages in state, skipping memory update")
             return None
 
         # Filter to only keep user inputs and final assistant responses
@@ -143,7 +194,13 @@ class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
             return None
 
         # Queue the filtered conversation for memory update
+        correction_detected = detect_correction(filtered_messages)
         queue = get_memory_queue()
-        queue.add(thread_id=thread_id, messages=filtered_messages, agent_name=self._agent_name)
+        queue.add(
+            thread_id=thread_id,
+            messages=filtered_messages,
+            agent_name=self._agent_name,
+            correction_detected=correction_detected,
+        )
 
         return None

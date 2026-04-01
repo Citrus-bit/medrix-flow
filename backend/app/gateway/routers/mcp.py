@@ -1,8 +1,12 @@
+import asyncio
 import json
 import logging
+import os
+import shutil
 from pathlib import Path
 from typing import Literal
 
+import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -167,3 +171,103 @@ async def update_mcp_configuration(request: McpConfigUpdateRequest) -> McpConfig
     except Exception as e:
         logger.error(f"Failed to update MCP configuration: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to update MCP configuration: {str(e)}")
+
+
+class McpTestRequest(BaseModel):
+    """Request model for testing an MCP server connection."""
+
+    type: str = Field(default="stdio", description="Transport type: 'stdio', 'sse', or 'http'")
+    command: str | None = Field(default=None, description="Command (for stdio type)")
+    args: list[str] = Field(default_factory=list, description="Arguments (for stdio type)")
+    env: dict[str, str] = Field(default_factory=dict, description="Environment variables (for stdio type)")
+    url: str | None = Field(default=None, description="URL (for sse or http type)")
+    headers: dict[str, str] = Field(default_factory=dict, description="HTTP headers (for sse or http type)")
+
+
+class McpTestResponse(BaseModel):
+    """Response model for MCP server connection test."""
+
+    success: bool
+    message: str
+
+
+@router.post(
+    "/mcp/test",
+    response_model=McpTestResponse,
+    summary="Test MCP Server Connection",
+    description="Test whether an MCP server is reachable and can be started.",
+)
+async def test_mcp_server(request: McpTestRequest) -> McpTestResponse:
+    """Test an MCP server connection.
+
+    For stdio servers: checks if the command exists and can be launched.
+    For sse/http servers: sends a HEAD/GET request to the URL.
+
+    Returns:
+        Test result with success status and message.
+    """
+    transport_type = request.type or "stdio"
+
+    try:
+        if transport_type == "stdio":
+            if not request.command:
+                return McpTestResponse(success=False, message="Command is required for stdio transport.")
+
+            command = request.command
+            if not shutil.which(command):
+                return McpTestResponse(success=False, message=f"Command '{command}' not found in PATH.")
+
+            try:
+                env = {**os.environ, **request.env} if request.env else None
+                proc = await asyncio.create_subprocess_exec(
+                    command,
+                    *request.args,
+                    stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    env=env,
+                )
+                try:
+                    await asyncio.wait_for(proc.communicate(input=b""), timeout=5.0)
+                except asyncio.TimeoutError:
+                    proc.terminate()
+                    try:
+                        await asyncio.wait_for(proc.wait(), timeout=3.0)
+                    except asyncio.TimeoutError:
+                        proc.kill()
+
+                return McpTestResponse(success=True, message=f"Command '{command}' launched successfully.")
+            except FileNotFoundError:
+                return McpTestResponse(success=False, message=f"Command '{command}' not found.")
+            except PermissionError:
+                return McpTestResponse(success=False, message=f"Permission denied when running '{command}'.")
+            except Exception as e:
+                return McpTestResponse(success=False, message=f"Failed to launch command: {str(e)}")
+
+        elif transport_type in ("sse", "http"):
+            if not request.url:
+                return McpTestResponse(success=False, message="URL is required for sse/http transport.")
+
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.get(
+                        request.url,
+                        headers=request.headers or {},
+                    )
+                    return McpTestResponse(
+                        success=True,
+                        message=f"Server responded with status {response.status_code}.",
+                    )
+            except httpx.ConnectError:
+                return McpTestResponse(success=False, message=f"Cannot connect to {request.url}.")
+            except httpx.TimeoutException:
+                return McpTestResponse(success=False, message=f"Connection to {request.url} timed out.")
+            except Exception as e:
+                return McpTestResponse(success=False, message=f"Connection failed: {str(e)}")
+
+        else:
+            return McpTestResponse(success=False, message=f"Unsupported transport type: {transport_type}")
+
+    except Exception as e:
+        logger.error(f"MCP test failed: {e}", exc_info=True)
+        return McpTestResponse(success=False, message=f"Test failed: {str(e)}")

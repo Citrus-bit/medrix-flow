@@ -17,6 +17,7 @@ class ConversationContext:
     messages: list[Any]
     timestamp: datetime = field(default_factory=datetime.utcnow)
     agent_name: str | None = None
+    correction_detected: bool = False
 
 
 class MemoryUpdateQueue:
@@ -34,13 +35,14 @@ class MemoryUpdateQueue:
         self._timer: threading.Timer | None = None
         self._processing = False
 
-    def add(self, thread_id: str, messages: list[Any], agent_name: str | None = None) -> None:
+    def add(self, thread_id: str, messages: list[Any], agent_name: str | None = None, correction_detected: bool = False) -> None:
         """Add a conversation to the update queue.
 
         Args:
             thread_id: The thread ID.
             messages: The conversation messages.
             agent_name: If provided, memory is stored per-agent. If None, uses global memory.
+            correction_detected: Whether user corrections were detected in recent turns.
         """
         config = get_memory_config()
         if not config.enabled:
@@ -50,6 +52,7 @@ class MemoryUpdateQueue:
             thread_id=thread_id,
             messages=messages,
             agent_name=agent_name,
+            correction_detected=correction_detected,
         )
 
         with self._lock:

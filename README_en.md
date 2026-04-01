@@ -26,7 +26,7 @@ MedrixFlow is a full-stack AI agent orchestration platform. The backend leverage
 Unlike simple LLM chain-of-thought calls, MedrixFlow uses a **LangGraph directed graph state machine** as its core orchestration engine:
 
 - **Lead Agent + Subagent Hierarchical Architecture**: The lead agent handles task understanding and decomposition, delegating to up to 3 subagents that execute in parallel, each with an independent 15-minute timeout
-- **14-Layer Middleware Chain**: A strictly ordered middleware pipeline covering cross-cutting concerns including thread isolation, file upload injection, sandbox lifecycle, context summarization, memory extraction, image vision, loop detection, tool error degradation, and more
+- **16+ Layer Middleware Chain**: A strictly ordered middleware pipeline covering cross-cutting concerns including thread isolation, file upload injection, sandbox lifecycle, security auditing, context summarization, memory extraction, image vision, loop detection, tool error degradation, token usage tracking, and more
 - **Dynamic Model Hot-Swapping**: Switch between different LLMs within the same conversation, with runtime toggling of Thinking mode and Vision mode
 
 ### 2. Thread-Level Sandbox Isolation
@@ -42,7 +42,9 @@ Each conversation thread has a fully isolated execution environment:
 Unlike simple conversation history concatenation, MedrixFlow implements a structured long-term memory system:
 
 - **Automatic Knowledge Extraction**: The LLM analyzes conversation content to automatically extract user backgrounds (profession, preferences), facts (with confidence scores), and context
+- **User Correction Detection**: 11 EN/ZH regex patterns detect user corrections in real time (e.g., "actually", "that's wrong", "不对", "其实是"), triggering priority memory updates to prevent stale facts from being persisted
 - **Debounced Batch Processing**: Aggregates multi-turn conversation changes through a configurable debounce mechanism (default 30s) to reduce LLM call overhead
+- **Pluggable Storage Backend**: Default JSON file storage (`FileMemoryStorage`), with support for swapping in any custom storage implementation (e.g., SQLite, Redis) via the `storage_class` configuration
 - **System Prompt Injection**: High-confidence facts and user context are automatically injected into the agent's prompt, enabling personalized responses across conversations
 
 ### 4. Streaming & Disconnection Recovery
@@ -69,13 +71,21 @@ In addition to the web interface, MedrixFlow supports IM channel integration:
 - **Slack**: Socket Mode WebSocket connection — no public IP required
 - **Telegram**: Bot interaction with per-user independent session configuration
 
+### 7. Security Auditing & Observability
+
+Built-in security auditing and token usage tracking — no external tools required:
+
+- **Bash Command Security Auditing**: `SandboxAuditMiddleware` performs three-tier classification on every bash tool call (block / warn / pass), working with the `allow_host_bash` config switch to automatically block high-risk commands (`rm -rf /`, `curl | sh`, etc.), warn on medium-risk operations (`chmod`, `kill`, etc.), and produce full audit logs
+- **Token Usage Tracking**: `TokenUsageMiddleware` records input / output / total token counts after each LLM call, providing the data foundation for cost monitoring and quota management
+- **Sandbox Security Awareness**: `security.py` provides `uses_local_sandbox_provider()` and `is_host_bash_allowed()` utility functions to dynamically determine the current sandbox security level at runtime
+
 ## Technical Challenges & Solutions
 
 ### Middleware Orchestration Order Dependencies
 
-**Challenge**: 14 middleware components each handle different cross-cutting concerns but have implicit dependencies on one another. For example, `SandboxMiddleware` must run after `UploadsMiddleware` (it needs the thread directory to be created), and `ClarificationMiddleware` must run last (it needs to interrupt graph execution).
+**Challenge**: 16+ middleware components each handle different cross-cutting concerns but have implicit dependencies on one another. For example, `SandboxMiddleware` must run after `UploadsMiddleware` (it needs the thread directory to be created), `ClarificationMiddleware` must run last (it needs to interrupt graph execution), and `SandboxAuditMiddleware` must run after `ToolErrorHandling` (it needs to intercept already-wrapped tool calls).
 
-**Solution**: An explicit ordered middleware chain pattern where each middleware declares its execution phase, and the runtime executes them serially in a fixed order. The middleware pipeline is: ThreadData → Uploads → Sandbox → Summarization → TodoList → Title → Memory → ViewImage → LoopDetection → ToolErrorHandling → SubagentLimit → DeferredToolFilter → DanglingToolCall → Clarification.
+**Solution**: An explicit ordered middleware chain pattern where each middleware declares its execution phase, and the runtime executes them serially in a fixed order. The middleware pipeline is: ThreadData → Uploads → Sandbox → DanglingToolCall → (Guardrail) → ToolErrorHandling → (Summarization) → (TodoList) → Title → Memory → (ViewImage) → (DeferredToolFilter) → (SubagentLimit) → LoopDetection → SandboxAudit → TokenUsage → Clarification.
 
 ### Streaming State Consistency
 
@@ -144,7 +154,7 @@ In addition to the web interface, MedrixFlow supports IM channel integration:
           │ ┌──────────────────┐ │  │  /api/models      Models     │
           │ │    Lead Agent    │ │  │  /api/mcp/config  MCP Config │
           │ │                  │ │  │  /api/skills      Skills     │
-          │ │  14-Layer        │ │  │  /api/memory      Memory     │
+          │ │  16+ Layer       │ │  │  /api/memory      Memory     │
           │ │  Middleware Chain │ │  │  /api/setup/*     Config     │
           │ │       |          │ │  │  /api/threads/*   Threads    │
           │ │   Tool System    │ │  │                              │
@@ -174,17 +184,20 @@ In addition to the web interface, MedrixFlow supports IM channel integration:
 | 1 | ThreadDataMiddleware | Creates thread-specific isolation directories (workspace/uploads/outputs) |
 | 2 | UploadsMiddleware | Injects newly uploaded files into the conversation context |
 | 3 | SandboxMiddleware | Acquires and manages the sandbox execution environment lifecycle |
-| 4 | SummarizationMiddleware | Auto-summarizes and compresses context when approaching token limits |
-| 5 | TodoListMiddleware | Tracks multi-step task progress in plan mode |
-| 6 | TitleMiddleware | Auto-generates conversation title after the first message exchange |
-| 7 | MemoryMiddleware | Enqueues conversations for asynchronous memory extraction |
-| 8 | ViewImageMiddleware | Injects image data for vision-capable models |
-| 9 | LoopDetectionMiddleware | Detects and interrupts infinite agent loop calls |
-| 10 | ToolErrorHandlingMiddleware | Graceful error degradation for failed tool calls |
-| 11 | SubagentLimitMiddleware | Controls the maximum number of concurrent subagents |
-| 12 | DeferredToolFilterMiddleware | Defers tool loading to reduce context usage |
-| 13 | DanglingToolCallMiddleware | Cleans up dangling incomplete tool calls |
-| 14 | ClarificationMiddleware | Intercepts clarification requests and interrupts graph execution (must be last) |
+| 4 | DanglingToolCallMiddleware | Cleans up dangling incomplete tool calls to ensure consistent history |
+| 5 | GuardrailMiddleware | Pre-tool-call authorization guard (optional, config-driven) |
+| 6 | ToolErrorHandlingMiddleware | Graceful error degradation for failed tool calls |
+| 7 | SummarizationMiddleware | Auto-summarizes and compresses context when approaching token limits (optional) |
+| 8 | TodoListMiddleware | Tracks multi-step task progress in plan mode (optional) |
+| 9 | TitleMiddleware | Auto-generates conversation title after the first message exchange |
+| 10 | MemoryMiddleware | Enqueues conversations for asynchronous memory extraction with correction detection |
+| 11 | ViewImageMiddleware | Injects image data for vision-capable models (model-dependent) |
+| 12 | DeferredToolFilterMiddleware | Defers tool loading to reduce context usage (config-driven) |
+| 13 | SubagentLimitMiddleware | Controls the maximum number of concurrent subagents (config-driven) |
+| 14 | LoopDetectionMiddleware | Detects and interrupts infinite agent loop calls |
+| 15 | SandboxAuditMiddleware | Bash command security auditing: three-tier classification (block/warn/pass) + audit logs |
+| 16 | TokenUsageMiddleware | Records input/output/total token usage per LLM call |
+| 17 | ClarificationMiddleware | Intercepts clarification requests and interrupts graph execution (must be last) |
 
 ### Tool Ecosystem
 
@@ -288,10 +301,10 @@ medrix-flow/
 │   ├── packages/harness/medrix_flow/
 │   │   ├── agents/                 # Agent system
 │   │   │   ├── lead_agent/         #   Lead agent (factory + prompts)
-│   │   │   ├── middlewares/        #   14 middleware components
-│   │   │   ├── memory/             #   Memory extraction & storage
+│   │   │   ├── middlewares/        #   17 middleware components (incl. security audit & token tracking)
+│   │   │   ├── memory/             #   Memory extraction, correction detection & pluggable storage
 │   │   │   └── thread_state.py     #   Thread state Schema
-│   │   ├── sandbox/                # Sandbox execution engine
+│   │   ├── sandbox/                # Sandbox execution engine + security auditing
 │   │   ├── subagents/              # Subagent system (registry + executor)
 │   │   ├── tools/                  # Tool collection
 │   │   ├── mcp/                    # MCP protocol integration
@@ -362,13 +375,14 @@ Edit `config.yaml` in the project root directory directly. Main configuration se
 |---------|-------------|
 | `models` | LLM model definitions (class paths, API Keys, Thinking/Vision support) |
 | `tools` | Tool definitions (module paths, groups) |
-| `sandbox` | Execution environment (local / Docker / K3s) |
+| `sandbox` | Execution environment (local / Docker / K3s) + `allow_host_bash` security switch |
 | `skills` | Skill directory paths |
-| `memory` | Memory system (enabled, storage, debounce, fact limit) |
+| `memory` | Memory system (enabled, storage, debounce, fact limit, storage backend class path) |
 | `summarization` | Context summarization (trigger strategy, retention policy) |
 | `subagents` | Subagents (timeout configuration) |
 | `channels` | IM channels (Feishu/Slack/Telegram) |
 | `guardrails` | Tool call authorization guards |
+| `token_usage` | Token usage tracking (enabled/disabled) |
 | `checkpointer` | State persistence (memory/sqlite/postgres) |
 
 ### Environment Variables

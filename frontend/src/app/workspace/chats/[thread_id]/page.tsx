@@ -95,7 +95,7 @@ export default function ChatPage() {
           <main className="flex min-h-0 max-w-full grow flex-col">
             <div className="flex size-full justify-center">
               <MessageList
-                className={cn("size-full", !isNewThread && "pt-10")}
+                className={cn("size-full", !isNewThread && "pt-12")}
                 threadId={threadId}
                 thread={thread}
               />

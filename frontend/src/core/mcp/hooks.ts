@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { loadMCPConfig, updateMCPConfig } from "./api";
+import { loadMCPConfig, testMCPServer, updateMCPConfig } from "./api";
+import type { MCPServerConfig, MCPTestRequest } from "./types";
 
 export const mcpConfigQueryOptions = {
   queryKey: ["mcpConfig"],
@@ -45,5 +46,23 @@ export function useEnableMCPServer() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["mcpConfig"] });
     },
+  });
+}
+
+export function useSaveMCPConfig() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (servers: Record<string, MCPServerConfig>) => {
+      await updateMCPConfig({ mcp_servers: servers });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["mcpConfig"] });
+    },
+  });
+}
+
+export function useTestMCPServer() {
+  return useMutation({
+    mutationFn: (request: MCPTestRequest) => testMCPServer(request),
   });
 }

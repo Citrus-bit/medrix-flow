@@ -57,5 +57,9 @@ class SandboxConfig(BaseModel):
         default_factory=dict,
         description="Environment variables to inject into the sandbox container. Values starting with $ will be resolved from host environment variables.",
     )
+    allow_host_bash: bool = Field(
+        default=False,
+        description="Allow host bash execution when using LocalSandboxProvider. Only enable in fully trusted local environments.",
+    )
 
     model_config = ConfigDict(extra="allow")
