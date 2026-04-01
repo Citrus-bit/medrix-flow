@@ -127,41 +127,78 @@ else
     GATEWAY_EXTRA_FLAGS=""
 fi
 
-echo "Starting LangGraph server..."
+# Launch LangGraph, Gateway, and Frontend in parallel for faster startup.
+# All three are independent at startup time — no inter-service dependency
+# until runtime requests flow through Nginx.
+
+echo "Starting LangGraph + Gateway + Frontend in parallel..."
+
 (cd backend && NO_COLOR=1 uv run langgraph dev --no-browser --allow-blocking $LANGGRAPH_EXTRA_FLAGS > ../logs/langgraph.log 2>&1) &
-./scripts/wait-for-port.sh 2024 60 "LangGraph" || {
+(cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 $GATEWAY_EXTRA_FLAGS > ../logs/gateway.log 2>&1) &
+(cd frontend && $FRONTEND_CMD > ../logs/frontend.log 2>&1) &
+
+# Wait for all three services to become ready (max 120s — longest is Frontend)
+
+LANGGRAPH_READY=false
+GATEWAY_READY=false
+FRONTEND_READY=false
+TIMEOUT=120
+elapsed=0
+interval=1
+
+while [ "$elapsed" -lt "$TIMEOUT" ]; do
+    if ! $LANGGRAPH_READY && lsof -nP -iTCP:2024 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        LANGGRAPH_READY=true
+        echo "  ✓ LangGraph ready on localhost:2024 (${elapsed}s)"
+    fi
+    if ! $GATEWAY_READY && lsof -nP -iTCP:8001 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        GATEWAY_READY=true
+        echo "  ✓ Gateway ready on localhost:8001 (${elapsed}s)"
+    fi
+    if ! $FRONTEND_READY && lsof -nP -iTCP:3000 -sTCP:LISTEN -t >/dev/null 2>&1; then
+        FRONTEND_READY=true
+        echo "  ✓ Frontend ready on localhost:3000 (${elapsed}s)"
+    fi
+    if $LANGGRAPH_READY && $GATEWAY_READY && $FRONTEND_READY; then
+        break
+    fi
+    printf "\r  Waiting for services... %ds" "$elapsed"
+    sleep "$interval"
+    elapsed=$((elapsed + interval))
+done
+printf "\r  %-60s\r" ""
+
+# Check for failures and report diagnostics
+FAILED=false
+if ! $LANGGRAPH_READY; then
+    FAILED=true
+    echo "✗ LangGraph failed to start on port 2024 after ${TIMEOUT}s"
     echo "  See logs/langgraph.log for details"
     tail -20 logs/langgraph.log
     if grep -qE "config_version|outdated|Environment variable .* not found|KeyError|ValidationError|config\.yaml" logs/langgraph.log 2>/dev/null; then
         echo ""
         echo "  Hint: This may be a configuration issue. Try running 'make config-upgrade' to update your config.yaml."
     fi
-    cleanup
-}
-echo "✓ LangGraph server started on localhost:2024"
-
-echo "Starting Gateway API..."
-(cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 $GATEWAY_EXTRA_FLAGS > ../logs/gateway.log 2>&1) &
-./scripts/wait-for-port.sh 8001 30 "Gateway API" || {
-    echo "✗ Gateway API failed to start. Last log output:"
+fi
+if ! $GATEWAY_READY; then
+    FAILED=true
+    echo "✗ Gateway API failed to start on port 8001 after ${TIMEOUT}s"
     tail -60 logs/gateway.log
     echo ""
     echo "Likely configuration errors:"
     grep -E "Failed to load configuration|Environment variable .* not found|config\.yaml.*not found" logs/gateway.log | tail -5 || true
     echo ""
     echo "  Hint: Try running 'make config-upgrade' to update your config.yaml with the latest fields."
-    cleanup
-}
-echo "✓ Gateway API started on localhost:8001"
-
-echo "Starting Frontend..."
-(cd frontend && $FRONTEND_CMD > ../logs/frontend.log 2>&1) &
-./scripts/wait-for-port.sh 3000 120 "Frontend" || {
+fi
+if ! $FRONTEND_READY; then
+    FAILED=true
+    echo "✗ Frontend failed to start on port 3000 after ${TIMEOUT}s"
     echo "  See logs/frontend.log for details"
     tail -20 logs/frontend.log
+fi
+if $FAILED; then
     cleanup
-}
-echo "✓ Frontend started on localhost:3000"
+fi
 
 echo "Starting Nginx reverse proxy..."
 nginx -g 'daemon off;' -c "$REPO_ROOT/docker/nginx/nginx.local.conf" -p "$REPO_ROOT" > logs/nginx.log 2>&1 &

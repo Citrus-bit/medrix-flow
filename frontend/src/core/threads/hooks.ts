@@ -248,7 +248,12 @@ export function useThreadStream({
       extraContext?: Record<string, unknown>,
     ) => {
       if (sendInFlightRef.current) {
-        return;
+        try {
+          await thread.stop();
+        } catch {
+          // stop may fail if the run already finished — safe to ignore
+        }
+        sendInFlightRef.current = false;
       }
       sendInFlightRef.current = true;
       setIsSubmitting(true);

@@ -34,6 +34,13 @@ if [ -z "$CONFIG" ]; then
     exit 0
 fi
 
+# Fast path: skip Python when config_version already matches
+USER_VERSION=$(grep -m1 '^config_version:' "$CONFIG" 2>/dev/null | awk '{print $2}')
+EXAMPLE_VERSION=$(grep -m1 '^config_version:' "$EXAMPLE" 2>/dev/null | awk '{print $2}')
+if [ -n "$USER_VERSION" ] && [ -n "$EXAMPLE_VERSION" ] && [ "$USER_VERSION" = "$EXAMPLE_VERSION" ]; then
+    exit 0
+fi
+
 # Use inline Python to do migrations + recursive merge with PyYAML
 cd "$REPO_ROOT/backend" && uv run python3 -c "
 import sys, shutil, copy, re

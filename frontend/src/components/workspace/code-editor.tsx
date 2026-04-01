@@ -1,15 +1,6 @@
 "use client";
 
-import { css } from "@codemirror/lang-css";
-import { html } from "@codemirror/lang-html";
-import { javascript } from "@codemirror/lang-javascript";
-import { json } from "@codemirror/lang-json";
-import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
-import { python } from "@codemirror/lang-python";
-import { languages } from "@codemirror/language-data";
-import { basicLightInit } from "@uiw/codemirror-theme-basic";
-import { monokaiInit } from "@uiw/codemirror-theme-monokai";
-import CodeMirror from "@uiw/react-codemirror";
+import dynamic from "next/dynamic";
 import { useTheme } from "next-themes";
 import { useMemo } from "react";
 
@@ -17,22 +8,106 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 import { useThread } from "./messages/context";
-const customDarkTheme = monokaiInit({
-  settings: {
-    background: "transparent",
-    gutterBackground: "transparent",
-    gutterForeground: "#555",
-    gutterActiveForeground: "#fff",
-    fontSize: "var(--text-sm)",
-  },
-});
 
-const customLightTheme = basicLightInit({
-  settings: {
-    background: "transparent",
-    fontSize: "var(--text-sm)",
-  },
-});
+const LazyCodeMirror = dynamic(
+  () =>
+    Promise.all([
+      import("@uiw/react-codemirror"),
+      import("@uiw/codemirror-theme-monokai"),
+      import("@uiw/codemirror-theme-basic"),
+      import("@codemirror/lang-css"),
+      import("@codemirror/lang-html"),
+      import("@codemirror/lang-javascript"),
+      import("@codemirror/lang-json"),
+      import("@codemirror/lang-markdown"),
+      import("@codemirror/lang-python"),
+      import("@codemirror/language-data"),
+    ]).then(
+      ([
+        codeMirrorMod,
+        monokaiMod,
+        basicMod,
+        cssMod,
+        htmlMod,
+        jsMod,
+        jsonMod,
+        mdMod,
+        pythonMod,
+        langDataMod,
+      ]) => {
+        const CodeMirror = codeMirrorMod.default;
+        const customDarkTheme = monokaiMod.monokaiInit({
+          settings: {
+            background: "transparent",
+            gutterBackground: "transparent",
+            gutterForeground: "#555",
+            gutterActiveForeground: "#fff",
+            fontSize: "var(--text-sm)",
+          },
+        });
+        const customLightTheme = basicMod.basicLightInit({
+          settings: {
+            background: "transparent",
+            fontSize: "var(--text-sm)",
+          },
+        });
+
+        function InnerCodeMirror(props: {
+          value: string;
+          readonly?: boolean;
+          disabled?: boolean;
+          placeholder?: string;
+          autoFocus?: boolean;
+          settings?: unknown;
+          resolvedTheme?: string;
+          className?: string;
+        }) {
+          const extensions = useMemo(() => {
+            return [
+              cssMod.css(),
+              htmlMod.html(),
+              jsMod.javascript({}),
+              jsonMod.json(),
+              mdMod.markdown({
+                base: mdMod.markdownLanguage,
+                codeLanguages: langDataMod.languages,
+              }),
+              pythonMod.python(),
+            ];
+          }, []);
+
+          return (
+            <CodeMirror
+              readOnly={props.readonly ?? props.disabled}
+              placeholder={props.placeholder}
+              className={props.className}
+              theme={
+                props.resolvedTheme === "dark"
+                  ? customDarkTheme
+                  : customLightTheme
+              }
+              extensions={extensions}
+              basicSetup={{
+                foldGutter:
+                  (props.settings as { foldGutter?: boolean })?.foldGutter ??
+                  false,
+                highlightActiveLine: false,
+                highlightActiveLineGutter: false,
+                lineNumbers:
+                  (props.settings as { lineNumbers?: boolean })?.lineNumbers ??
+                  false,
+              }}
+              autoFocus={props.autoFocus}
+              value={props.value}
+            />
+          );
+        }
+
+        return InnerCodeMirror;
+      },
+    ),
+  { ssr: false },
+);
 
 export function CodeEditor({
   className,
@@ -56,20 +131,6 @@ export function CodeEditor({
   } = useThread();
   const { resolvedTheme } = useTheme();
 
-  const extensions = useMemo(() => {
-    return [
-      css(),
-      html(),
-      javascript({}),
-      json(),
-      markdown({
-        base: markdownLanguage,
-        codeLanguages: languages,
-      }),
-      python(),
-    ];
-  }, []);
-
   return (
     <div
       className={cn(
@@ -88,23 +149,16 @@ export function CodeEditor({
           value={value}
         />
       ) : (
-        <CodeMirror
-          readOnly={readonly ?? disabled}
+        <LazyCodeMirror
+          readonly={readonly}
+          disabled={disabled}
           placeholder={placeholder}
           className={cn(
             "h-full overflow-auto font-mono [&_.cm-editor]:h-full [&_.cm-focused]:outline-none!",
             "px-2 py-0! [&_.cm-line]:px-2! [&_.cm-line]:py-0!",
           )}
-          theme={resolvedTheme === "dark" ? customDarkTheme : customLightTheme}
-          extensions={extensions}
-          basicSetup={{
-            foldGutter:
-              (settings as { foldGutter?: boolean })?.foldGutter ?? false,
-            highlightActiveLine: false,
-            highlightActiveLineGutter: false,
-            lineNumbers:
-              (settings as { lineNumbers?: boolean })?.lineNumbers ?? false,
-          }}
+          resolvedTheme={resolvedTheme}
+          settings={settings}
           autoFocus={autoFocus}
           value={value}
         />
