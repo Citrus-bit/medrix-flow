@@ -35,6 +35,7 @@ coverage.xml
 coverage/
 .medrix-flow/
 .claude/
+.omc/
 skills/custom/*
 logs/
 log/
