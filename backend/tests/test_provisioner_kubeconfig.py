@@ -1,9 +1,20 @@
-"""Regression tests for provisioner kubeconfig path handling."""
+"""Regression tests for provisioner kubeconfig path handling.
+
+These tests dynamically load docker/provisioner/app.py which depends on the
+``kubernetes`` package.  That package is NOT part of the main backend
+dependencies (it lives inside the provisioner Docker image only), so these
+tests are skipped when ``kubernetes`` is not installed.
+"""
 
 from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+
+import pytest
+
+_k8s_available = importlib.util.find_spec("kubernetes") is not None
+pytestmark = pytest.mark.skipif(not _k8s_available, reason="kubernetes package not installed")
 
 
 def _load_provisioner_module():

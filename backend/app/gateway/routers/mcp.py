@@ -229,11 +229,11 @@ async def test_mcp_server(request: McpTestRequest) -> McpTestResponse:
                 )
                 try:
                     await asyncio.wait_for(proc.communicate(input=b""), timeout=5.0)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     proc.terminate()
                     try:
                         await asyncio.wait_for(proc.wait(), timeout=3.0)
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         proc.kill()
 
                 return McpTestResponse(success=True, message=f"Command '{command}' launched successfully.")
