@@ -4,7 +4,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "demo:save": "node scripts/save-demo.js",
     "build": "next build",
     "check": "next lint && tsc --noEmit",
     "dev": "next dev --turbo",
