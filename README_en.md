@@ -26,7 +26,7 @@ MedrixFlow is a full-stack AI agent orchestration platform. The backend leverage
 Unlike simple LLM chain-of-thought calls, MedrixFlow uses a **LangGraph directed graph state machine** as its core orchestration engine:
 
 - **Lead Agent + Subagent Hierarchical Architecture**: The lead agent handles task understanding and decomposition, delegating to up to 3 subagents that execute in parallel, each with an independent 15-minute timeout
-- **16+ Layer Middleware Chain**: A strictly ordered middleware pipeline covering cross-cutting concerns including thread isolation, file upload injection, sandbox lifecycle, security auditing, context summarization, memory extraction, image vision, loop detection, tool error degradation, token usage tracking, and more
+- **16+ Layer Middleware Chain**: A strictly ordered middleware pipeline covering cross-cutting concerns including thread isolation, file upload injection, sandbox lifecycle, security auditing, context summarization, memory extraction, image vision, loop detection, tool error degradation, token usage tracking, visual quality gating, and more
 - **Dynamic Model Hot-Swapping**: Switch between different LLMs within the same conversation, with runtime toggling of Thinking mode and Vision mode
 
 ### 2. Thread-Level Sandbox Isolation
@@ -71,7 +71,19 @@ In addition to the web interface, MedrixFlow supports IM channel integration:
 - **Slack**: Socket Mode WebSocket connection — no public IP required
 - **Telegram**: Bot interaction with per-user independent session configuration
 
-### 7. Security Auditing & Observability
+### 7. Visual Output Quality System
+
+MedrixFlow includes a professional-grade visual output quality assurance system covering the full pipeline for charts, PPT, and image generation:
+
+- **Prompt Constraint Injection**: When visual skills are active, design standards are automatically injected (60-30-10 color rule, typography hierarchy, 8pt grid spacing, accessibility contrast ratios), task-specific rules (targeted constraints for charts/PPT/images), and a mandatory workflow (clarify → spec → self-review → iterate → deliver)
+- **Quality Gate Tools**: `visual_quality_check` performs structured self-assessment before delivery (5 checks each for charts, PPT, and images), returning PASS / FAIL / FIXED status; `visual_refinement_check` enables iterative refinement, scoring 1–10 across content accuracy, style match, color fidelity, and more — scores below 7 trigger automatic regeneration (up to 3 rounds)
+- **Middleware Enforcement**: `VisualQualityMiddleware` detects when the agent calls `present_files` with visual output without running a quality check first, injecting a reminder
+- **Dedicated Visual Subagent**: The `visual-specialist` subagent has built-in design expertise and a complete quality workflow; the Lead Agent can delegate chart, PPT, and image tasks to it
+- **Memory Preference Persistence**: The memory system now supports a `visual_preference` fact category, persisting user design preferences (color schemes, fonts, brand guidelines) across conversations
+- **Design Resource Library**: Built-in 12 professional color palettes (business-blue, tech-vibrant, medical-clinical, accessible-high-contrast, etc.), 5 chart scenario presets (executive-dashboard, technical-report, marketing-report, etc.), and 5 PPT scenario presets (pitch-deck, quarterly-report, product-launch, etc.) — the agent automatically matches and references them
+- **Enhanced PPT Script**: `generate.py` now supports slide transitions, speaker notes, cover/contain image fitting modes, and metadata (author/keywords)
+
+### 8. Security Auditing & Observability
 
 Built-in security auditing and token usage tracking — no external tools required:
 
@@ -198,13 +210,14 @@ Built-in security auditing and token usage tracking — no external tools requir
 | 15 | SandboxAuditMiddleware | Bash command security auditing: three-tier classification (block/warn/pass) + audit logs |
 | 16 | TokenUsageMiddleware | Records input/output/total token usage per LLM call |
 | 17 | ClarificationMiddleware | Intercepts clarification requests and interrupts graph execution (must be last) |
+| 18 | VisualQualityMiddleware | Visual output quality gate: checks if visual_quality_check was run before presenting visual files, injects reminder if not |
 
 ### Tool Ecosystem
 
 | Category | Tools | Description |
 |----------|-------|-------------|
 | Sandbox | bash, ls, read_file, write_file, str_replace | Thread-isolated filesystem operations |
-| Built-in | present_files, ask_clarification, view_image, task | File presentation, interactive clarification, image understanding, subagent delegation |
+| Built-in | present_files, ask_clarification, view_image, task, visual_quality_check, visual_refinement_check | File presentation, interactive clarification, image understanding, subagent delegation, visual quality gate, iterative refinement check |
 | Community | Tavily, Jina AI, Firecrawl, DuckDuckGo | Web search, web scraping, image search |
 | MCP | Any MCP-compatible server | Supports stdio/SSE/HTTP transport protocols |
 | Skills | Domain-specific workflows | Configurable skill packs injected via System Prompt |
@@ -301,12 +314,12 @@ medrix-flow/
 │   ├── packages/harness/medrix_flow/
 │   │   ├── agents/                 # Agent system
 │   │   │   ├── lead_agent/         #   Lead agent (factory + prompts)
-│   │   │   ├── middlewares/        #   17 middleware components (incl. security audit & token tracking)
-│   │   │   ├── memory/             #   Memory extraction, correction detection & pluggable storage
+│   │   │   ├── middlewares/        #   18 middleware components (incl. security audit, token tracking & visual quality gate)
+│   │   │   ├── memory/             #   Memory extraction, correction detection, visual preference persistence & pluggable storage
 │   │   │   └── thread_state.py     #   Thread state Schema
 │   │   ├── sandbox/                # Sandbox execution engine + security auditing
-│   │   ├── subagents/              # Subagent system (registry + executor)
-│   │   ├── tools/                  # Tool collection
+│   │   ├── subagents/              # Subagent system (registry + executor + visual-specialist)
+│   │   ├── tools/                  # Tool collection (incl. visual_quality_check, visual_refinement_check)
 │   │   ├── mcp/                    # MCP protocol integration
 │   │   ├── models/                 # Model factory + Provider patches
 │   │   ├── skills/                 # Skill discovery & loading

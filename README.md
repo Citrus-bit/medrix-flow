@@ -26,7 +26,7 @@ MedrixFlow 是一个全栈 AI 代理编排平台，后端基于 LangGraph 实现
 区别于简单的 LLM 链式调用，MedrixFlow 采用 **LangGraph 有向图状态机** 作为核心编排引擎：
 
 - **Lead Agent + Subagent 分层架构**：主代理负责任务理解与拆分，最多 3 个子代理并行执行，每个任务独立 15 分钟超时控制
-- **16+ 层中间件链**：按严格顺序执行的中间件流水线，覆盖线程隔离、文件上传注入、沙箱生命周期、安全审计、上下文摘要、记忆提取、图像视觉、循环检测、工具错误降级、Token 用量追踪等横切关注点
+- **16+ 层中间件链**：按严格顺序执行的中间件流水线，覆盖线程隔离、文件上传注入、沙箱生命周期、安全审计、上下文摘要、记忆提取、图像视觉、循环检测、工具错误降级、Token 用量追踪、视觉质量门控等横切关注点
 - **动态模型热切换**：同一对话内可在不同 LLM 之间切换，支持 Thinking 模式、Vision 模式的运行时启停
 
 ### 2. 线程级沙箱隔离
@@ -63,7 +63,7 @@ MedrixFlow 是一个全栈 AI 代理编排平台，后端基于 LangGraph 实现
 - **一键测试连通性**：动态实例化 Provider 类发送 ainvoke("Hi") 验证模型可用性
 - **热重载生效**：配置保存后自动写入 config.yaml + .env，调用 reload_app_config() 即时生效，无需重启服务
 
-### 6. 多渠道接入
+### 6. 多渠道接入（IM 集成）
 
 除 Web 界面外，还支持 IM 渠道接入：
 
@@ -71,7 +71,19 @@ MedrixFlow 是一个全栈 AI 代理编排平台，后端基于 LangGraph 实现
 - **Slack**：Socket Mode WebSocket 连接，无需公网 IP
 - **Telegram**：Bot 交互，支持每用户独立会话配置
 
-### 7. 安全审计与可观测性
+### 7. 视觉输出质量系统
+
+MedrixFlow 内置了专业级视觉输出质量保障体系，覆盖图表、PPT、图片生成全链路：
+
+- **提示词约束注入**：当视觉类技能激活时，自动注入设计标准（60-30-10 配色规则、排版层次、8pt 网格间距、无障碍对比度）、任务专属规则（图表/PPT/图片各有针对性约束）以及强制工作流（澄清 → 规格 → 自审 → 迭代 → 交付）
+- **质量门控工具**：`visual_quality_check` 在交付前执行结构化自检（图表 5 项、PPT 5 项、图片 5 项），返回 PASS / FAIL / FIXED 状态；`visual_refinement_check` 支持迭代精修，按内容准确性、风格匹配、色彩保真度等维度评分 1-10，低于 7 分自动触发重做（最多 3 轮）
+- **中间件强制执行**：`VisualQualityMiddleware` 在代理调用 `present_files` 交付视觉文件时，检测是否已运行质量检查，未通过则注入提醒
+- **专用视觉子代理**：`visual-specialist` 子代理内置设计专业知识和完整的质量工作流，Lead Agent 可将图表、PPT、图片任务委派给它
+- **记忆偏好持久化**：记忆系统新增 `visual_preference` 事实类别，跨对话保留用户的配色偏好、字体选择、品牌规范等设计偏好
+- **设计资源库**：内置 12 套专业配色方案（商务蓝、科技紫、医疗绿、无障碍高对比等）、5 套图表场景预设（高管仪表盘、技术报告、营销报告等）、5 套 PPT 场景预设（路演、季报、产品发布等），代理可自动匹配并引用
+- **PPT 脚本增强**：`generate.py` 新增幻灯片切换动画、演讲者备注、封面/包含图片适配模式、元数据（作者/关键词）支持
+
+### 8. 安全审计与可观测性
 
 系统内置安全审计和 Token 用量追踪能力，无需外部工具：
 
@@ -197,13 +209,14 @@ MedrixFlow 是一个全栈 AI 代理编排平台，后端基于 LangGraph 实现
 | 15 | SandboxAuditMiddleware | Bash 命令安全审计：三级分类（block/warn/pass）+ 审计日志 |
 | 16 | TokenUsageMiddleware | 记录每次 LLM 调用的 input/output/total token 用量 |
 | 17 | ClarificationMiddleware | 拦截澄清请求并中断图执行（必须在最后） |
+| 18 | VisualQualityMiddleware | 视觉输出质量门控：交付前检测是否已运行 visual_quality_check，未通过则注入提醒 |
 
 ### 工具生态
 
 | 类别 | 工具 | 说明 |
 |------|------|------|
 | 沙箱 | bash, ls, read_file, write_file, str_replace | 线程隔离的文件系统操作 |
-| 内置 | present_files, ask_clarification, view_image, task | 文件展示、交互澄清、图像理解、子代理委派 |
+| 内置 | present_files, ask_clarification, view_image, task, visual_quality_check, visual_refinement_check | 文件展示、交互澄清、图像理解、子代理委派、视觉质量门控、迭代精修检查 |
 | 社区 | Tavily, Jina AI, Firecrawl, DuckDuckGo | 网页搜索、网页抓取、图片搜索 |
 | MCP | 任意 MCP 兼容服务器 | 支持 stdio/SSE/HTTP 传输协议 |
 | Skills | 领域专属工作流 | 通过 System Prompt 注入的可配置技能包 |
@@ -300,12 +313,12 @@ medrix-flow/
 │   ├── packages/harness/medrix_flow/
 │   │   ├── agents/                 # 代理系统
 │   │   │   ├── lead_agent/         #   主代理（工厂 + 提示词）
-│   │   │   ├── middlewares/        #   17 个中间件组件（含安全审计与 Token 追踪）
-│   │   │   ├── memory/             #   记忆抽取、纠正检测与可插拔存储
+│   │   │   ├── middlewares/        #   18 个中间件组件（含安全审计、Token 追踪、视觉质量门控）
+│   │   │   ├── memory/             #   记忆抽取、纠正检测、视觉偏好持久化与可插拔存储
 │   │   │   └── thread_state.py     #   线程状态 Schema
 │   │   ├── sandbox/                # 沙箱执行引擎 + 安全审计
-│   │   ├── subagents/              # 子代理系统（注册 + 执行器）
-│   │   ├── tools/                  # 工具集
+│   │   ├── subagents/              # 子代理系统（注册 + 执行器 + visual-specialist）
+│   │   ├── tools/                  # 工具集（含 visual_quality_check、visual_refinement_check）
 │   │   ├── mcp/                    # MCP 协议集成
 │   │   ├── models/                 # 模型工厂 + Provider 补丁
 │   │   ├── skills/                 # Skill 发现与加载
