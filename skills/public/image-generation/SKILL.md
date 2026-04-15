@@ -178,6 +178,37 @@ For scenarios where visual accuracy is critical, **use the `image_search` tool f
 
 This approach significantly improves generation quality by providing the model with concrete visual guidance rather than relying solely on text descriptions.
 
+## Quality Standards (Mandatory)
+
+### Before Generation — Clarify Requirements
+If ANY of the following are unclear, call `ask_clarification` BEFORE generating:
+- What is the subject/scene? (character, product, environment, abstract)
+- What style? (photorealistic, illustration, anime, oil painting, etc.)
+- What mood/atmosphere? (dramatic, warm, mysterious, professional)
+- What is the usage context? (social media, print, presentation, avatar)
+- Aspect ratio preference? (16:9 landscape, 9:16 portrait, 1:1 square)
+
+### Image Prompt Checklist
+Apply these rules when creating the JSON prompt:
+
+1. **Prompt length**: Minimum 150 words for any non-trivial image. Complex scenes need 200-300 words.
+2. **Structure**: Always include [Subject] + [Action/Pose] + [Environment] + [Style] + [Lighting] + [Color palette] + [Technical specs].
+3. **Specificity**: Use exact descriptions, not vague terms. "warm golden hour sunlight at 15° angle" not "nice lighting". "#667eea deep purple" not "purple".
+4. **Negative prompt**: Always include `negative_prompt` to exclude unwanted elements (blur, deformation, low quality, etc.).
+5. **Reference images**: For characters, products, or specific styles — use `image_search` tool first to find references, then pass via `--reference-images`.
+6. **Composition**: Specify camera angle, framing (close-up/medium/wide), depth of field, and rule of thirds placement.
+7. **Style consistency**: For image series, reference previous outputs and explicitly state "match the style of the reference image exactly".
+
+### After Generation — Self-Review
+Before presenting the image to the user:
+- [ ] Does the image match the requested subject and style?
+- [ ] Is the composition balanced with a clear focal point?
+- [ ] Are colors harmonious and appropriate for the mood?
+- [ ] Is the quality sufficient? (no artifacts, blur, or deformation)
+- [ ] For series: is it visually consistent with previous images?
+
+If quality is insufficient, refine the prompt (add more detail, adjust negative_prompt) and regenerate. Max 2 retries before presenting to user with notes on what could be improved.
+
 ## Notes
 
 - Always use English for prompts regardless of user's language

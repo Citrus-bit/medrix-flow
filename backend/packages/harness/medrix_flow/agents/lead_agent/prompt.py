@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from medrix_flow.config.agents_config import load_agent_soul
+from medrix_flow.agents.lead_agent.prompt_enhancements import VISUAL_SKILL_NAMES, get_visual_quality_prompt
 from medrix_flow.skills import load_skills
 
 
@@ -487,5 +488,10 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
         subagent_reminder=subagent_reminder,
         subagent_thinking=subagent_thinking,
     )
+
+    # Inject visual quality guidelines when any visual skill is enabled
+    enabled_skill_names = {s.name for s in load_skills(enabled_only=True)}
+    if enabled_skill_names & VISUAL_SKILL_NAMES:
+        prompt += "\n\n" + get_visual_quality_prompt()
 
     return prompt + f"\n<current_date>{datetime.now().strftime('%Y-%m-%d, %A')}</current_date>"

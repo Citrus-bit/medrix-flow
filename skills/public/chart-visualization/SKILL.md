@@ -67,6 +67,35 @@ Return the following to the user:
 ## Reference Material
 Detailed specifications for each chart type are located in the `references/` directory. Consult these files to ensure the `args` passed to the script match the expected schema.
 
+## Quality Standards (Mandatory)
+
+### Before Generation — Clarify Requirements
+If ANY of the following are unclear, call `ask_clarification` BEFORE generating:
+- What story should the chart tell? (trend, comparison, distribution, composition)
+- Who is the audience? (executive summary vs. technical detail)
+- Are there brand colors or style preferences?
+- What is the output context? (report, dashboard, presentation slide)
+
+### Chart Design Checklist
+Apply these rules when selecting chart type and configuring `args`:
+
+1. **Data integrity**: Never truncate Y-axis without explicit justification. Start at 0 for bar/column charts.
+2. **Chart type fit**: Time series → line/area. Comparison → bar/column. Part-to-whole → pie (≤6 slices) or treemap. Distribution → histogram/boxplot/violin. Correlation → scatter.
+3. **Avoid anti-patterns**: No 3D charts. No pie charts with >6 slices. No dual Y-axis without clear labeling. No chartjunk (unnecessary gridlines, decorations, borders).
+4. **Color**: Max 5 colors. Use hex codes in `style.color`. Ensure color-blind safe palette (avoid red-green only encoding).
+5. **Labels**: Add `title`. Include data labels for key values. Annotate anomalies or inflection points.
+6. **Readability**: Font size ≥12pt for labels, ≥16pt for title. Sufficient contrast against background.
+
+### After Generation — Self-Review
+Before returning the chart to the user, verify:
+- [ ] Chart type matches the data story (not just "looks nice")
+- [ ] All axes are labeled with units
+- [ ] Color palette is harmonious and accessible
+- [ ] No misleading visual encoding (area ≠ value distortion)
+- [ ] Title clearly states the insight, not just the topic
+
+If any check fails, adjust `args` and regenerate.
+
 ## License
 
 This `SKILL.md` is provided by [antvis/chart-visualization-skills](https://github.com/antvis/chart-visualization-skills).

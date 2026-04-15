@@ -4,7 +4,7 @@ from langchain.tools import BaseTool
 
 from medrix_flow.config import get_app_config
 from medrix_flow.reflection import resolve_variable
-from medrix_flow.tools.builtins import ask_clarification_tool, present_file_tool, task_tool, view_image_tool
+from medrix_flow.tools.builtins import ask_clarification_tool, present_file_tool, task_tool, view_image_tool, visual_quality_check_tool
 from medrix_flow.tools.builtins.tool_search import reset_deferred_registry
 
 logger = logging.getLogger(__name__)
@@ -60,6 +60,18 @@ def get_available_tools(
     if model_config is not None and model_config.supports_vision:
         builtin_tools.append(view_image_tool)
         logger.info(f"Including view_image_tool for model '{model_name}' (supports_vision=True)")
+
+    # Add visual_quality_check_tool when any visual skill is enabled
+    try:
+        from medrix_flow.agents.lead_agent.prompt_enhancements import VISUAL_SKILL_NAMES
+        from medrix_flow.skills import load_skills
+
+        enabled_skill_names = {s.name for s in load_skills(enabled_only=True)}
+        if enabled_skill_names & VISUAL_SKILL_NAMES:
+            builtin_tools.append(visual_quality_check_tool)
+            logger.info("Including visual_quality_check_tool (visual skills active)")
+    except Exception as e:
+        logger.debug(f"Skipping visual_quality_check_tool: {e}")
 
     # Get cached MCP tools if enabled
     # NOTE: We use ExtensionsConfig.from_file() instead of config.extensions
