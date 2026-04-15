@@ -10,6 +10,7 @@ from medrix_flow.agents.middlewares.loop_detection_middleware import LoopDetecti
 from medrix_flow.agents.middlewares.memory_middleware import MemoryMiddleware
 from medrix_flow.agents.middlewares.sandbox_audit_middleware import SandboxAuditMiddleware
 from medrix_flow.agents.middlewares.subagent_limit_middleware import SubagentLimitMiddleware
+from medrix_flow.agents.middlewares.visual_quality_middleware import VisualQualityMiddleware
 from medrix_flow.agents.middlewares.title_middleware import TitleMiddleware
 from medrix_flow.agents.middlewares.todo_middleware import TodoMiddleware
 from medrix_flow.agents.middlewares.token_usage_middleware import TokenUsageMiddleware
@@ -256,6 +257,19 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
 
     # LoopDetectionMiddleware — detect and break repetitive tool call loops
     middlewares.append(LoopDetectionMiddleware())
+
+    # VisualQualityMiddleware — enforce quality check before presenting visual output
+    # Only added when visual skills are enabled
+    try:
+        from medrix_flow.agents.lead_agent.prompt_enhancements import VISUAL_SKILL_NAMES
+        from medrix_flow.skills import load_skills
+
+        enabled_skill_names = {s.name for s in load_skills(enabled_only=True)}
+        if enabled_skill_names & VISUAL_SKILL_NAMES:
+            middlewares.append(VisualQualityMiddleware())
+            logger.info("Including VisualQualityMiddleware (visual skills active)")
+    except Exception as e:
+        logger.debug(f"Skipping VisualQualityMiddleware: {e}")
 
     # SandboxAuditMiddleware — bash command security auditing (block/warn/pass)
     middlewares.append(SandboxAuditMiddleware())

@@ -62,6 +62,7 @@ Memory Section Guidelines:
   * context: Background facts (job title, projects, locations, languages)
   * behavior: Working patterns, communication habits, problem-solving approaches
   * goal: Stated objectives, learning targets, project ambitions
+  * visual_preference: Design style preferences (color palettes, typography, layout styles, brand guidelines, preferred chart types, presentation aesthetics). Extract when user expresses opinions on visual output, requests specific styles, or provides brand/design constraints.
 - Confidence levels:
   * 0.9-1.0: Explicitly stated facts ("I work on X", "My role is Y")
   * 0.7-0.8: Strongly implied from actions/discussions
@@ -94,7 +95,7 @@ Output Format (JSON):
     "longTermBackground": {{ "summary": "...", "shouldUpdate": true/false }}
   }},
   "newFacts": [
-    {{ "content": "...", "category": "preference|knowledge|context|behavior|goal", "confidence": 0.0-1.0 }}
+    {{ "content": "...", "category": "preference|knowledge|context|behavior|goal|visual_preference", "confidence": 0.0-1.0 }}
   ],
   "factsToRemove": ["fact_id_1", "fact_id_2"]
 }}
@@ -126,7 +127,7 @@ Message:
 Extract facts in this JSON format:
 {{
   "facts": [
-    {{ "content": "...", "category": "preference|knowledge|context|behavior|goal", "confidence": 0.0-1.0 }}
+    {{ "content": "...", "category": "preference|knowledge|context|behavior|goal|visual_preference", "confidence": 0.0-1.0 }}
   ]
 }}
 
@@ -136,6 +137,7 @@ Categories:
 - context: Background context (location, job, projects)
 - behavior: Behavioral patterns
 - goal: User's goals or objectives
+- visual_preference: Design preferences (colors, fonts, layout styles, brand guidelines, chart/PPT aesthetics)
 
 Rules:
 - Only extract clear, specific facts
