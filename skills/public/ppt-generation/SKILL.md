@@ -45,6 +45,17 @@ When a user requests presentation generation, identify:
 - Content outline: Key points for each slide
 - You don't need to check the folder under `/mnt/user-data`
 
+### Scenario Presets
+
+Read `templates/presets.json` for 5 pre-built presentation scenarios:
+- **pitch-deck**: Startup pitch (10 slides, gradient-modern style)
+- **quarterly-report**: Business review (12 slides, minimal-swiss style)
+- **product-launch**: Keynote launch (8 slides, keynote style)
+- **training-workshop**: Educational training (15 slides, 3d-isometric style)
+- **annual-review**: Year-end review (15 slides, editorial style)
+
+Each preset includes a recommended storytelling arc, slide count, style, and detailed style_guidelines. Use these as starting points and customize based on user requirements.
+
 ### Step 2: Create Presentation Plan
 
 Create a JSON file in `/mnt/user-data/workspace/` with the presentation structure. **Important**: Include the `style` field to define the overall visual consistency.
@@ -53,6 +64,13 @@ Create a JSON file in `/mnt/user-data/workspace/` with the presentation structur
 {
   "title": "Presentation Title",
   "style": "keynote",
+  "author": "Author Name",
+  "keywords": ["keyword1", "keyword2"],
+  "image_fit": "cover",
+  "transition": {
+    "speed": "medium",
+    "advance_after_seconds": null
+  },
   "style_guidelines": {
     "color_palette": "Deep black backgrounds, white text, single accent color (blue or orange)",
     "typography": "Bold sans-serif headlines, clean body text, dramatic size contrast",

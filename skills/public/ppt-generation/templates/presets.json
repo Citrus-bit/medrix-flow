@@ -1,0 +1,65 @@
+{
+  "_description": "Reusable PPT design presets for common presentation scenarios. Use these as starting points for style_guidelines.",
+  "presets": {
+    "pitch-deck": {
+      "description": "Startup pitch deck with bold visuals and clear narrative",
+      "recommended_slides": 10,
+      "recommended_style": "gradient-modern",
+      "storytelling_arc": ["Title + Hook", "Problem", "Solution", "Market Size", "Product Demo", "Business Model", "Traction", "Team", "Financials", "CTA / Ask"],
+      "style_guidelines": {
+        "color_palette": "Bold gradient: #7C3AED → #EC4899 → #F97316, white text on dark, accent #06B6D4",
+        "typography": "Satoshi or Inter, 72pt+ bold headlines, 20pt body, -0.02em letter-spacing on titles",
+        "imagery": "Abstract 3D shapes, product screenshots on device mockups, team photos with consistent treatment",
+        "layout": "Full-bleed backgrounds, centered content blocks, generous 48px padding, one stat per slide"
+      }
+    },
+    "quarterly-report": {
+      "description": "Professional quarterly business review with data focus",
+      "recommended_slides": 12,
+      "recommended_style": "minimal-swiss",
+      "storytelling_arc": ["Title + Quarter Overview", "Executive Summary", "Revenue Metrics", "Growth Trends", "Product Updates", "Customer Metrics", "Market Analysis", "Challenges", "Next Quarter Goals", "Team Updates", "Financial Details", "Q&A"],
+      "style_guidelines": {
+        "color_palette": "Corporate blue #1B4F72 primary, #2E86C1 secondary, #E8F4FD background accents, #333333 text",
+        "typography": "Helvetica Neue or SF Pro, 48pt bold headlines, 18pt body, strict baseline grid",
+        "imagery": "Clean data visualizations, minimal icons, no decorative elements, charts embedded as images",
+        "layout": "12-column grid, left-aligned text, charts right-aligned or full-width, 60% negative space"
+      }
+    },
+    "product-launch": {
+      "description": "Product launch keynote with cinematic impact",
+      "recommended_slides": 8,
+      "recommended_style": "keynote",
+      "storytelling_arc": ["Title + Teaser", "The Problem Today", "Introducing [Product]", "Key Features", "How It Works", "Real Results", "Pricing / Availability", "Call to Action"],
+      "style_guidelines": {
+        "color_palette": "Deep black #000000 base, pure white text, signature accent blue #0071E3 or product brand color",
+        "typography": "SF Pro Display, 80pt+ dramatic headlines, 24pt light body, extreme weight contrast",
+        "imagery": "Cinematic product shots, shallow DOF, dramatic rim lighting, full-bleed hero images",
+        "layout": "Maximum negative space 60%+, single focal point, centered or dramatically offset, no clutter"
+      }
+    },
+    "training-workshop": {
+      "description": "Educational training with clear structure and engagement",
+      "recommended_slides": 15,
+      "recommended_style": "3d-isometric",
+      "storytelling_arc": ["Title + Objectives", "Agenda", "Topic 1 Intro", "Topic 1 Detail", "Exercise 1", "Topic 2 Intro", "Topic 2 Detail", "Exercise 2", "Topic 3 Intro", "Topic 3 Detail", "Exercise 3", "Best Practices", "Common Mistakes", "Resources", "Q&A + Feedback"],
+      "style_guidelines": {
+        "color_palette": "Friendly: muted purple #8B5CF6, teal #14B8A6, coral #FB7185, cream background #FAFAFA",
+        "typography": "Circular or Gilroy, 48pt medium headlines, 20pt body, comfortable line-height 1.5",
+        "imagery": "Clean isometric illustrations, step-by-step diagrams, numbered callouts, friendly icons",
+        "layout": "Central content with breathing room, numbered sections, progress indicators, 64px margins"
+      }
+    },
+    "annual-review": {
+      "description": "Annual review with editorial sophistication",
+      "recommended_slides": 15,
+      "recommended_style": "editorial",
+      "storytelling_arc": ["Cover", "Year in Review", "Key Achievements", "Revenue & Growth", "Product Milestones", "Customer Stories", "Team Growth", "Market Position", "Challenges & Learnings", "Innovation Highlights", "Sustainability", "Community Impact", "Looking Ahead", "Thank You", "Appendix"],
+      "style_guidelines": {
+        "color_palette": "Sophisticated: off-white #F5F5F0, charcoal #2D2D2D, burgundy accent #7C2D12",
+        "typography": "Playfair Display serif headlines, Söhne sans-serif body, 96pt headlines, 16pt body, line-height 1.6",
+        "imagery": "Magazine-quality photography, dramatic crops, full-bleed images, editorial lighting",
+        "layout": "12-column grid, intentional asymmetry, pull quotes as design elements, elegant margins"
+      }
+    }
+  }
+}

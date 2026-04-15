@@ -1,0 +1,78 @@
+{
+  "_description": "Professional color palettes for chart visualization. Use via style.palette in chart args.",
+  "_usage": "Select a palette by name, then pass its 'colors' array as style.palette in the chart spec.",
+  "palettes": {
+    "business-blue": {
+      "description": "Corporate blue tones for business reports and dashboards",
+      "colors": ["#1B4F72", "#2E86C1", "#5DADE2", "#85C1E9", "#AED6F1", "#D6EAF8"],
+      "background": "#FAFCFE",
+      "best_for": ["quarterly reports", "financial dashboards", "executive summaries"]
+    },
+    "tech-vibrant": {
+      "description": "Modern tech palette inspired by SaaS products",
+      "colors": ["#667EEA", "#764BA2", "#F093FB", "#5EE7DF", "#B8F3FF", "#FBC2EB"],
+      "background": "#FFFFFF",
+      "best_for": ["product metrics", "tech presentations", "startup pitches"]
+    },
+    "medical-clinical": {
+      "description": "Clean clinical palette for healthcare and medical data",
+      "colors": ["#0D6EFD", "#198754", "#6F42C1", "#20C997", "#0DCAF0", "#6EA8FE"],
+      "background": "#F8F9FA",
+      "best_for": ["clinical trials", "patient data", "medical research"]
+    },
+    "nature-earth": {
+      "description": "Earthy organic tones for environmental and sustainability data",
+      "colors": ["#2D6A4F", "#40916C", "#52B788", "#74C69D", "#95D5B2", "#D8F3DC"],
+      "background": "#FEFCF3",
+      "best_for": ["sustainability reports", "environmental data", "agriculture"]
+    },
+    "warm-sunset": {
+      "description": "Warm gradient for engagement and marketing data",
+      "colors": ["#D62828", "#F77F00", "#FCBF49", "#EAE2B7", "#F4845F", "#F9C74F"],
+      "background": "#FFFBF0",
+      "best_for": ["marketing campaigns", "user engagement", "social media analytics"]
+    },
+    "cool-ocean": {
+      "description": "Cool blue-green tones for data-heavy visualizations",
+      "colors": ["#023E8A", "#0077B6", "#0096C7", "#00B4D8", "#48CAE4", "#90E0EF"],
+      "background": "#F0F8FF",
+      "best_for": ["time series", "trend analysis", "scientific data"]
+    },
+    "accessible-high-contrast": {
+      "description": "WCAG AA compliant palette with maximum distinguishability",
+      "colors": ["#003F5C", "#58508D", "#BC5090", "#FF6361", "#FFA600", "#374C80"],
+      "background": "#FFFFFF",
+      "best_for": ["accessibility-critical reports", "public-facing dashboards", "government data"]
+    },
+    "monochrome-gray": {
+      "description": "Grayscale palette for print-friendly and formal documents",
+      "colors": ["#212529", "#495057", "#6C757D", "#ADB5BD", "#CED4DA", "#DEE2E6"],
+      "background": "#FFFFFF",
+      "best_for": ["print reports", "formal documents", "black-and-white printing"]
+    },
+    "pastel-soft": {
+      "description": "Soft pastel tones for friendly, approachable visualizations",
+      "colors": ["#A8DADC", "#457B9D", "#F4A261", "#E76F51", "#2A9D8F", "#264653"],
+      "background": "#FEFEFE",
+      "best_for": ["education", "consumer products", "lifestyle data"]
+    },
+    "dark-mode": {
+      "description": "Luminous colors optimized for dark backgrounds",
+      "colors": ["#00D4FF", "#7C3AED", "#F472B6", "#34D399", "#FBBF24", "#F87171"],
+      "background": "#0F172A",
+      "best_for": ["dark dashboards", "developer tools", "real-time monitoring"]
+    },
+    "financial-conservative": {
+      "description": "Conservative palette for financial and banking contexts",
+      "colors": ["#1A3C5E", "#2E5E8E", "#4A90D9", "#7FB3E0", "#B0D4F1", "#D4E6F1"],
+      "background": "#FAFBFC",
+      "best_for": ["banking reports", "investment analysis", "risk assessment"]
+    },
+    "categorical-distinct": {
+      "description": "Maximum perceptual distance between categories (colorblind-safe)",
+      "colors": ["#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F", "#EDC948"],
+      "background": "#FFFFFF",
+      "best_for": ["categorical comparisons", "multi-series charts", "survey results"]
+    }
+  }
+}

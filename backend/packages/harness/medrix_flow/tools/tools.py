@@ -4,7 +4,7 @@ from langchain.tools import BaseTool
 
 from medrix_flow.config import get_app_config
 from medrix_flow.reflection import resolve_variable
-from medrix_flow.tools.builtins import ask_clarification_tool, present_file_tool, task_tool, view_image_tool, visual_quality_check_tool
+from medrix_flow.tools.builtins import ask_clarification_tool, present_file_tool, task_tool, view_image_tool, visual_quality_check_tool, visual_refinement_check_tool
 from medrix_flow.tools.builtins.tool_search import reset_deferred_registry
 
 logger = logging.getLogger(__name__)
@@ -69,7 +69,8 @@ def get_available_tools(
         enabled_skill_names = {s.name for s in load_skills(enabled_only=True)}
         if enabled_skill_names & VISUAL_SKILL_NAMES:
             builtin_tools.append(visual_quality_check_tool)
-            logger.info("Including visual_quality_check_tool (visual skills active)")
+            builtin_tools.append(visual_refinement_check_tool)
+            logger.info("Including visual_quality_check_tool and visual_refinement_check_tool (visual skills active)")
     except Exception as e:
         logger.debug(f"Skipping visual_quality_check_tool: {e}")
 

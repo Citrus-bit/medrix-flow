@@ -1,0 +1,85 @@
+{
+  "_description": "Chart template presets for common data visualization scenarios. Use these as starting configurations.",
+  "presets": {
+    "executive-dashboard": {
+      "description": "Clean KPI dashboard charts for executive audiences",
+      "recommended_charts": ["line", "column", "liquid", "pie"],
+      "style": {
+        "theme": "default",
+        "palette": ["#1B4F72", "#2E86C1", "#5DADE2", "#85C1E9"],
+        "backgroundColor": "#FFFFFF",
+        "texture": "default"
+      },
+      "defaults": {
+        "width": 800,
+        "height": 500,
+        "title_format": "[Metric]: [Value] [Direction] [Period]"
+      },
+      "guidelines": "Titles state the insight, not the topic. Use data labels on key values. Limit to 5 series max."
+    },
+    "technical-report": {
+      "description": "Detailed technical charts for engineering and data teams",
+      "recommended_charts": ["line", "scatter", "boxplot", "histogram", "dual-axes"],
+      "style": {
+        "theme": "default",
+        "palette": ["#4E79A7", "#F28E2B", "#E15759", "#76B7B2", "#59A14F"],
+        "backgroundColor": "#FFFFFF",
+        "texture": "default"
+      },
+      "defaults": {
+        "width": 900,
+        "height": 600,
+        "title_format": "[Variable] vs [Variable] — [Dataset] ([N] samples)"
+      },
+      "guidelines": "Include axis labels with units. Show error bars or confidence intervals where applicable. Use scatter for correlation."
+    },
+    "marketing-report": {
+      "description": "Engaging charts for marketing and growth metrics",
+      "recommended_charts": ["area", "funnel", "bar", "pie", "treemap"],
+      "style": {
+        "theme": "default",
+        "palette": ["#667EEA", "#764BA2", "#F093FB", "#5EE7DF", "#FBC2EB"],
+        "backgroundColor": "#FFFFFF",
+        "texture": "default"
+      },
+      "defaults": {
+        "width": 800,
+        "height": 500,
+        "title_format": "[Metric] [Direction] [Percentage]% in [Period]"
+      },
+      "guidelines": "Lead with the story. Use funnel for conversion flows. Area charts for growth trends. Bright, engaging colors."
+    },
+    "financial-analysis": {
+      "description": "Conservative charts for financial data and reporting",
+      "recommended_charts": ["line", "column", "dual-axes", "bar", "area"],
+      "style": {
+        "theme": "default",
+        "palette": ["#1A3C5E", "#2E5E8E", "#4A90D9", "#7FB3E0", "#B0D4F1"],
+        "backgroundColor": "#FAFBFC",
+        "texture": "default"
+      },
+      "defaults": {
+        "width": 900,
+        "height": 550,
+        "title_format": "[Metric] — [Currency] [Period] ([Comparison])"
+      },
+      "guidelines": "Y-axis must start at 0 for bar/column. Use dual-axes for revenue vs margin. Conservative colors. Include currency units."
+    },
+    "dark-dashboard": {
+      "description": "Dark-themed charts for monitoring dashboards and real-time data",
+      "recommended_charts": ["line", "area", "liquid", "radar", "network-graph"],
+      "style": {
+        "theme": "dark",
+        "palette": ["#00D4FF", "#7C3AED", "#F472B6", "#34D399", "#FBBF24"],
+        "backgroundColor": "#0F172A",
+        "texture": "default"
+      },
+      "defaults": {
+        "width": 800,
+        "height": 500,
+        "title_format": "[System]: [Metric] — [Status]"
+      },
+      "guidelines": "Luminous colors on dark background. Use area charts with transparency for layered metrics. Liquid for percentages."
+    }
+  }
+}

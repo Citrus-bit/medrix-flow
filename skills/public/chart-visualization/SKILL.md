@@ -67,6 +67,30 @@ Return the following to the user:
 ## Reference Material
 Detailed specifications for each chart type are located in the `references/` directory. Consult these files to ensure the `args` passed to the script match the expected schema.
 
+## Color Palettes & Presets
+
+### Professional Color Palettes
+Read `references/color_palettes.json` for 12 pre-built professional palettes. Select a palette that matches the audience and context:
+- **business-blue**: Corporate reports, dashboards
+- **tech-vibrant**: SaaS products, startup pitches
+- **medical-clinical**: Healthcare, clinical data
+- **nature-earth**: Sustainability, environmental data
+- **accessible-high-contrast**: Public-facing, accessibility-critical
+- **categorical-distinct**: Multi-series comparisons (colorblind-safe)
+- **dark-mode**: Dark dashboards, monitoring
+
+Usage: Pass the palette's `colors` array directly as `style.palette` in the chart args.
+
+### Chart Presets
+Read `references/chart_presets.json` for 5 scenario presets with recommended chart types, styles, and guidelines:
+- **executive-dashboard**: KPI charts for executives
+- **technical-report**: Detailed charts for engineering teams
+- **marketing-report**: Engaging charts for growth metrics
+- **financial-analysis**: Conservative charts for financial data
+- **dark-dashboard**: Dark-themed monitoring charts
+
+Usage: Use the preset's `style` object as a starting point for your chart configuration.
+
 ## Quality Standards (Mandatory)
 
 ### Before Generation — Clarify Requirements
