@@ -5,7 +5,7 @@ from typing import Any, Self
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from medrix_flow.config.checkpointer_config import CheckpointerConfig, load_checkpointer_config_from_dict
 from medrix_flow.config.extensions_config import ExtensionsConfig
@@ -35,8 +35,14 @@ class AppConfig(BaseModel):
     skills: SkillsConfig = Field(default_factory=SkillsConfig, description="Skills configuration")
     extensions: ExtensionsConfig = Field(default_factory=ExtensionsConfig, description="Extensions configuration (MCP servers and skills state)")
     tool_search: ToolSearchConfig = Field(default_factory=ToolSearchConfig, description="Tool search / deferred loading configuration")
-    model_config = ConfigDict(extra="allow", frozen=False)
     checkpointer: CheckpointerConfig | None = Field(default=None, description="Checkpointer configuration")
+    model_config = ConfigDict(extra="allow", frozen=False)
+
+    @field_validator("models", "tools", "tool_groups", mode="before")
+    @classmethod
+    def _none_to_list(cls, v: Any) -> Any:
+        """Allow YAML `key:` (parsed as None) to fall back to an empty list."""
+        return v if v is not None else []
 
     @classmethod
     def resolve_config_path(cls, config_path: str | None = None) -> Path:
@@ -85,6 +91,9 @@ class AppConfig(BaseModel):
 
         # Check config version before processing
         cls._check_config_version(config_data, resolved_path)
+
+        # Reload .env so that keys written by the Gateway setup API are visible
+        load_dotenv(resolved_path.parent / ".env", override=True)
 
         config_data = cls.resolve_env_variables(config_data)
 
