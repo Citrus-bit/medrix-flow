@@ -55,6 +55,14 @@ function getStreamErrorMessage(error: unknown): string {
   return "Request failed.";
 }
 
+function isModelNotConfiguredError(error: unknown): boolean {
+  const message = getStreamErrorMessage(error).toLowerCase();
+  return (
+    message.includes("no chat models are configured") ||
+    message.includes("please configure at least one model")
+  );
+}
+
 export function useThreadStream({
   threadId,
   context,
@@ -197,6 +205,9 @@ export function useThreadStream({
     },
     onError(error) {
       setOptimisticMessages([]);
+      if (!threadIdRef.current && isModelNotConfiguredError(error)) {
+        return;
+      }
       toast.error(getStreamErrorMessage(error));
     },
     onFinish(state) {
