@@ -242,7 +242,7 @@ Get MedrixFlow running in just 4 steps — **no manual config file editing requi
 git clone https://github.com/Citrus-bit/medrix-flow.git
 cd medrix-flow
 make config    # Auto-generate config.yaml and .env (first time only)
-make install   # One-command install for all frontend and backend dependencies
+make install   # One-command install for all frontend and backend dependencies (backend includes dev dependency group)
 ```
 
 ### Step 3: Start Services
@@ -275,6 +275,7 @@ When you first open the page, the setup panel will **automatically pop up** to g
 | `make dev-daemon` | Start as background daemon |
 | `make stop` | Stop all services |
 | `make check` | Check if prerequisites are installed |
+| `make verify` | Run CI-aligned local checks (backend lint/test + frontend lint/typecheck) |
 | `make clean` | Stop services and clean up temporary files |
 | `make up` | Docker production deployment |
 | `make down` | Stop Docker containers |
