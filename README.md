@@ -241,7 +241,7 @@ MedrixFlow 内置了专业级视觉输出质量保障体系，覆盖图表、PPT
 git clone https://github.com/Citrus-bit/medrix-flow.git
 cd medrix-flow
 make config    # 自动生成 config.yaml 和 .env（仅首次需要）
-make install   # 一键安装前后端所有依赖
+make install   # 一键安装前后端所有依赖（后端含 dev 依赖组）
 ```
 
 ### 第 3 步：启动服务
@@ -274,6 +274,7 @@ make dev       # 启动所有服务（LangGraph + Gateway + Frontend + Nginx）
 | `make dev-daemon` | 后台守护进程启动 |
 | `make stop` | 停止所有服务 |
 | `make check` | 检查前置工具是否已安装 |
+| `make verify` | 本地执行与 CI 对齐的校验（backend lint/test + frontend lint/typecheck） |
 | `make clean` | 停止服务并清理临时文件 |
 | `make up` | Docker 生产部署 |
 | `make down` | 停止 Docker 容器 |

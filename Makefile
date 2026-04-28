@@ -1,6 +1,6 @@
 # MedrixFlow - Unified Development Environment
 
-.PHONY: help config config-upgrade check install dev dev-daemon start stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway
+.PHONY: help config config-upgrade check install verify dev dev-daemon start stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway
 
 PYTHON ?= python
 
@@ -9,8 +9,8 @@ help:
 	@echo "  make config          - Generate local config files (aborts if config already exists)"
 	@echo "  make config-upgrade  - Merge new fields from config.example.yaml into config.yaml"
 	@echo "  make check           - Check if all required tools are installed"
-	@echo "  make install         - Install all dependencies (frontend + backend)"
-	@echo "  make setup-sandbox   - Pre-pull sandbox container image (recommended)"
+	@echo "  make install         - Install all dependencies (frontend + backend dev group)"
+	@echo "  make verify          - Run local checks aligned with CI (backend lint/test + frontend lint/typecheck)"
 	@echo "  make dev             - Start all services in development mode (with hot-reloading)"
 	@echo "  make dev-daemon      - Start all services in background (daemon mode)"
 	@echo "  make start           - Start all services in production mode (optimized, no hot-reloading)"
@@ -18,12 +18,12 @@ help:
 	@echo "  make clean           - Clean up processes and temporary files"
 	@echo ""
 	@echo "Docker Production Commands:"
-	@echo "  make up              - Build and start production Docker services (localhost:2026)"
+	@echo "  make up              - Build and start production Docker services (localhost:1000)"
 	@echo "  make down            - Stop and remove production Docker containers"
 	@echo ""
 	@echo "Docker Development Commands:"
 	@echo "  make docker-init     - Pull the sandbox image"
-	@echo "  make docker-start    - Start Docker services (mode-aware from config.yaml, localhost:2026)"
+	@echo "  make docker-start    - Start Docker services (mode-aware from config.yaml, localhost:1000)"
 	@echo "  make docker-stop     - Stop Docker development services"
 	@echo "  make docker-logs     - View Docker development logs"
 	@echo "  make docker-logs-frontend - View Docker frontend logs"
@@ -42,7 +42,7 @@ check:
 # Install all dependencies
 install:
 	@echo "Installing backend dependencies..."
-	@cd backend && uv sync
+	@cd backend && uv sync --group dev
 	@echo "Installing frontend dependencies..."
 	@cd frontend && pnpm install
 	@echo "✓ All dependencies installed"
@@ -54,6 +54,13 @@ install:
 	@echo "If you plan to use Docker/Container-based sandbox, you can pre-pull the image:"
 	@echo "  make setup-sandbox"
 	@echo ""
+
+verify:
+	@echo "Running backend checks (lint + test)..."
+	@cd backend && make lint && make test
+	@echo "Running frontend checks (lint + typecheck)..."
+	@cd frontend && pnpm lint && pnpm typecheck
+	@echo "✓ Verification checks passed"
 
 # Pre-pull sandbox Docker image (optional but recommended)
 setup-sandbox:

@@ -38,16 +38,37 @@ export function useSubtask(id: string) {
   return tasks[id];
 }
 
+export function hasTaskPatchChanges(
+  previous: Subtask | undefined,
+  patch: Partial<Subtask> & { id: string },
+) {
+  if (!previous) {
+    return true;
+  }
+  for (const [key, value] of Object.entries(patch)) {
+    if (!Object.is(previous[key as keyof Subtask], value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function useUpdateSubtask() {
-  const { tasks, setTasks } = useSubtaskContext();
+  const { setTasks } = useSubtaskContext();
   const updateSubtask = useCallback(
     (task: Partial<Subtask> & { id: string }) => {
-      tasks[task.id] = { ...tasks[task.id], ...task } as Subtask;
-      if (task.latestMessage) {
-        setTasks({ ...tasks });
-      }
+      setTasks((previousTasks) => {
+        const previousTask = previousTasks[task.id];
+        if (!hasTaskPatchChanges(previousTask, task)) {
+          return previousTasks;
+        }
+        return {
+          ...previousTasks,
+          [task.id]: { ...previousTask, ...task } as Subtask,
+        };
+      });
     },
-    [tasks, setTasks],
+    [setTasks],
   );
   return updateSubtask;
 }

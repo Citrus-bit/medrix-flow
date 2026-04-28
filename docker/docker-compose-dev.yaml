@@ -2,7 +2,7 @@
 # Usage: docker-compose -f docker-compose-dev.yaml up --build
 #
 # Services:
-#   - nginx: Reverse proxy (port 2026)
+#   - nginx: Reverse proxy (port 1000)
 #   - frontend: Frontend Next.js dev server (port 3000)
 #   - gateway: Backend Gateway API (port 8001)
 #   - langgraph: LangGraph server (port 2024)
@@ -11,7 +11,7 @@
 # Prerequisites:
 #   - Kubernetes cluster + kubeconfig are only required when using provisioner mode.
 #
-# Access: http://localhost:2026
+# Access: http://localhost:1000
 
 services:
   # ── Sandbox Provisioner ────────────────────────────────────────────────

@@ -8,7 +8,7 @@ MedrixFlow is a LangGraph-based AI super agent with sandbox execution, persisten
 
 ```
                         ┌──────────────────────────────────────┐
-                        │          Nginx (Port 2026)           │
+                        │          Nginx (Port 1000)           │
                         │      Unified reverse proxy           │
                         └───────┬──────────────────┬───────────┘
                                 │                  │
@@ -195,7 +195,7 @@ export OPENAI_API_KEY="your-api-key-here"
 make dev  # Starts LangGraph + Gateway + Frontend + Nginx
 ```
 
-Access at: http://localhost:2026
+Access at: http://localhost:1000
 
 **Backend Only** (from backend directory):
 

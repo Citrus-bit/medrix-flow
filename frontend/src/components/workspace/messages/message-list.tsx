@@ -19,6 +19,7 @@ import type { Subtask } from "@/core/tasks";
 import { useUpdateSubtask } from "@/core/tasks/context";
 import type { AgentThreadState } from "@/core/threads";
 import { cn } from "@/lib/utils";
+import { useEffect } from "react";
 
 import { ArtifactFileList } from "../artifacts/artifact-file-list";
 import { StreamingIndicator } from "../streaming-indicator";
@@ -44,6 +45,60 @@ export function MessageList({
   const rehypePlugins = useRehypeSplitWordsIntoSpans(thread.isLoading);
   const updateSubtask = useUpdateSubtask();
   const messages = thread.messages;
+
+  useEffect(() => {
+    for (const message of messages) {
+      if (message.type === "ai") {
+        for (const toolCall of message.tool_calls ?? []) {
+          if (toolCall.name === "task") {
+            updateSubtask({
+              id: toolCall.id!,
+              subagent_type: toolCall.args.subagent_type,
+              description: toolCall.args.description,
+              prompt: toolCall.args.prompt,
+              status: "in_progress",
+            });
+          }
+        }
+      }
+
+      if (message.type !== "tool") {
+        continue;
+      }
+
+      const taskId = message.tool_call_id;
+      if (!taskId) {
+        continue;
+      }
+
+      const result = extractTextFromMessage(message);
+      if (result.startsWith("Task Succeeded. Result:")) {
+        updateSubtask({
+          id: taskId,
+          status: "completed",
+          result: result.split("Task Succeeded. Result:")[1]?.trim(),
+        });
+      } else if (result.startsWith("Task failed.")) {
+        updateSubtask({
+          id: taskId,
+          status: "failed",
+          error: result.split("Task failed.")[1]?.trim(),
+        });
+      } else if (result.startsWith("Task timed out")) {
+        updateSubtask({
+          id: taskId,
+          status: "failed",
+          error: result,
+        });
+      } else {
+        updateSubtask({
+          id: taskId,
+          status: "in_progress",
+        });
+      }
+    }
+  }, [messages, updateSubtask]);
+
   if (thread.isThreadLoading && messages.length === 0) {
     return <MessageListSkeleton />;
   }
@@ -103,44 +158,11 @@ export function MessageList({
               if (message.type === "ai") {
                 for (const toolCall of message.tool_calls ?? []) {
                   if (toolCall.name === "task") {
-                    const task: Subtask = {
+                    tasks.add({
                       id: toolCall.id!,
                       subagent_type: toolCall.args.subagent_type,
                       description: toolCall.args.description,
                       prompt: toolCall.args.prompt,
-                      status: "in_progress",
-                    };
-                    updateSubtask(task);
-                    tasks.add(task);
-                  }
-                }
-              } else if (message.type === "tool") {
-                const taskId = message.tool_call_id;
-                if (taskId) {
-                  const result = extractTextFromMessage(message);
-                  if (result.startsWith("Task Succeeded. Result:")) {
-                    updateSubtask({
-                      id: taskId,
-                      status: "completed",
-                      result: result
-                        .split("Task Succeeded. Result:")[1]
-                        ?.trim(),
-                    });
-                  } else if (result.startsWith("Task failed.")) {
-                    updateSubtask({
-                      id: taskId,
-                      status: "failed",
-                      error: result.split("Task failed.")[1]?.trim(),
-                    });
-                  } else if (result.startsWith("Task timed out")) {
-                    updateSubtask({
-                      id: taskId,
-                      status: "failed",
-                      error: result,
-                    });
-                  } else {
-                    updateSubtask({
-                      id: taskId,
                       status: "in_progress",
                     });
                   }
