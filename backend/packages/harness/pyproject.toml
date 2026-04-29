@@ -1,6 +1,6 @@
 [project]
 name = "medrix-flow-harness"
-version = "0.1.0"
+version = "2.3.0"
 description = "MedrixFlow agent harness framework"
 requires-python = ">=3.12"
 dependencies = [
