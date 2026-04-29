@@ -414,5 +414,8 @@ export const zhCN: Translations = {
     loadingSlow: "加载时间较长",
     loadingSlowHint: "后端服务可能还在启动中，你可以稍等片刻或重试。",
     retry: "重试",
+    noModelsConfigured: "未配置模型",
+    noModelsConfiguredHint: "请在设置中配置至少一个聊天模型以开始对话。",
+    openSettings: "打开设置",
   },
 };

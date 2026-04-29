@@ -1,10 +1,20 @@
 "use client";
 
-import { ActivityIcon, BrainIcon, SearchIcon } from "lucide-react";
+import {
+  ActivityIcon,
+  AlertTriangleIcon,
+  BrainIcon,
+  SearchIcon,
+  SettingsIcon,
+} from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo } from "react";
 
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/core/i18n/hooks";
+import { useModels } from "@/core/models/hooks";
+import { dispatchOpenSettings } from "@/core/settings/events";
 import { cn } from "@/lib/utils";
 
 let waved = false;
@@ -53,7 +63,9 @@ export function Welcome({
 }) {
   const { t } = useI18n();
   const searchParams = useSearchParams();
+  const { models, isLoading } = useModels();
   const isUltra = useMemo(() => mode === "ultra", [mode]);
+  const showModelWarning = !isLoading && models.length === 0;
   useEffect(() => {
     waved = true;
   }, []);
@@ -124,6 +136,24 @@ export function Welcome({
             </div>
           </div>
         </>
+      )}
+      {showModelWarning && (
+        <Alert variant="destructive" className="mt-4 w-full text-left">
+          <AlertTriangleIcon className="size-4" />
+          <AlertTitle>{t.setup.noModelsConfigured}</AlertTitle>
+          <AlertDescription>
+            <p>{t.setup.noModelsConfiguredHint}</p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={() => dispatchOpenSettings({ section: "setup" })}
+            >
+              <SettingsIcon className="mr-1.5 size-3.5" />
+              {t.setup.openSettings}
+            </Button>
+          </AlertDescription>
+        </Alert>
       )}
     </div>
   );

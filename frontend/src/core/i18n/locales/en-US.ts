@@ -429,5 +429,8 @@ export const enUS: Translations = {
     loadingSlow: "Loading is taking longer than expected",
     loadingSlowHint: "The backend service may still be starting up. You can wait or try again.",
     retry: "Retry",
+    noModelsConfigured: "No models configured",
+    noModelsConfiguredHint: "Please configure at least one chat model in settings to start chatting.",
+    openSettings: "Open Settings",
   },
 };

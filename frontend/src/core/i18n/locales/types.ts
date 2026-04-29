@@ -358,5 +358,8 @@ export interface Translations {
     loadingSlow: string;
     loadingSlowHint: string;
     retry: string;
+    noModelsConfigured: string;
+    noModelsConfiguredHint: string;
+    openSettings: string;
   };
 }

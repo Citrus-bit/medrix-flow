@@ -23,6 +23,10 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useI18n } from "@/core/i18n/hooks";
+import {
+  OPEN_SETTINGS_EVENT,
+  type OpenSettingsDetail,
+} from "@/core/settings/events";
 
 import { GithubIcon } from "./github-icon";
 import { SettingsDialog } from "./settings";
@@ -60,6 +64,16 @@ export function WorkspaceNavMenu() {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<OpenSettingsDetail>).detail;
+      setSettingsDefaultSection(detail?.section ?? "setup");
+      setSettingsOpen(true);
+    };
+    window.addEventListener(OPEN_SETTINGS_EVENT, handler);
+    return () => window.removeEventListener(OPEN_SETTINGS_EVENT, handler);
   }, []);
 
   // Auto-open settings on "setup" tab to remind users to configure model/API

@@ -12,6 +12,7 @@ import { getBackendBaseURL } from "../config";
 import { useI18n } from "../i18n/hooks";
 import type { FileInMessage } from "../messages/utils";
 import type { LocalSettings } from "../settings";
+import { dispatchOpenSettings } from "../settings/events";
 import { useUpdateSubtask } from "../tasks/context";
 import type { UploadedFileInfo } from "../uploads";
 import { uploadFiles } from "../uploads";
@@ -205,7 +206,16 @@ export function useThreadStream({
     },
     onError(error) {
       setOptimisticMessages([]);
-      if (!threadIdRef.current && isModelNotConfiguredError(error)) {
+      if (isModelNotConfiguredError(error)) {
+        toast.error(t.setup.noModelsConfigured, {
+          id: "model-not-configured",
+          description: t.setup.noModelsConfiguredHint,
+          duration: 8000,
+          action: {
+            label: t.setup.openSettings,
+            onClick: () => dispatchOpenSettings({ section: "setup" }),
+          },
+        });
         return;
       }
       toast.error(getStreamErrorMessage(error));
