@@ -1,4 +1,4 @@
-# MedrixFlow
+# MedrixFlow 2.3.0
 
 **English** | [中文](./README.md)
 
