@@ -60,6 +60,8 @@ verify:
 	@cd backend && make lint && make test
 	@echo "Running frontend checks (lint + typecheck)..."
 	@cd frontend && pnpm lint && pnpm typecheck
+	@echo "Running frontend build check..."
+	@cd frontend && BETTER_AUTH_SECRET=local-dev-secret pnpm build
 	@echo "✓ Verification checks passed"
 
 # Pre-pull sandbox Docker image (optional but recommended)

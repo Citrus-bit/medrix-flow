@@ -1,10 +1,11 @@
 import { createContext, useCallback, useContext, useState } from "react";
+import type { Dispatch, SetStateAction } from "react";
 
 import type { Subtask } from "./types";
 
 export interface SubtaskContextValue {
   tasks: Record<string, Subtask>;
-  setTasks: (tasks: Record<string, Subtask>) => void;
+  setTasks: Dispatch<SetStateAction<Record<string, Subtask>>>;
 }
 
 export const SubtaskContext = createContext<SubtaskContextValue>({

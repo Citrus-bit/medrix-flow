@@ -63,8 +63,10 @@ export function RecentChatList() {
   const pathname = usePathname();
   const { thread_id: threadIdFromPath } = useParams<{ thread_id: string }>();
   const { data: threads = [] } = useThreads();
-  const { mutate: deleteThread } = useDeleteThread();
-  const { mutate: renameThread } = useRenameThread();
+  const { mutateAsync: deleteThread, isPending: isDeletingThread } =
+    useDeleteThread();
+  const { mutateAsync: renameThread, isPending: isRenamingThread } =
+    useRenameThread();
 
   // Rename dialog state
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
@@ -72,8 +74,11 @@ export function RecentChatList() {
   const [renameValue, setRenameValue] = useState("");
 
   const handleDelete = useCallback(
-    (threadId: string) => {
-      deleteThread({ threadId });
+    async (threadId: string) => {
+      if (isDeletingThread) {
+        return;
+      }
+      await deleteThread({ threadId });
       if (threadId === threadIdFromPath) {
         const threadIndex = threads.findIndex((t) => t.thread_id === threadId);
         let nextThreadId = "new";
@@ -87,7 +92,7 @@ export function RecentChatList() {
         void router.push(`/workspace/chats/${nextThreadId}`);
       }
     },
-    [deleteThread, router, threadIdFromPath, threads],
+    [deleteThread, isDeletingThread, router, threadIdFromPath, threads],
   );
 
   const handleRenameClick = useCallback(
@@ -99,14 +104,17 @@ export function RecentChatList() {
     [],
   );
 
-  const handleRenameSubmit = useCallback(() => {
+  const handleRenameSubmit = useCallback(async () => {
+    if (isRenamingThread) {
+      return;
+    }
     if (renameThreadId && renameValue.trim()) {
-      renameThread({ threadId: renameThreadId, title: renameValue.trim() });
+      await renameThread({ threadId: renameThreadId, title: renameValue.trim() });
       setRenameDialogOpen(false);
       setRenameThreadId(null);
       setRenameValue("");
     }
-  }, [renameThread, renameThreadId, renameValue]);
+  }, [isRenamingThread, renameThread, renameThreadId, renameValue]);
 
   const handleShare = useCallback(
     async (threadId: string) => {
@@ -272,7 +280,7 @@ export function RecentChatList() {
               placeholder={t.common.rename}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
-                  handleRenameSubmit();
+                  void handleRenameSubmit();
                 }
               }}
             />
@@ -284,7 +292,7 @@ export function RecentChatList() {
             >
               {t.common.cancel}
             </Button>
-            <Button onClick={handleRenameSubmit}>{t.common.save}</Button>
+            <Button onClick={() => void handleRenameSubmit()}>{t.common.save}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

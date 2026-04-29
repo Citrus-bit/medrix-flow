@@ -583,6 +583,9 @@ export function useDeleteThread() {
         },
       );
     },
+    onError(error) {
+      toast.error(getStreamErrorMessage(error));
+    },
     onSettled() {
       void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
     },
@@ -625,6 +628,9 @@ export function useRenameThread() {
           });
         },
       );
+    },
+    onError(error) {
+      toast.error(getStreamErrorMessage(error));
     },
   });
 }

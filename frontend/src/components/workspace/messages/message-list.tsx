@@ -1,4 +1,5 @@
 import type { BaseStream } from "@langchain/langgraph-sdk/react";
+import { useEffect } from "react";
 
 import {
   Conversation,
@@ -17,9 +18,9 @@ import {
 import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
 import type { Subtask } from "@/core/tasks";
 import { useUpdateSubtask } from "@/core/tasks/context";
+import { parseTaskToolResult } from "@/core/tasks/result-parser";
 import type { AgentThreadState } from "@/core/threads";
 import { cn } from "@/lib/utils";
-import { useEffect } from "react";
 
 import { ArtifactFileList } from "../artifacts/artifact-file-list";
 import { StreamingIndicator } from "../streaming-indicator";
@@ -72,30 +73,11 @@ export function MessageList({
       }
 
       const result = extractTextFromMessage(message);
-      if (result.startsWith("Task Succeeded. Result:")) {
-        updateSubtask({
-          id: taskId,
-          status: "completed",
-          result: result.split("Task Succeeded. Result:")[1]?.trim(),
-        });
-      } else if (result.startsWith("Task failed.")) {
-        updateSubtask({
-          id: taskId,
-          status: "failed",
-          error: result.split("Task failed.")[1]?.trim(),
-        });
-      } else if (result.startsWith("Task timed out")) {
-        updateSubtask({
-          id: taskId,
-          status: "failed",
-          error: result,
-        });
-      } else {
-        updateSubtask({
-          id: taskId,
-          status: "in_progress",
-        });
-      }
+      const parsed = parseTaskToolResult(result);
+      updateSubtask({
+        id: taskId,
+        ...parsed,
+      });
     }
   }, [messages, updateSubtask]);
 
