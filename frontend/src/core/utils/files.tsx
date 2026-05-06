@@ -96,6 +96,8 @@ const extensionMap: Record<string, string> = {
 
   // Markdown & Docs
   md: "markdown",
+  tex: "text",
+  latex: "text",
   mdx: "mdx",
   rst: "rst",
 
@@ -179,6 +181,9 @@ export function getFileExtensionDisplayName(filepath: string) {
       return "Word";
     case "md":
       return "Markdown";
+    case "tex":
+    case "latex":
+      return "LaTeX";
     case "txt":
       return "Text";
     case "ppt":

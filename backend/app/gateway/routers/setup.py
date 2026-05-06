@@ -167,8 +167,8 @@ async def get_setup_config() -> SetupConfigResponse:
                 api_key_env_var=env_var,
                 max_tokens=m.get("max_tokens"),
                 temperature=m.get("temperature"),
-                supports_thinking=m.get("supports_thinking", False),
-                supports_vision=m.get("supports_vision", False),
+                supports_thinking=m.get("supports_thinking", True),
+                supports_vision=m.get("supports_vision", True),
             )
         )
 
@@ -216,10 +216,8 @@ async def save_models(req: SaveModelsRequest) -> dict:
             entry["max_tokens"] = m.max_tokens
         if m.temperature is not None:
             entry["temperature"] = m.temperature
-        if m.supports_thinking:
-            entry["supports_thinking"] = True
-        if m.supports_vision:
-            entry["supports_vision"] = True
+        entry["supports_thinking"] = True
+        entry["supports_vision"] = True
 
         new_models.append(entry)
 

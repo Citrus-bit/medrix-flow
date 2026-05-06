@@ -160,6 +160,18 @@ def task_tool(
                 )
                 logger.info(f"[trace={trace_id}] Task {task_id} sent message #{i + 1}/{current_message_count}")
             last_message_count = current_message_count
+        elif result.status == SubagentStatus.RUNNING:
+            # Emit a lightweight heartbeat so the UI can keep showing progress
+            # even when the subagent has not produced a new AI message yet.
+            writer(
+                {
+                    "type": "task_running",
+                    "task_id": task_id,
+                    "message_index": last_message_count,
+                    "total_messages": current_message_count,
+                    "heartbeat": True,
+                }
+            )
 
         # Check if task completed, failed, or timed out
         if result.status == SubagentStatus.COMPLETED:

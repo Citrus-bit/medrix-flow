@@ -76,6 +76,11 @@ class VisualQualityMiddleware(AgentMiddleware[ThreadState]):
             "`visual_quality_check` first. For professional-grade deliverables, call "
             "`visual_quality_check` to verify design standards before presenting to the user."
         )
+        if any(fp.lower().endswith((".pdf", ".tex")) for fp in filepaths):
+            reminder += (
+                " For LaTeX/PDF reports, also verify equations render correctly, symbols are legible, "
+                "and every figure is backed by validated local data or assets."
+            )
 
         # Append reminder to the messages in the Command update
         update = dict(result.update) if result.update else {}

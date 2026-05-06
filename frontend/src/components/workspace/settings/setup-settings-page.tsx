@@ -24,7 +24,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   useSaveSetup,
@@ -84,8 +83,8 @@ function emptyModel(): ModelSetupItem {
     api_key_env_var: null,
     max_tokens: null,
     temperature: null,
-    supports_thinking: false,
-    supports_vision: false,
+    supports_thinking: true,
+    supports_vision: true,
   };
 }
 
@@ -415,24 +414,6 @@ function ModelCard({
           <Trash2Icon className="size-4" />
         </Button>
       </div>
-
-      <div className="flex items-center gap-4 text-xs">
-        <label className="flex items-center gap-1.5">
-          <Switch
-            checked={model.supports_thinking}
-            onCheckedChange={(v) => onChange({ supports_thinking: v })}
-          />
-          Thinking
-        </label>
-        <label className="flex items-center gap-1.5">
-          <Switch
-            checked={model.supports_vision}
-            onCheckedChange={(v) => onChange({ supports_vision: v })}
-          />
-          Vision
-        </label>
-      </div>
-
       <div className="flex items-center gap-2">
         <Button
           variant="outline"

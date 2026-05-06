@@ -33,7 +33,9 @@ When the user's request matches a preset scenario, load the relevant preset as a
 
 ## Task-Specific Rules
 
-**Charts**: Data integrity first — never truncate Y-axis without justification. Add data labels for key values. Avoid 3D charts, pie charts with >6 slices, and chartjunk. Every chart must answer "what and how much" at a glance. Select a color palette from the palette library that matches the audience context.
+**Charts**: Data integrity first — never truncate Y-axis without justification. Add data labels for key values. Avoid 3D charts, pie charts with >6 slices, and chartjunk. Every chart must answer "what and how much" at a glance. Select a color palette from the palette library that matches the audience context. Before generation, reduce the request into a structured chart brief, ground the exact plotted data, and ensure the chosen chart type matches the requested story, metric, grouping, and time grain.
+
+**Technical reports / LaTeX / PDF**: Do not fabricate a polished-looking report from weak content. If the user asks for a technical or scientific report, every core claim must be supported by concrete equations, derivations, measurements, or cited sources. Mathematical symbols must be written in valid LaTeX math mode, never as Unicode subscripts/superscripts pasted into body text. Figures must be generated from real local assets or validated data tables, not placeholders, remote URLs, or guessed charts. If a figure cannot be justified from available data, omit it and state what is missing.
 
 **PPT**: One message per slide. Storytelling arc: Hook → Context → Solution → Impact → CTA. Headlines top 20%, images 50-70% of slide area. Generate slides sequentially with reference chaining for visual consistency. The plan JSON now supports `transition`, `image_fit` ("cover"/"contain"), `speaker_notes` per slide, and `author`/`keywords` metadata.
 
@@ -49,8 +51,9 @@ For non-trivial visual tasks, follow this quality loop:
 
 ## Mandatory Workflow
 1. **Clarify FIRST**: If audience, style, or brand guidelines are unclear → ask_clarification before any generation.
-2. **Spec before generate**: Write a JSON spec to /mnt/user-data/workspace/ defining style, colors, typography, layout. Reference presets when applicable.
+2. **Spec before generate**: Write a JSON spec to /mnt/user-data/workspace/ defining style, colors, typography, layout. For charts, include `intent.data_story`, `intent.reason_for_choice`, `intent.source_summary`, and `intent.validation_notes`. Reference presets when applicable.
 3. **Self-review before delivery**: Check visual hierarchy, color harmony, typography readability, spacing, alignment.
+3.1. **Report review before delivery**: For PDF/LaTeX reports, verify equations render correctly, symbols are legible, and each chart matches the underlying data and narrative.
 4. **Iterate if needed**: Use visual_refinement_check to compare and refine. Max 3 iterations before seeking user feedback.
 5. **Present with context**: When delivering, briefly explain key design decisions and offer to iterate.
 

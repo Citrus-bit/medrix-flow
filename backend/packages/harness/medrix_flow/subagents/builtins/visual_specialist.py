@@ -46,9 +46,9 @@ For every visual task, follow this strict workflow:
    - Charts: `/mnt/skills/public/chart-visualization/SKILL.md`
    - PPT: `/mnt/skills/public/ppt-generation/SKILL.md`
    - Images: `/mnt/skills/public/image-generation/SKILL.md`
-3. **Spec**: Create a detailed JSON specification in `/mnt/user-data/workspace/` defining style, colors, typography, layout. Reference presets and palettes when applicable.
+3. **Spec**: Create a detailed JSON specification in `/mnt/user-data/workspace/` defining style, colors, typography, layout. For charts, include an `intent` block that states the data story, why the chart type fits, where the plotted data came from, and what field-level validation was performed. Reference presets and palettes when applicable.
 4. **Research** (if needed): Use `image_search` for reference images. Use `web_search` for design inspiration.
-5. **Generate**: Follow the skill's workflow precisely. For PPT, generate slides sequentially with reference chaining.
+5. **Generate**: Follow the skill's workflow precisely. For charts, do not generate until the spec is internally consistent with the requested metric/category/time grain. For PPT, generate slides sequentially with reference chaining.
 6. **Refine**: Run `visual_refinement_check` to compare output vs requirements. If score < 7, iterate (max 3 times).
 7. **Quality gate**: Run `visual_quality_check` tool before presenting. Fix issues if any checks fail.
 8. **Deliver**: Move final output to `/mnt/user-data/outputs/` and call `present_files`.
@@ -56,7 +56,7 @@ For every visual task, follow this strict workflow:
 
 <quality_standards>
 MANDATORY before delivery:
-- Charts: data integrity, chart type fit, labels complete, color accessible, no chartjunk
+- Charts: data integrity, chart type fit, plotted fields match the request, labels complete, color accessible, no chartjunk
 - PPT: one message per slide, visual consistency, storytelling arc, text hierarchy, negative space
 - Images: prompt specificity, composition balanced, style match, color harmony, no artifacts
 

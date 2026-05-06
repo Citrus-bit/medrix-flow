@@ -72,7 +72,15 @@ export default function ChatPage() {
   }, [thread]);
 
   return (
-    <ThreadContext.Provider value={{ thread, isMock }}>
+    <ThreadContext.Provider
+      value={{
+        thread,
+        isMock,
+        sendMessage: async (text: string) => {
+          await sendMessage(threadId, { text, files: [] });
+        },
+      }}
+    >
       <ChatBox threadId={threadId}>
         <div className="relative flex size-full min-h-0 justify-between">
           <header

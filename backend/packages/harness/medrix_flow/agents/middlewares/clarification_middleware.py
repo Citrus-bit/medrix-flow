@@ -88,6 +88,17 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
 
         return "\n".join(message_parts)
 
+    def _build_clarification_payload(self, args: dict) -> dict:
+        """Build a structured payload for the frontend clarification card."""
+        options = args.get("options", []) or []
+        return {
+            "question": args.get("question", ""),
+            "clarification_type": args.get("clarification_type", "missing_info"),
+            "context": args.get("context"),
+            "options": options,
+            "allow_custom_input": True,
+        }
+
     def _handle_clarification(self, request: ToolCallRequest) -> Command:
         """Handle clarification request and return command to interrupt execution.
 
@@ -116,6 +127,7 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
             content=formatted_message,
             tool_call_id=tool_call_id,
             name="ask_clarification",
+            additional_kwargs={"clarification": self._build_clarification_payload(args)},
         )
 
         # Return a Command that:

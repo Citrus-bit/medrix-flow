@@ -6,6 +6,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
 import { Streamdown } from "streamdown";
 
 import {
@@ -110,6 +111,13 @@ export function SubtaskCard({
                         ? explainLastToolCall(task.latestMessage, t)
                         : t.subtasks[task.status]}
                     </FlipDisplay>
+                    {task.status === "in_progress" && task.lastUpdatedAt && (
+                      <span className="ml-1 text-xs opacity-60">
+                        {formatDistanceToNow(new Date(task.lastUpdatedAt), {
+                          addSuffix: true,
+                        })}
+                      </span>
+                    )}
                   </div>
                 )}
                 <ChevronUp

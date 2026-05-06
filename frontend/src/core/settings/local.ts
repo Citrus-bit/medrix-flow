@@ -25,7 +25,7 @@ export interface LocalSettings {
     "thread_id" | "is_plan_mode" | "thinking_enabled" | "subagent_enabled"
   > & {
     mode: "flash" | "thinking" | "pro" | "ultra" | undefined;
-    reasoning_effort?: "minimal" | "low" | "medium" | "high";
+    reasoning_effort?: "low" | "medium" | "high" | "xhigh";
   };
   layout: {
     sidebar_collapsed: boolean;

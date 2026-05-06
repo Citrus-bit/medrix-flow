@@ -5,9 +5,11 @@ import {
   Conversation,
   ConversationContent,
 } from "@/components/ai-elements/conversation";
+import { Button } from "@/components/ui/button";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   extractContentFromMessage,
+  extractClarificationPayload,
   extractPresentFilesFromMessage,
   extractTextFromMessage,
   groupMessages,
@@ -24,6 +26,8 @@ import { cn } from "@/lib/utils";
 
 import { ArtifactFileList } from "../artifacts/artifact-file-list";
 import { StreamingIndicator } from "../streaming-indicator";
+import { usePromptInputController } from "@/components/ai-elements/prompt-input";
+import { useThread } from "./context";
 
 import { MarkdownContent } from "./markdown-content";
 import { MessageGroup } from "./message-group";
@@ -45,6 +49,7 @@ export function MessageList({
   const { t } = useI18n();
   const rehypePlugins = useRehypeSplitWordsIntoSpans(thread.isLoading);
   const updateSubtask = useUpdateSubtask();
+  const { sendMessage } = useThread();
   const messages = thread.messages;
 
   useEffect(() => {
@@ -102,13 +107,14 @@ export function MessageList({
             });
           } else if (group.type === "assistant:clarification") {
             const message = group.messages[0];
-            if (message && hasContent(message)) {
+            if (message) {
+              const payload = extractClarificationPayload(message);
               return (
-                <MarkdownContent
+                <ClarificationCard
                   key={group.id}
-                  content={extractContentFromMessage(message)}
-                  isLoading={thread.isLoading}
-                  rehypePlugins={rehypePlugins}
+                  payload={payload}
+                  fallbackContent={extractContentFromMessage(message)}
+                  onSubmit={sendMessage}
                 />
               );
             }
@@ -206,5 +212,58 @@ export function MessageList({
         <div style={{ height: `${paddingBottom}px` }} />
       </ConversationContent>
     </Conversation>
+  );
+}
+
+function ClarificationCard({
+  payload,
+  fallbackContent,
+  onSubmit,
+}: {
+  payload:
+    | {
+        question?: string;
+        clarification_type?: string;
+        context?: string;
+        options?: string[];
+        allow_custom_input?: boolean;
+      }
+    | null;
+  fallbackContent: string;
+  onSubmit?: (text: string) => Promise<void>;
+}) {
+  const { textInput } = usePromptInputController();
+  const options = payload?.options ?? [];
+  const question = payload?.question ?? fallbackContent;
+  const context = payload?.context;
+
+  const handlePick = async (choice: string) => {
+    await onSubmit?.(choice);
+  };
+
+  const handleCustom = () => {
+    textInput.setInput("");
+    requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLTextAreaElement>("textarea[name='message']")
+        ?.focus();
+    });
+  };
+
+  return (
+    <div className="rounded-2xl border bg-background p-4">
+      {context && <div className="text-muted-foreground mb-2 text-sm">{context}</div>}
+      <div className="mb-3 text-sm font-medium">{question}</div>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option) => (
+          <Button key={option} variant="secondary" onClick={() => void handlePick(option)}>
+            {option}
+          </Button>
+        ))}
+        <Button variant="outline" onClick={handleCustom}>
+          type something
+        </Button>
+      </div>
+    </div>
   );
 }

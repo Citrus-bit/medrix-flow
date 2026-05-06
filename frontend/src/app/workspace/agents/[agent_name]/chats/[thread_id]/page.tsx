@@ -82,7 +82,14 @@ export default function AgentChatPage() {
   }, [thread]);
 
   return (
-    <ThreadContext.Provider value={{ thread }}>
+    <ThreadContext.Provider
+      value={{
+        thread,
+        sendMessage: async (text: string) => {
+          await sendMessage(threadId, { text, files: [] }, { agent_name });
+        },
+      }}
+    >
       <ChatBox threadId={threadId}>
         <div className="relative flex size-full min-h-0 justify-between">
           <header

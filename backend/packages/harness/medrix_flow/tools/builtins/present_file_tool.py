@@ -1,3 +1,5 @@
+import logging
+import shutil
 from pathlib import Path
 from typing import Annotated
 
@@ -8,8 +10,10 @@ from langgraph.typing import ContextT
 
 from medrix_flow.agents.thread_state import ThreadState
 from medrix_flow.config.paths import VIRTUAL_PATH_PREFIX, get_paths
+from medrix_flow.utils.latex import compile_latex_to_pdf, prepare_latex_preview
 
 OUTPUTS_VIRTUAL_PREFIX = f"{VIRTUAL_PATH_PREFIX}/outputs"
+logger = logging.getLogger(__name__)
 
 
 def _normalize_presented_filepath(
@@ -85,7 +89,28 @@ def present_file_tool(
         filepaths: List of absolute file paths to present to the user. **Only** files in `/mnt/user-data/outputs` can be presented.
     """
     try:
-        normalized_paths = [_normalize_presented_filepath(runtime, filepath) for filepath in filepaths]
+        normalized_paths: list[str] = []
+        thread_id = runtime.context.get("thread_id")
+        outputs_dir = Path(runtime.state.get("thread_data", {}).get("outputs_path", "")).resolve()
+        for filepath in filepaths:
+            normalized_path = _normalize_presented_filepath(runtime, filepath)
+
+            if normalized_path.lower().endswith(".tex") and thread_id:
+                try:
+                    tex_relative = Path(normalized_path.removeprefix(OUTPUTS_VIRTUAL_PREFIX).lstrip("/"))
+                    tex_path = outputs_dir / tex_relative
+                    prepared_path = prepare_latex_preview(tex_path)
+                    preview_pdf = compile_latex_to_pdf(prepared_path, prepared_path.parent)
+                    final_pdf = tex_path.with_suffix(".pdf")
+                    shutil.copy2(preview_pdf, final_pdf)
+                    normalized_paths.append(f"{OUTPUTS_VIRTUAL_PREFIX}/{final_pdf.relative_to(outputs_dir).as_posix()}")
+                    normalized_paths.append(normalized_path)
+                    logger.info("Compiled LaTeX preview: %s -> %s", tex_path, final_pdf)
+                    continue
+                except Exception as exc:
+                    logger.warning("LaTeX preview compilation failed for %s: %s", normalized_path, exc)
+
+            normalized_paths.append(normalized_path)
     except ValueError as exc:
         return Command(
             update={"messages": [ToolMessage(f"Error: {exc}", tool_call_id=tool_call_id)]},

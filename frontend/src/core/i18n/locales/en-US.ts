@@ -100,6 +100,8 @@ export const enUS: Translations = {
     reasoningEffortHigh: "High",
     reasoningEffortHighDescription:
       "Full-dimensional Logic Deduction + Multi-path Verification + Backward Check",
+    reasoningEffortUnsupported: "Unsupported",
+    reasoningEffortDisabledInFlash: "Disabled in Flash",
     searchModels: "Search models...",
     surpriseMe: "Surprise",
     surpriseMePrompt: "Surprise me",

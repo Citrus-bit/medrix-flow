@@ -186,7 +186,14 @@ export default function NewAgentPage() {
   // ── Step 2: chat ───────────────────────────────────────────────────────────
 
   return (
-    <ThreadContext.Provider value={{ thread }}>
+    <ThreadContext.Provider
+      value={{
+        thread,
+        sendMessage: async (text: string) => {
+          await sendMessage(threadId, { text, files: [] });
+        },
+      }}
+    >
       <ArtifactsProvider>
         <div className="flex size-full flex-col">
           {header}

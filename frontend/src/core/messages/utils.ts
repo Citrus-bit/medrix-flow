@@ -283,6 +283,23 @@ export function isClarificationToolMessage(message: Message) {
   return message.type === "tool" && message.name === "ask_clarification";
 }
 
+export function extractClarificationPayload(message: Message) {
+  if (message.type !== "tool" || message.name !== "ask_clarification") {
+    return null;
+  }
+  const payload = message.additional_kwargs?.clarification;
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+  return payload as {
+    question?: string;
+    clarification_type?: string;
+    context?: string;
+    options?: string[];
+    allow_custom_input?: boolean;
+  };
+}
+
 export function extractPresentFilesFromMessage(message: Message) {
   if (message.type !== "ai" || !hasPresentFiles(message)) {
     return [];

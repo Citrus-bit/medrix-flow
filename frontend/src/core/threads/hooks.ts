@@ -199,9 +199,14 @@ export function useThreadStream({
         const e = event as {
           type: "task_running";
           task_id: string;
-          message: AIMessage;
+          message?: AIMessage;
+          heartbeat?: boolean;
         };
-        updateSubtask({ id: e.task_id, latestMessage: e.message });
+        updateSubtask({
+          id: e.task_id,
+          ...(e.message ? { latestMessage: e.message } : {}),
+          lastUpdatedAt: new Date().toISOString(),
+        });
       }
     },
     onError(error) {
@@ -231,12 +236,50 @@ export function useThreadStream({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const sendInFlightRef = useRef(false);
   const prevMsgCountRef = useRef(thread.messages.length);
+  const [polledValues, setPolledValues] = useState<AgentThreadState | null>(
+    null,
+  );
 
   useEffect(() => {
     if (thread.isLoading) {
       setIsSubmitting(false);
     }
   }, [thread.isLoading]);
+
+  useEffect(() => {
+    if (!thread.isLoading) {
+      setPolledValues(null);
+      return;
+    }
+
+    const client = getAPIClient(isMock);
+    let cancelled = false;
+
+    const syncThreadState = async () => {
+      const currentThreadId = threadIdRef.current;
+      if (!currentThreadId) return;
+      try {
+        const state = await client.threads.getState<AgentThreadState>(
+          currentThreadId,
+        );
+        if (cancelled) return;
+        setPolledValues(state.values);
+        void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
+      } catch {
+        // Best-effort fallback only.
+      }
+    };
+
+    void syncThreadState();
+    const interval = window.setInterval(() => {
+      void syncThreadState();
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [isMock, queryClient, thread.isLoading]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -261,6 +304,17 @@ export function useThreadStream({
       setOptimisticMessages([]);
     }
   }, [thread.messages.length, optimisticMessages.length]);
+
+  const snapshotThread =
+    polledValues === null
+      ? thread
+      : ({
+          ...thread,
+          values: polledValues,
+          messages: Array.isArray(polledValues.messages)
+            ? polledValues.messages
+            : thread.messages,
+        } as typeof thread);
 
   const sendMessage = useCallback(
     async (
@@ -456,12 +510,10 @@ export function useThreadStream({
               reasoning_effort:
                 context.reasoning_effort ??
                 (context.mode === "ultra"
-                  ? "high"
+                  ? "xhigh"
                   : context.mode === "pro"
-                    ? "medium"
-                    : context.mode === "thinking"
-                      ? "low"
-                      : undefined),
+                    ? "high"
+                    : "medium"),
               thread_id: threadId,
             },
           },
@@ -483,10 +535,10 @@ export function useThreadStream({
   const mergedThread =
     optimisticMessages.length > 0
       ? ({
-          ...thread,
-          messages: [...thread.messages, ...optimisticMessages],
+          ...snapshotThread,
+          messages: [...(snapshotThread.messages ?? []), ...optimisticMessages],
         } as typeof thread)
-      : thread;
+      : snapshotThread;
 
   return [mergedThread, sendMessage, isUploading, isSubmitting] as const;
 }
