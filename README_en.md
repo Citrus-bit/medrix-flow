@@ -1,4 +1,4 @@
-# MedrixFlow 2.3.0
+# MedrixFlow 2.6.2
 
 **English** | [中文](./README.md)
 
@@ -26,8 +26,8 @@ MedrixFlow is a full-stack AI agent orchestration platform. The backend leverage
 Unlike simple LLM chain-of-thought calls, MedrixFlow uses a **LangGraph directed graph state machine** as its core orchestration engine:
 
 - **Lead Agent + Subagent Hierarchical Architecture**: The lead agent handles task understanding and decomposition, delegating to up to 3 subagents that execute in parallel, each with an independent 15-minute timeout
-- **16+ Layer Middleware Chain**: A strictly ordered middleware pipeline covering cross-cutting concerns including thread isolation, file upload injection, sandbox lifecycle, security auditing, context summarization, memory extraction, image vision, loop detection, tool error degradation, token usage tracking, visual quality gating, and more
-- **Dynamic Model Hot-Swapping**: Switch between different LLMs within the same conversation, with runtime toggling of Thinking mode and Vision mode
+- **Multi-Layer Middleware Chain**: A strictly ordered middleware pipeline covering cross-cutting concerns including thread isolation, file upload injection, sandbox lifecycle, security auditing, context summarization, memory extraction, loop detection, tool error degradation, token usage tracking, visual quality gating, and more
+- **Dynamic Model Hot-Swapping**: Switch between different LLMs within the same conversation; model capabilities are declared via flags such as `supports_thinking`, `supports_reasoning_effort`, and `supports_vision`, and the frontend adapts automatically
 
 ### 2. Thread-Level Sandbox Isolation
 
@@ -62,6 +62,7 @@ Model and API Key configuration is entirely handled through the frontend UI — 
 - **First-Visit Auto-Guidance**: The configuration panel automatically pops up in a new tab, using `sessionStorage` to ensure it only triggers once per browser session
 - **One-Click Connectivity Test**: Dynamically instantiates the Provider class and sends `ainvoke("Hi")` to verify model availability
 - **Hot-Reload Activation**: Saved configuration is automatically written to `config.yaml` + `.env`, and takes effect immediately via `reload_app_config()` — no service restart needed
+- **Modes Map to Reasoning Depth**: The frontend exposes `flash / pro / ultra` by default, mapped to `medium / high / xhigh` reasoning effort; separate thinking / vision / effort toggles are no longer shown
 
 ### 6. Multi-Channel Access
 
@@ -91,63 +92,25 @@ Built-in security auditing and token usage tracking — no external tools requir
 - **Token Usage Tracking**: `TokenUsageMiddleware` records input / output / total token counts after each LLM call, providing the data foundation for cost monitoring and quota management
 - **Sandbox Security Awareness**: `security.py` provides `uses_local_sandbox_provider()` and `is_host_bash_allowed()` utility functions to dynamically determine the current sandbox security level at runtime
 
-## Technical Challenges & Solutions
+## Current Interaction Notes
 
-### Middleware Orchestration Order Dependencies
+### Clarification and Confirmation
 
-**Challenge**: 16+ middleware components each handle different cross-cutting concerns but have implicit dependencies on one another. For example, `SandboxMiddleware` must run after `UploadsMiddleware` (it needs the thread directory to be created), `ClarificationMiddleware` must run last (it needs to interrupt graph execution), and `SandboxAuditMiddleware` must run after `ToolErrorHandling` (it needs to intercept already-wrapped tool calls).
+- When the agent needs more information or explicit approval, it calls `ask_clarification`
+- In the web UI, these requests are rendered as button-based choices instead of plain text only
+- Each clarification card includes a final `type something` option so the user can switch back to free-form input
 
-**Solution**: An explicit ordered middleware chain pattern where each middleware declares its execution phase, and the runtime executes them serially in a fixed order. The middleware pipeline is: ThreadData → Uploads → Sandbox → DanglingToolCall → (Guardrail) → ToolErrorHandling → (Summarization) → (TodoList) → Title → Memory → (ViewImage) → (DeferredToolFilter) → (SubagentLimit) → LoopDetection → SandboxAudit → TokenUsage → Clarification.
+### LaTeX / PDF Preview
 
-### Streaming State Consistency
+- When `present_files` is used on a `.tex` file, the app attempts to generate a preview PDF automatically
+- The current implementation prefers local `tectonic` and does not require `pdflatex`, `xelatex`, or `latexmk`
+- The preview pipeline also applies common compatibility fixes such as downloading remote images, injecting `subfig`, and normalizing some Unicode sub/superscripts
 
-**Challenge**: During SSE streaming, the frontend must simultaneously handle multiple stream types (messages, Thinking reasoning, subagent task events, tool calls) and recover stream state after page refresh. Safari browsers exhibit inconsistent SSE reconnection behavior.
+### Skills and Extensions
 
-**Solution**:
-- Use `sessionStorage` to store `lg:stream:{threadId}` → `runId` mappings, enabling `reconnectOnMount` stream resumption
-- Backend sets `onDisconnect: "continue"` to ensure the run continues after client disconnection
-- Thread list adds `refetchOnWindowFocus`, `staleTime: 30s`, and `visibilitychange` listeners to fix Safari compatibility
-- Subagent tasks trigger `useUpdateSubtask()` via `onCustomEvent` to update the SubtaskCard in real time
-
-### Configuration Hot-Reload Consistency
-
-**Challenge**: `config.yaml` and `.env` are modified by the frontend UI and need to take effect immediately, but the LangGraph Server, Gateway API, and frontend each maintain their own configuration caches.
-
-**Solution**: The `AppConfig` singleton uses mtime-based file modification detection with automatic hot-reload. The Gateway API checks for file changes on every request via `get_app_config()`. The LangGraph Server monitors YAML file changes and auto-restarts in the Gateway's `--reload` mode. Environment variables are resolved through `load_dotenv` + `resolve_env_variables` with recursive `$VAR` reference substitution.
-
-### Long Conversation Context Management
-
-**Challenge**: Long conversations can easily exceed the model's token limit, causing request failures or context loss.
-
-**Solution**: A configurable `SummarizationMiddleware` supporting three trigger strategies (token threshold, message count, model limit percentage). When triggered, a lightweight model generates a summary, and the most recent N messages + summary become the new context.
-
-## Performance Optimizations
-
-### Startup Speed Optimizations
-
-| Optimization | Measure | Impact |
-|--------|------|------|
-| Parallel Service Startup | LangGraph, Gateway, and Frontend start simultaneously; only Nginx waits for all three ports to be ready | 40–60% faster startup |
-| Config Upgrade Fast Skip | `config-upgrade.sh` uses bash-level `grep` to compare `config_version`, exiting immediately if versions match without starting Python | Reduces cold start by 1–2s |
-| Unused Dependency Cleanup | Removed zero-reference `kubernetes` and `duckdb` packages (~130MB); removed mistakenly included `nuxt-og-image` from the Nuxt project | Smaller install size, faster CI |
-
-### Frontend Runtime Optimizations
-
-| Optimization | Measure | Impact |
-|--------|------|------|
-| Shiki Syntax Highlighting Lazy Load | Changed `codeToHtml` to `await import("shiki")` dynamic import; type imports remain static | First-screen JS reduced by ~200KB |
-| CodeMirror Editor Lazy Load | 10 CodeMirror packages (7 languages + 2 themes + react-codemirror) wrapped with `next/dynamic` + `ssr: false`, internally loaded via `Promise.all()` | First-screen JS reduced by ~500KB |
-| Optimistic UI Updates | Messages appear instantly on send; thread creation uses optimistic query cache insertion | Eliminates perceived network latency |
-| TanStack Query Caching Strategy | `staleTime: 30s` + `refetchOnWindowFocus` + `visibilitychange` listener | Reduces unnecessary API requests |
-
-### Stability Improvements from Bug Fixes
-
-| Issue | Root Cause | Fix |
-|------|------|------|
-| `max_tokens` 400 Error | GLM-5 via Huawei ModelArts supports a maximum of 131072; the original config of 200000 caused a `BadRequest` silently swallowed by the frontend | Corrected to 131072 |
-| UI Freeze When Appending During Send | `sendMessage` with `sendInFlightRef` set to `true` would directly `return` and discard the second message | Changed to first `await thread.stop()` to cancel the current run before sending a new message |
-| Thread List Disappearing (Safari) | `useThreads` lacked a refetch strategy; cache expired after tab switching | Added `refetchOnWindowFocus`, `staleTime`, `visibilitychange` listener, and `onCreated` optimistic insertion |
-| Thinking State Display Glitch | Optimistic thinking placeholder used a static spinner, causing a flash when switching to actual reasoning content | Replaced with Reasoning component (brain icon + shimmer animation + real-time seconds counter) |
+- Skills are auto-discovered from `skills/public` and `skills/custom`
+- Skill enablement state and MCP configuration are stored together in `extensions_config.json`
+- Users can enable or disable skills from the settings page, or drop custom skills directly into `skills/custom`
 
 ## System Architecture
 
@@ -166,7 +129,7 @@ Built-in security auditing and token usage tracking — no external tools requir
           │ ┌──────────────────┐ │  │  /api/models      Models     │
           │ │    Lead Agent    │ │  │  /api/mcp/config  MCP Config │
           │ │                  │ │  │  /api/skills      Skills     │
-          │ │  16+ Layer       │ │  │  /api/memory      Memory     │
+          │ │   Multi-Layer    │ │  │  /api/memory      Memory     │
           │ │  Middleware Chain │ │  │  /api/setup/*     Config     │
           │ │       |          │ │  │  /api/threads/*   Threads    │
           │ │   Tool System    │ │  │                              │
@@ -209,7 +172,7 @@ Built-in security auditing and token usage tracking — no external tools requir
 | 14 | LoopDetectionMiddleware | Detects and interrupts infinite agent loop calls |
 | 15 | SandboxAuditMiddleware | Bash command security auditing: three-tier classification (block/warn/pass) + audit logs |
 | 16 | TokenUsageMiddleware | Records input/output/total token usage per LLM call |
-| 17 | ClarificationMiddleware | Intercepts clarification requests and interrupts graph execution (must be last) |
+| 17 | ClarificationMiddleware | Intercepts clarification requests, interrupts graph execution, and feeds the frontend clarification card (must be last) |
 | 18 | VisualQualityMiddleware | Visual output quality gate: checks if visual_quality_check was run before presenting visual files, injects reminder if not |
 
 ### Tool Ecosystem
@@ -220,7 +183,7 @@ Built-in security auditing and token usage tracking — no external tools requir
 | Built-in | present_files, ask_clarification, view_image, task, visual_quality_check, visual_refinement_check | File presentation, interactive clarification, image understanding, subagent delegation, visual quality gate, iterative refinement check |
 | Community | Tavily, Jina AI, Firecrawl, DuckDuckGo | Web search, web scraping, image search |
 | MCP | Any MCP-compatible server | Supports stdio/SSE/HTTP transport protocols |
-| Skills | Domain-specific workflows | Configurable skill packs injected via System Prompt |
+| Skills | Domain-specific workflows | Skill packs discovered from `skills/public` and `skills/custom`, injected based on enablement state |
 
 ## Quick Start
 
@@ -235,6 +198,7 @@ Get MedrixFlow running in just 4 steps — **no manual config file editing requi
 | Node.js | 22+ | [nodejs.org](https://nodejs.org/) |
 | pnpm | 10+ | `npm install -g pnpm` |
 | nginx | - | macOS: `brew install nginx` / Linux: `sudo apt install nginx` |
+| tectonic | Recommended | Local PDF preview/export for `.tex` files |
 
 ### Step 2: Clone & Install
 
@@ -315,7 +279,7 @@ medrix-flow/
 │   ├── packages/harness/medrix_flow/
 │   │   ├── agents/                 # Agent system
 │   │   │   ├── lead_agent/         #   Lead agent (factory + prompts)
-│   │   │   ├── middlewares/        #   18 middleware components (incl. security audit, token tracking & visual quality gate)
+│   │   │   ├── middlewares/        #   Middleware components (incl. security audit, token tracking & visual quality gate)
 │   │   │   ├── memory/             #   Memory extraction, correction detection, visual preference persistence & pluggable storage
 │   │   │   └── thread_state.py     #   Thread state Schema
 │   │   ├── sandbox/                # Sandbox execution engine + security auditing
@@ -329,7 +293,7 @@ medrix-flow/
 │   ├── app/gateway/                # FastAPI gateway
 │   │   ├── app.py                  #   Application entry point
 │   │   └── routers/                #   Route modules (models/mcp/skills/memory/setup)
-│   ├── tests/                      # Test suite (277 test cases)
+│   ├── tests/                      # Test suite
 │   ├── langgraph.json              # LangGraph entry configuration
 │   └── pyproject.toml              # Python dependencies
 │
@@ -374,10 +338,11 @@ medrix-flow/
 
 MedrixFlow supports managing all model and API key configurations directly through the web interface:
 
-- **Model Management**: Add / edit / delete LLM models, supporting 5 preset providers + OpenAI Compatible mode
+- **Model Management**: Add / edit / delete LLM models, supporting preset providers and OpenAI Compatible mode
 - **Connectivity Testing**: Each model configuration has a "Test" button that dynamically instantiates the Provider to verify availability
 - **Tool API Keys**: Configure Tavily (web search) and Jina (web scraping) keys
 - **Instant Effect**: Saving automatically writes to `config.yaml` and `.env`, and the service hot-reloads
+- **Capabilities Default On**: Thinking and vision capabilities are enabled by default in model setup; the frontend no longer exposes separate toggles for them
 
 **How to open**: Bottom-left "Settings & More" → "Settings" → "Configuration" tab
 
@@ -387,7 +352,7 @@ Edit `config.yaml` in the project root directory directly. Main configuration se
 
 | Section | Description |
 |---------|-------------|
-| `models` | LLM model definitions (class paths, API Keys, Thinking/Vision support) |
+| `models` | LLM model definitions (class paths, API Keys, capability flags such as `supports_thinking`, `supports_reasoning_effort`, and `supports_vision`) |
 | `tools` | Tool definitions (module paths, groups) |
 | `sandbox` | Execution environment (local / Docker / K3s) + `allow_host_bash` security switch |
 | `skills` | Skill directory paths |
@@ -407,7 +372,9 @@ Configuration values prefixed with `$` are automatically resolved as environment
 - Tool API Keys: `TAVILY_API_KEY`, `JINA_API_KEY`, `GITHUB_TOKEN`
 - Config overrides: `MEDRIX_FLOW_CONFIG_PATH`, `MEDRIX_FLOW_EXTENSIONS_CONFIG_PATH`
 
-### MCP Server Configuration (extensions_config.json)
+### MCP and Skills Configuration (`extensions_config.json`)
+
+You can copy `extensions_config.example.json` from the project root as a starting point, or manage it from the settings UI.
 
 ```json
 {
