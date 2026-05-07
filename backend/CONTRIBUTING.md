@@ -2,6 +2,12 @@
 
 Thank you for your interest in contributing to MedrixFlow! This document provides guidelines and instructions for contributing to the backend codebase.
 
+## Project Notes
+
+- The current runtime package source of truth is `backend/packages/harness/medrix_flow/`; older `backend/src/` references in historical notes should be treated as conceptual, not canonical.
+- Clarification flows should preserve the structured `ask_clarification` payload because the frontend uses it to render button-based choices.
+- For LaTeX preview bugs, inspect `tools/builtins/present_file_tool.py` together with `utils/latex.py`; `.tex` preview currently relies on local `tectonic`.
+
 ## Table of Contents
 
 - [Getting Started](#getting-started)

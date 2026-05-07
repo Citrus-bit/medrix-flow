@@ -1,5 +1,8 @@
 name: Lint Check
 
+# Frontend build stays in this workflow because env validation and route changes
+# routinely surface issues that lint/typecheck alone will miss.
+
 on:
   push:
     branches: [ 'main' ]

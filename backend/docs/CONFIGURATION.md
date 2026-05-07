@@ -32,6 +32,14 @@ models:
     temperature: 0.7               # Sampling temperature
 ```
 
+Capability flags commonly used by the current frontend:
+
+- `supports_thinking`: marks models that can run higher-reasoning paths
+- `supports_reasoning_effort`: enables explicit reasoning-effort plumbing in request context
+- `supports_vision`: enables image-aware flows such as `view_image`
+
+In the current web UI, `flash / pro / ultra` map to reasoning effort `medium / high / xhigh` respectively. Thinking and vision are treated as model capabilities rather than separate settings toggles.
+
 **Supported Providers**:
 - OpenAI (`langchain_openai:ChatOpenAI`)
 - Anthropic (`langchain_anthropic:ChatAnthropic`)
@@ -173,6 +181,8 @@ tools:
 ### Sandbox
 
 MedrixFlow supports multiple sandbox execution modes. Configure your preferred mode in `config.yaml`:
+
+Note: `.tex` artifact preview is not configured through YAML. In local workflows, `present_files` attempts PDF preview via host-installed `tectonic`.
 
 **Local Execution** (runs sandbox code directly on the host machine):
 ```yaml

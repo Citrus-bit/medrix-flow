@@ -1,5 +1,8 @@
 name: Unit Tests
 
+# Keep this workflow focused on backend pytest parity with `backend/Makefile`.
+# Linting and frontend validation live in separate workflows.
+
 on:
   push:
     branches: [ 'main' ]

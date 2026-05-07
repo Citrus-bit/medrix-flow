@@ -52,6 +52,12 @@ This document provides a comprehensive overview of the MedrixFlow backend archit
 
 ## Component Details
 
+## Current Product Notes
+
+- Clarification interrupts are structured: `ClarificationMiddleware` emits both the visible message and the metadata consumed by the frontend clarification card.
+- `.tex` artifact preview is part of the file-presentation flow: `present_files` attempts local PDF generation through `tectonic` before exposing the artifact.
+- Frontend chat modes are capability-driven: the UI maps `flash / pro / ultra` onto backend reasoning-effort context rather than exposing a separate raw effort control.
+
 ### LangGraph Server
 
 The LangGraph server is the core agent runtime, built on LangGraph for robust multi-agent workflow orchestration.

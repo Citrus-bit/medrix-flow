@@ -2,6 +2,12 @@
 
 Like the original MedrixFlow 1.0, we would love to give the community a minimalistic and easy-to-use web interface with a more modern and flexible architecture.
 
+This frontend is responsible for the current MedrixFlow interaction model:
+
+- model capabilities are discovered from backend config flags such as `supports_thinking`, `supports_reasoning_effort`, and `supports_vision`
+- the chat composer exposes `flash / pro / ultra`, which currently map to `medium / high / xhigh` reasoning effort
+- clarification requests are rendered as button-based choices with a final `type something` fallback for free-form input
+
 ## Tech Stack
 
 - **Framework**: [Next.js 16](https://nextjs.org/) with [App Router](https://nextjs.org/docs/app)
@@ -45,7 +51,7 @@ pnpm typecheck
 pnpm lint
 
 # Build for production
-pnpm build
+BETTER_AUTH_SECRET=local-dev-secret pnpm build
 
 # Start production server
 pnpm start
@@ -124,6 +130,8 @@ src/
 - Turbopack enabled by default in development for faster builds
 - Environment validation can be skipped with `SKIP_ENV_VALIDATION=1` (useful for Docker)
 - Backend API URLs are optional; nginx proxy is used by default in development
+- `pnpm build` is most reliable when `BETTER_AUTH_SECRET` is explicitly set
+- when running the full stack from the repo root with `make dev`, the unified local entrypoint is `http://localhost:1000`
 
 ## License
 

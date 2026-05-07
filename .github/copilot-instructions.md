@@ -8,10 +8,16 @@ MedrixFlow is a full-stack "super agent harness".
 
 - Backend: Python 3.12, LangGraph + FastAPI gateway, sandbox/tool system, memory, MCP integration.
 - Frontend: Next.js 16 + React 19 + TypeScript + pnpm.
-- Local dev entrypoint: root `Makefile` starts backend + frontend + nginx on `http://localhost:2026`.
+- Local dev entrypoint: root `Makefile` starts backend + frontend + nginx on `http://localhost:1000`.
 - Docker dev entrypoint: `make docker-*` (mode-aware provisioner startup from `config.yaml`).
 
 Current repo footprint is medium-large (backend service, frontend app, docker stack, skills library, docs).
+
+## 1.1) Product-Specific Notes
+
+- Frontend mode mapping: `flash / pro / ultra` currently map to reasoning effort `medium / high / xhigh`.
+- Clarification UX: `ask_clarification` is rendered as button-based choices in the web UI, with a final `type something` option for free-form replies.
+- LaTeX preview: `.tex` artifacts presented through `present_files` attempt local PDF preview via `tectonic` when available.
 
 ## 2) Runtime and Toolchain Requirements
 
@@ -94,8 +100,8 @@ make dev
 Behavior:
 
 - Stops existing local services first.
-- Starts LangGraph (`2024`), Gateway (`8001`), Frontend (`3000`), nginx (`2026`).
-- Unified app endpoint: `http://localhost:2026`.
+- Starts LangGraph (`2024`), Gateway (`8001`), Frontend (`3000`), nginx (`1000`).
+- Unified app endpoint: `http://localhost:1000`.
 - Logs: `logs/langgraph.log`, `logs/gateway.log`, `logs/frontend.log`, `logs/nginx.log`.
 
 Stop services:

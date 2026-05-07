@@ -90,6 +90,24 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: interaction_mode
+    attributes:
+      label: Chat mode
+      description: If relevant, note which composer mode was active when the issue occurred.
+      options:
+        - flash
+        - pro
+        - ultra
+        - custom / not sure
+
+  - type: input
+    id: latex_tooling
+    attributes:
+      label: LaTeX / PDF tooling
+      description: If the issue involves `.tex` preview or export, note whether `tectonic` is installed.
+      placeholder: e.g. tectonic 0.15.x / not installed / not relevant
+
   - type: textarea
     id: reproduce
     attributes:

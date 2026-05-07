@@ -6,6 +6,10 @@
 #   However you can change it using the `MEDRIX_FLOW_CONFIG_PATH` environment variable.
 # - Environment variables are available for all field values. Example: `api_key: $OPENAI_API_KEY`
 # - The `use` path is a string that looks like "package_name.sub_package_name.module_name:class_name/variable_name".
+# - In the current web UI, `flash / pro / ultra` map to reasoning effort
+#   `medium / high / xhigh`; thinking and vision are capability flags, not
+#   separate user-facing toggles.
+# - `.tex` artifact preview uses local `tectonic` when available on the host.
 
 # ============================================================================
 # Config Version (used to detect outdated config files)
@@ -44,6 +48,9 @@ models:
   #   max_tokens: 4096
   #   temperature: 0.7
   #   supports_vision: true # Enable vision support for view_image tool
+  #   # Optional capability flags consumed by the frontend:
+  #   # supports_thinking: true
+  #   # supports_reasoning_effort: true
 
   # Example: OpenAI Responses API model
   # - name: gpt-5-responses
