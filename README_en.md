@@ -11,88 +11,94 @@
 </p>
 
 <p align="center">
-  <b>AI Super Agent System Built on LangGraph</b><br/>
-  Sandbox Execution · Persistent Memory · Multi-Agent Collaboration · Extensible Tool Ecosystem
+  <b>An AI Research Agent Platform for Academic Writing and Experiment Reports</b><br/>
+  Literature Retrieval · APA 7 References · Experimental Evidence · Multi-Agent Collaboration
 </p>
 
 ---
 
-MedrixFlow is a full-stack AI agent orchestration platform. The backend leverages LangGraph for multi-agent collaboration and state management, while the frontend is built with Next.js 16 to deliver a modern interactive interface. The system supports code execution, web browsing, and file management within isolated thread-level sandboxes, and retains user context across conversations through persistent memory.
+MedrixFlow is a full-stack AI agent orchestration platform for academic writing, literature reviews, experiment reports, and research delivery. The backend uses LangGraph for multi-agent collaboration and state management, while the frontend provides a thread-based chat and artifact workflow built on Next.js 16. Beyond general-purpose agent capabilities, MedrixFlow now includes structured academic retrieval, APA 7 reference export, CS/AI and bioinformatics experiment specialist agents, local evidence storage, and report-oriented artifact delivery designed to solve the usual gaps in academic workflows: weak scholarly grounding, poor references, and disconnected experiment outputs.
 
 ## Key Features
 
-### 1. LangGraph-Powered Multi-Agent Orchestration
+### 1. Academic Research Pipeline: From Topic to APA 7 References
 
-Unlike simple LLM chain-of-thought calls, MedrixFlow uses a **LangGraph directed graph state machine** as its core orchestration engine:
+MedrixFlow now includes a dedicated, traceable pipeline for formal academic reporting:
 
-- **Lead Agent + Subagent Hierarchical Architecture**: The lead agent handles task understanding and decomposition, delegating to up to 3 subagents that execute in parallel, each with an independent 15-minute timeout
-- **Multi-Layer Middleware Chain**: A strictly ordered middleware pipeline covering cross-cutting concerns including thread isolation, file upload injection, sandbox lifecycle, security auditing, context summarization, memory extraction, loop detection, tool error degradation, token usage tracking, visual quality gating, and more
-- **Dynamic Model Hot-Swapping**: Switch between different LLMs within the same conversation; model capabilities are declared via flags such as `supports_thinking`, `supports_reasoning_effort`, and `supports_vision`, and the frontend adapts automatically
+- **Built-in academic subagent**: `academic-researcher` handles topic decomposition, query expansion, candidate paper screening, evidence card generation, outline building, and reference export
+- **Multi-source academic adapters**: `OpenAlex`, `Crossref`, `arXiv`, and `PubMed` are enabled by default, with optional `Semantic Scholar` enrichment, followed by metadata normalization, deduplication, and ranking
+- **Formal report exports**: a single research project can produce `report.md`, `references.md`, `references.bib`, `evidence_map.json`, and optionally `graph.json`
+- **Local evidence persistence**: research projects, paper metadata, evidence cards, outline mappings, and formatted references are stored locally in SQLite for incremental reuse
 
-### 2. Thread-Level Sandbox Isolation
+### 2. Experiment Specialist Agents: CS/AI and Bioinformatics
+
+MedrixFlow does not stop at writing. It also closes the gap between experiments and paper-ready outputs:
+
+- **Visible system agents**: `cs-ai-lab` focuses on regression, classification, clustering, dimensionality reduction, diagnostics, and paper-ready result summaries; `bioinformatics-lab` focuses on bulk expression workflows, differential analysis, enrichment, and single-cell starter analyses
+- **Python-first execution**: experiment workflows run through a unified local Python path to reduce runtime switching and keep outputs reproducible
+- **Automatic scientific figure routing**: chart type is selected from task intent and data shape, including line plots, histograms, scatter plots, heatmaps, ROC/PR, volcano, violin, and dot plots
+- **Paper-ready export bundle**: experiments can export `experiment_plan.md`, `methods.md`, `results.md`, `metrics.json`, `figure_manifest.json`, `figures/`, `tables/`, and when needed `paper_ready_results.md`
+
+### 3. Thread-Level Delivery and Artifact Discovery
+
+Academic workflows only work if users can reliably find the generated outputs:
+
+- **Thread-level outputs directory**: reports, BibTeX, figures, and result tables are written into the current thread’s artifact directory
+- **Improved right-side file panel**: the artifact panel supports auto-discovery of thread `outputs`, a manual refresh button, latest-file highlighting, preview, and download
+- **Delivery over chat spam**: larger research tasks prefer artifact bundles instead of forcing long reports into a single chat message
+
+### 4. LangGraph-Powered Multi-Agent Orchestration
+
+Unlike simple LLM chaining, MedrixFlow uses a **LangGraph directed graph state machine** as its orchestration core:
+
+- **Lead Agent + Subagent architecture**: the lead agent handles task understanding and decomposition, delegating to up to 3 subagents in parallel, each with a 15-minute timeout
+- **Multi-layer middleware chain**: a strictly ordered pipeline handles thread isolation, uploads, sandbox lifecycle, security auditing, summarization, memory extraction, loop detection, tool error degradation, token tracking, and visual quality gating
+- **Dynamic model hot-swapping**: conversations can switch LLMs mid-thread, with model capabilities declared through flags such as `supports_thinking`, `supports_reasoning_effort`, and `supports_vision`
+
+### 5. Thread-Level Sandbox Isolation
 
 Each conversation thread has a fully isolated execution environment:
 
-- **Virtual Filesystem Mapping**: `/mnt/user-data/{workspace,uploads,outputs}` is automatically mapped to thread-specific physical directories, preventing cross-thread data leakage
-- **Dual Sandbox Engine**: Supports both local direct execution (LocalSandboxProvider) and Docker container isolation (AioSandboxProvider), with the option to switch to K3s Pod-level isolation in production
-- **Complete Toolchain Coverage**: bash execution, file read/write, string replacement, directory browsing — agents have full filesystem operation capabilities
+- **Virtual filesystem mapping**: `/mnt/user-data/{workspace,uploads,outputs}` is mapped to thread-specific physical directories to prevent cross-thread data leakage
+- **Dual sandbox engine**: supports local direct execution (`LocalSandboxProvider`) and Docker-based isolation (`AioSandboxProvider`), with K3s pod isolation as a production option
+- **Complete toolchain coverage**: bash execution, file read/write, string replacement, and directory browsing are all available inside the isolated workspace
 
-### 3. LLM-Driven Persistent Memory
+### 6. LLM-Driven Persistent Memory
 
-Unlike simple conversation history concatenation, MedrixFlow implements a structured long-term memory system:
+Unlike simple history concatenation, MedrixFlow implements a structured long-term memory system:
 
-- **Automatic Knowledge Extraction**: The LLM analyzes conversation content to automatically extract user backgrounds (profession, preferences), facts (with confidence scores), and context
-- **User Correction Detection**: 11 EN/ZH regex patterns detect user corrections in real time (e.g., "actually", "that's wrong", "不对", "其实是"), triggering priority memory updates to prevent stale facts from being persisted
-- **Debounced Batch Processing**: Aggregates multi-turn conversation changes through a configurable debounce mechanism (default 30s) to reduce LLM call overhead
-- **Pluggable Storage Backend**: Default JSON file storage (`FileMemoryStorage`), with support for swapping in any custom storage implementation (e.g., SQLite, Redis) via the `storage_class` configuration
-- **System Prompt Injection**: High-confidence facts and user context are automatically injected into the agent's prompt, enabling personalized responses across conversations
+- **Automatic knowledge extraction**: the LLM extracts user background, preferences, facts, and context from conversations
+- **User correction detection**: 11 EN/ZH regex patterns detect corrections in real time and prioritize memory updates
+- **Debounced batch processing**: multi-turn changes are aggregated with a configurable debounce window (default 30s) to reduce LLM overhead
+- **Pluggable storage backend**: JSON file storage is the default, but `storage_class` can be swapped for SQLite, Redis, or custom implementations
+- **System prompt injection**: high-confidence facts and user context are automatically injected into prompts for cross-session personalization
 
-### 4. Streaming & Disconnection Recovery
+### 7. Streaming and Zero-Config Frontend UX
 
-A production-grade streaming experience built on the LangGraph SDK's `useStream`:
+MedrixFlow keeps the UX production-ready through the LangGraph SDK’s `useStream` and a frontend-first setup flow:
 
-- **SSE Streaming Rendering**: Agent responses, Thinking process, and subagent task progress are all streamed in real time
-- **Automatic Disconnection Recovery**: `reconnectOnMount` + `streamResumable` mechanisms ensure automatic reconnection after page refresh or network disconnection, while the backend continues running uninterrupted
-- **Optimistic UI Updates**: Messages appear instantly upon sending, and thread lists are optimistically inserted, eliminating perceived network latency
+- **SSE streaming rendering**: responses, thinking traces, and subagent progress stream in real time
+- **Automatic disconnection recovery**: `reconnectOnMount + streamResumable` allows recovery after refresh or network interruption while backend execution continues
+- **Frontend-first setup**: model and API key configuration is handled in the UI and hot-reloaded into the app
+- **Modes map to reasoning depth**: `flash / pro / ultra` expose higher-level behavior instead of low-level model toggles
 
-### 5. Zero-Config Frontend UX
+### 8. Visual Quality, Security Auditing, and Observability
 
-Model and API Key configuration is entirely handled through the frontend UI — no manual config file editing required:
+The platform also keeps strong delivery quality and operational visibility:
 
-- **First-Visit Auto-Guidance**: The configuration panel automatically pops up in a new tab, using `sessionStorage` to ensure it only triggers once per browser session
-- **One-Click Connectivity Test**: Dynamically instantiates the Provider class and sends `ainvoke("Hi")` to verify model availability
-- **Hot-Reload Activation**: Saved configuration is automatically written to `config.yaml` + `.env`, and takes effect immediately via `reload_app_config()` — no service restart needed
-- **Modes Map to Reasoning Depth**: The frontend exposes `flash / pro / ultra` by default, mapped to `medium / high / xhigh` reasoning effort; separate thinking / vision / effort toggles are no longer shown
-
-### 6. Multi-Channel Access
-
-In addition to the web interface, MedrixFlow supports IM channel integration:
-
-- **Feishu (Lark)**: Real-time streaming responses with in-place card message updates (stores `message_id` to patch the same card incrementally)
-- **Slack**: Socket Mode WebSocket connection — no public IP required
-- **Telegram**: Bot interaction with per-user independent session configuration
-
-### 7. Visual Output Quality System
-
-MedrixFlow includes a professional-grade visual output quality assurance system covering the full pipeline for charts, PPT, and image generation:
-
-- **Prompt Constraint Injection**: When visual skills are active, design standards are automatically injected (60-30-10 color rule, typography hierarchy, 8pt grid spacing, accessibility contrast ratios), task-specific rules (targeted constraints for charts/PPT/images), and a mandatory workflow (clarify → spec → self-review → iterate → deliver)
-- **Quality Gate Tools**: `visual_quality_check` performs structured self-assessment before delivery (5 checks each for charts, PPT, and images), returning PASS / FAIL / FIXED status; `visual_refinement_check` enables iterative refinement, scoring 1–10 across content accuracy, style match, color fidelity, and more — scores below 7 trigger automatic regeneration (up to 3 rounds)
-- **Middleware Enforcement**: `VisualQualityMiddleware` detects when the agent calls `present_files` with visual output without running a quality check first, injecting a reminder
-- **Dedicated Visual Subagent**: The `visual-specialist` subagent has built-in design expertise and a complete quality workflow; the Lead Agent can delegate chart, PPT, and image tasks to it
-- **Memory Preference Persistence**: The memory system now supports a `visual_preference` fact category, persisting user design preferences (color schemes, fonts, brand guidelines) across conversations
-- **Design Resource Library**: Built-in 12 professional color palettes (business-blue, tech-vibrant, medical-clinical, accessible-high-contrast, etc.), 5 chart scenario presets (executive-dashboard, technical-report, marketing-report, etc.), and 5 PPT scenario presets (pitch-deck, quarterly-report, product-launch, etc.) — the agent automatically matches and references them
-- **Enhanced PPT Script**: `generate.py` now supports slide transitions, speaker notes, cover/contain image fitting modes, and metadata (author/keywords)
-
-### 8. Security Auditing & Observability
-
-Built-in security auditing and token usage tracking — no external tools required:
-
-- **Bash Command Security Auditing**: `SandboxAuditMiddleware` performs three-tier classification on every bash tool call (block / warn / pass), working with the `allow_host_bash` config switch to automatically block high-risk commands (`rm -rf /`, `curl | sh`, etc.), warn on medium-risk operations (`chmod`, `kill`, etc.), and produce full audit logs
-- **Token Usage Tracking**: `TokenUsageMiddleware` records input / output / total token counts after each LLM call, providing the data foundation for cost monitoring and quota management
-- **Sandbox Security Awareness**: `security.py` provides `uses_local_sandbox_provider()` and `is_host_bash_allowed()` utility functions to dynamically determine the current sandbox security level at runtime
+- **Visual quality gates**: `visual_quality_check` and `visual_refinement_check` enforce structured QA before charts, PPT, or image outputs are delivered
+- **Dedicated visual subagent**: `visual-specialist` handles high-quality visual generation and iterative refinement
+- **Bash command auditing**: `SandboxAuditMiddleware` classifies every bash call into block / warn / pass and records audit logs
+- **Token usage tracking**: `TokenUsageMiddleware` records input / output / total token counts per LLM call
+- **Sandbox security awareness**: `security.py` exposes helpers to determine the current sandbox security level at runtime
 
 ## Current Interaction Notes
+
+### Academic Reports and File Delivery
+
+- Academic research and experiment tasks write outputs such as `report.md`, `references.md`, `references.bib`, figures, and result tables into the current thread’s `outputs`
+- The right-side file panel auto-discovers these artifacts and supports **manual refresh**, **latest-file highlighting**, preview, and download
+- When a task is better delivered as files than as chat prose, the agent prefers returning an artifact bundle that can be reused directly in writing workflows
 
 ### Clarification and Confirmation
 
@@ -126,15 +132,15 @@ Built-in security auditing and token usage tracking — no external tools requir
           │  LangGraph Server    │  │   Gateway API (Port 8001)    │
           │    (Port 2024)       │  │   FastAPI REST               │
           │                      │  │                              │
-          │ ┌──────────────────┐ │  │  /api/models      Models     │
-          │ │    Lead Agent    │ │  │  /api/mcp/config  MCP Config │
-          │ │                  │ │  │  /api/skills      Skills     │
-          │ │   Multi-Layer    │ │  │  /api/memory      Memory     │
-          │ │  Middleware Chain │ │  │  /api/setup/*     Config     │
-          │ │       |          │ │  │  /api/threads/*   Threads    │
-          │ │   Tool System    │ │  │                              │
-          │ │       |          │ │  └──────────────────────────────┘
-          │ │  Subagents(x3)   │ │
+          │ ┌──────────────────┐ │  │  /api/models        Models   │
+          │ │    Lead Agent    │ │  │  /api/agents        Agents   │
+          │ │                  │ │  │  /api/academic/*    Academic │
+          │ │   Multi-Layer    │ │  │  /api/experiments/* Experim. │
+          │ │  Middleware Chain │ │  │  /api/threads/*     Threads  │
+          │ │       |          │ │  │  /api/skills        Skills   │
+          │ │   Tool System    │ │  │  /api/setup/*       Config   │
+          │ │       |          │ │  │  /api/mcp/config    MCP Cfg  │
+          │ │  Subagents(x3)   │ │  └──────────────────────────────┘
           │ └──────────────────┘ │
           └──────────────────────┘
                             │
@@ -149,7 +155,7 @@ Built-in security auditing and token usage tracking — no external tools requir
 
 **Request Routing** (via Nginx):
 - `/api/langgraph/*` → LangGraph Server: Agent interaction, thread management, SSE streaming
-- `/api/*` (other) → Gateway API: Models, MCP, Skills, Memory, file uploads, artifacts
+- `/api/*` (other) → Gateway API: Models, MCP, Skills, academic research, experiment projects, run/feedback APIs, uploads, and artifacts
 - `/` (non-API) → Frontend: Next.js web interface
 
 ### Middleware Chain Details
@@ -179,11 +185,33 @@ Built-in security auditing and token usage tracking — no external tools requir
 
 | Category | Tools | Description |
 |----------|-------|-------------|
+| Academic Research | `academic_research` | Structured literature retrieval, metadata normalization, paper deduplication, evidence-card persistence, and APA reference export |
+| Experiment Execution | `experiment_lab` | Python-first experiment pipeline, scientific figure routing, and result bundle export |
 | Sandbox | bash, ls, read_file, write_file, str_replace | Thread-isolated filesystem operations |
 | Built-in | present_files, ask_clarification, view_image, task, visual_quality_check, visual_refinement_check | File presentation, interactive clarification, image understanding, subagent delegation, visual quality gate, iterative refinement check |
 | Community | Tavily, Jina AI, Firecrawl, DuckDuckGo | Web search, web scraping, image search |
 | MCP | Any MCP-compatible server | Supports stdio/SSE/HTTP transport protocols |
 | Skills | Domain-specific workflows | Skill packs discovered from `skills/public` and `skills/custom`, injected based on enablement state |
+
+### Academic / Experiment APIs
+
+| Route | Description |
+|-------|-------------|
+| `POST /api/academic/projects` | Create or reuse an academic project bound to a `thread_id` and topic |
+| `POST /api/academic/projects/{project_id}/ingest` | Retrieve papers from multiple sources, normalize metadata, deduplicate, and build the evidence pool |
+| `POST /api/academic/projects/{project_id}/synthesize` | Generate the formal report, APA references, BibTeX, and evidence mapping files |
+| `GET /api/academic/projects/{project_id}/references?style=apa7` | Read the APA 7 reference set |
+| `POST /api/experiments/projects` | Create an experiment project bound to an expert agent, datasets, and an optional academic project |
+| `POST /api/experiments/projects/{project_id}/execute` | Run the experiment pipeline and generate metrics, figures, and result summaries |
+| `POST /api/experiments/projects/{project_id}/export` | Export the experiment bundle, optionally including `paper_ready_results.md` |
+
+## Academic Writing Additions
+
+- **Literature review / related work**: given a topic, MedrixFlow can use `academic-researcher` with `academic-deep-research` to expand queries, search multiple academic sources, deduplicate, and build a core paper pool with evidence mappings
+- **APA 7 references**: formal report workflows can export normalized `references.md` and `references.bib`, which is much closer to real paper, thesis, and course-report writing needs
+- **Experiment-backed writing**: `cs-ai-lab` and `bioinformatics-lab` can turn structured datasets or expression analyses into figures, tables, methods, and results bundles, reducing the gap between prose and evidence
+- **Local evidence reuse**: academic and experiment projects can be incrementally reused in the same thread, so follow-up literature, references, and experiments do not have to start from scratch
+- **Artifact-first delivery**: the right-side artifact panel is now better suited for locating newly generated reports, figures, and references without repeatedly asking the agent to resend them
 
 ## Quick Start
 
@@ -282,17 +310,20 @@ medrix-flow/
 │   │   │   ├── middlewares/        #   Middleware components (incl. security audit, token tracking & visual quality gate)
 │   │   │   ├── memory/             #   Memory extraction, correction detection, visual preference persistence & pluggable storage
 │   │   │   └── thread_state.py     #   Thread state Schema
+│   │   ├── academic/               # Academic research pipeline (multi-source retrieval, dedupe, APA export, evidence store / graph projection)
+│   │   ├── experiments/            # Experiment workflows (CS/AI + bioinformatics, figure routing, bundle export)
+│   │   ├── runtime/                # Runs, message persistence, feedback, and stream bridge
 │   │   ├── sandbox/                # Sandbox execution engine + security auditing
-│   │   ├── subagents/              # Subagent system (registry + executor + visual-specialist)
-│   │   ├── tools/                  # Tool collection (incl. visual_quality_check, visual_refinement_check)
+│   │   ├── subagents/              # Subagent system (incl. academic-researcher, experiment specialists, visual-specialist)
+│   │   ├── tools/                  # Tool collection (incl. academic_research, experiment_lab, visual QA)
 │   │   ├── mcp/                    # MCP protocol integration
 │   │   ├── models/                 # Model factory + Provider patches
 │   │   ├── skills/                 # Skill discovery & loading
 │   │   ├── community/              # Community tools (Tavily/Jina/Firecrawl)
-│   │   └── config/                 # Config system (hot-reload + env var resolution)
+│   │   └── config/                 # Config system (hot-reload + env var resolution + system agents)
 │   ├── app/gateway/                # FastAPI gateway
 │   │   ├── app.py                  #   Application entry point
-│   │   └── routers/                #   Route modules (models/mcp/skills/memory/setup)
+│   │   └── routers/                #   Route modules (threads/artifacts/agents/academic/experiments/runs/...)
 │   ├── tests/                      # Test suite
 │   ├── langgraph.json              # LangGraph entry configuration
 │   └── pyproject.toml              # Python dependencies
@@ -306,6 +337,7 @@ medrix-flow/
 │   │   │   └── ai-elements/        #   AI components (reasoning/code block/model selector)
 │   │   ├── core/                   # Core business logic
 │   │   │   ├── threads/            #   Thread management + streaming
+│   │   │   ├── artifacts/          #   Thread artifact inventory, refresh, highlighting, and content loading
 │   │   │   ├── setup/              #   Configuration management (types/API/Hooks)
 │   │   │   ├── i18n/               #   Internationalization (ZH/EN)
 │   │   │   └── settings/           #   Local settings (localStorage)
@@ -329,7 +361,7 @@ medrix-flow/
 │
 ├── config.example.yaml             # Configuration template (with full field examples)
 ├── Makefile                        # Root command entry point
-└── README.md                       # This file
+└── README_en.md                    # This file
 ```
 
 ## Configuration
@@ -369,7 +401,7 @@ Edit `config.yaml` in the project root directory directly. Main configuration se
 Configuration values prefixed with `$` are automatically resolved as environment variables. Common variables:
 
 - Model API Keys: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `GOOGLE_API_KEY`
-- Tool API Keys: `TAVILY_API_KEY`, `JINA_API_KEY`, `GITHUB_TOKEN`
+- Tool / academic API Keys: `TAVILY_API_KEY`, `JINA_API_KEY`, `GITHUB_TOKEN`, `OPENALEX_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY`
 - Config overrides: `MEDRIX_FLOW_CONFIG_PATH`, `MEDRIX_FLOW_EXTENSIONS_CONFIG_PATH`
 
 ### MCP and Skills Configuration (`extensions_config.json`)
