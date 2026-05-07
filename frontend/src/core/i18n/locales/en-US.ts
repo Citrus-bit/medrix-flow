@@ -203,6 +203,9 @@ export const enUS: Translations = {
     agentCreated: "Agent created!",
     startChatting: "Start chatting",
     backToGallery: "Back to Gallery",
+    systemAgent: "System",
+    customAgent: "Custom",
+    readonly: "Read-only",
   },
 
   // Breadcrumb

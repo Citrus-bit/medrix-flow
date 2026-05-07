@@ -7,6 +7,7 @@ from medrix_flow.reflection import resolve_variable
 from medrix_flow.tools.builtins import (
     academic_research_tool,
     ask_clarification_tool,
+    experiment_lab_tool,
     present_file_tool,
     task_tool,
     view_image_tool,
@@ -21,6 +22,7 @@ BUILTIN_TOOLS = [
     present_file_tool,
     ask_clarification_tool,
     academic_research_tool,
+    experiment_lab_tool,
 ]
 
 SUBAGENT_TOOLS = [

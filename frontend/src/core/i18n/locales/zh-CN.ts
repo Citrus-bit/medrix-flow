@@ -192,6 +192,9 @@ export const zhCN: Translations = {
     agentCreated: "智能体已创建！",
     startChatting: "开始对话",
     backToGallery: "返回 Gallery",
+    systemAgent: "系统内置",
+    customAgent: "自定义",
+    readonly: "只读",
   },
 
   // Breadcrumb

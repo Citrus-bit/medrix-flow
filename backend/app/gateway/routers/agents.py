@@ -8,7 +8,14 @@ import yaml
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from medrix_flow.config.agents_config import AgentConfig, list_custom_agents, load_agent_config, load_agent_soul
+from medrix_flow.config.agents_config import (
+    AgentConfig,
+    is_system_agent,
+    list_custom_agents,
+    list_system_agents,
+    load_agent_config,
+    load_agent_soul,
+)
 from medrix_flow.config.paths import get_paths
 
 logger = logging.getLogger(__name__)
@@ -18,12 +25,14 @@ AGENT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9-]+$")
 
 
 class AgentResponse(BaseModel):
-    """Response model for a custom agent."""
+    """Response model for a visible agent."""
 
     name: str = Field(..., description="Agent name (hyphen-case)")
     description: str = Field(default="", description="Agent description")
     model: str | None = Field(default=None, description="Optional model override")
     tool_groups: list[str] | None = Field(default=None, description="Optional tool group whitelist")
+    kind: str = Field(default="custom", description="Agent kind: system or custom")
+    readonly: bool = Field(default=False, description="Whether the agent is read-only and cannot be edited or deleted")
     soul: str | None = Field(default=None, description="SOUL.md content (included on GET /{name})")
 
 
@@ -76,6 +85,7 @@ def _normalize_agent_name(name: str) -> str:
 def _agent_config_to_response(agent_cfg: AgentConfig, include_soul: bool = False) -> AgentResponse:
     """Convert AgentConfig to AgentResponse."""
     soul: str | None = None
+    kind = "system" if is_system_agent(agent_cfg.name) else "custom"
     if include_soul:
         soul = load_agent_soul(agent_cfg.name) or ""
 
@@ -84,6 +94,8 @@ def _agent_config_to_response(agent_cfg: AgentConfig, include_soul: bool = False
         description=agent_cfg.description,
         model=agent_cfg.model,
         tool_groups=agent_cfg.tool_groups,
+        kind=kind,
+        readonly=kind == "system",
         soul=soul,
     )
 
@@ -91,17 +103,17 @@ def _agent_config_to_response(agent_cfg: AgentConfig, include_soul: bool = False
 @router.get(
     "/agents",
     response_model=AgentsListResponse,
-    summary="List Custom Agents",
-    description="List all custom agents available in the agents directory.",
+    summary="List Visible Agents",
+    description="List all visible system and custom agents.",
 )
 async def list_agents() -> AgentsListResponse:
-    """List all custom agents.
+    """List all visible agents.
 
     Returns:
-        List of all custom agents with their metadata (without soul content).
+        List of all visible agents with their metadata (without soul content).
     """
     try:
-        agents = list_custom_agents()
+        agents = list_system_agents() + list_custom_agents()
         return AgentsListResponse(agents=[_agent_config_to_response(a) for a in agents])
     except Exception as e:
         logger.error(f"Failed to list agents: {e}", exc_info=True)
@@ -127,15 +139,15 @@ async def check_agent_name(name: str) -> dict:
     """
     _validate_agent_name(name)
     normalized = _normalize_agent_name(name)
-    available = not get_paths().agent_dir(normalized).exists()
+    available = not get_paths().agent_dir(normalized).exists() and not is_system_agent(normalized)
     return {"available": available, "name": normalized}
 
 
 @router.get(
     "/agents/{name}",
     response_model=AgentResponse,
-    summary="Get Custom Agent",
-    description="Retrieve details and SOUL.md content for a specific custom agent.",
+    summary="Get Agent",
+    description="Retrieve details and SOUL.md content for a specific visible agent.",
 )
 async def get_agent(name: str) -> AgentResponse:
     """Get a specific custom agent by name.
@@ -186,7 +198,7 @@ async def create_agent_endpoint(request: AgentCreateRequest) -> AgentResponse:
 
     agent_dir = get_paths().agent_dir(normalized_name)
 
-    if agent_dir.exists():
+    if agent_dir.exists() or is_system_agent(normalized_name):
         raise HTTPException(status_code=409, detail=f"Agent '{normalized_name}' already exists")
 
     try:
@@ -245,6 +257,8 @@ async def update_agent(name: str, request: AgentUpdateRequest) -> AgentResponse:
     """
     _validate_agent_name(name)
     name = _normalize_agent_name(name)
+    if is_system_agent(name):
+        raise HTTPException(status_code=403, detail=f"Agent '{name}' is read-only")
 
     try:
         agent_cfg = load_agent_config(name)
@@ -369,6 +383,8 @@ async def delete_agent(name: str) -> None:
     """
     _validate_agent_name(name)
     name = _normalize_agent_name(name)
+    if is_system_agent(name):
+        raise HTTPException(status_code=403, detail=f"Agent '{name}' is read-only")
 
     agent_dir = get_paths().agent_dir(name)
 

@@ -3,6 +3,8 @@ export interface Agent {
   description: string;
   model: string | null;
   tool_groups: string[] | null;
+  kind: "system" | "custom";
+  readonly: boolean;
   soul?: string | null;
 }
 

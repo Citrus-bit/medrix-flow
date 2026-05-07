@@ -376,7 +376,10 @@ class TestAgentsAPI:
         response = agent_client.get("/api/agents")
         assert response.status_code == 200
         data = response.json()
-        assert data["agents"] == []
+        names = [item["name"] for item in data["agents"]]
+        assert "cs-ai-lab" in names
+        assert "bioinformatics-lab" in names
+        assert all(item["readonly"] is True for item in data["agents"] if item["kind"] == "system")
 
     def test_create_agent(self, agent_client):
         payload = {
@@ -404,6 +407,10 @@ class TestAgentsAPI:
         response = agent_client.post("/api/agents", json=payload)
         assert response.status_code == 409
 
+    def test_create_reserved_system_agent_409(self, agent_client):
+        response = agent_client.post("/api/agents", json={"name": "cs-ai-lab", "soul": "override"})
+        assert response.status_code == 409
+
     def test_list_agents_after_create(self, agent_client):
         agent_client.post("/api/agents", json={"name": "agent-one", "soul": "p1"})
         agent_client.post("/api/agents", json={"name": "agent-two", "soul": "p2"})
@@ -422,6 +429,13 @@ class TestAgentsAPI:
         data = response.json()
         assert data["name"] == "test-agent"
         assert data["soul"] == "Hello world"
+
+    def test_get_system_agent(self, agent_client):
+        response = agent_client.get("/api/agents/cs-ai-lab")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["kind"] == "system"
+        assert data["readonly"] is True
 
     def test_get_missing_agent_404(self, agent_client):
         response = agent_client.get("/api/agents/nonexistent")
@@ -445,6 +459,10 @@ class TestAgentsAPI:
         response = agent_client.put("/api/agents/ghost-agent", json={"soul": "new"})
         assert response.status_code == 404
 
+    def test_update_system_agent_forbidden(self, agent_client):
+        response = agent_client.put("/api/agents/cs-ai-lab", json={"description": "override"})
+        assert response.status_code == 403
+
     def test_delete_agent(self, agent_client):
         agent_client.post("/api/agents", json={"name": "del-me", "soul": "bye"})
 
@@ -458,6 +476,10 @@ class TestAgentsAPI:
     def test_delete_missing_agent_404(self, agent_client):
         response = agent_client.delete("/api/agents/does-not-exist")
         assert response.status_code == 404
+
+    def test_delete_system_agent_forbidden(self, agent_client):
+        response = agent_client.delete("/api/agents/bioinformatics-lab")
+        assert response.status_code == 403
 
     def test_create_agent_with_model_and_tool_groups(self, agent_client):
         payload = {

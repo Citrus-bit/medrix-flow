@@ -8,6 +8,7 @@ describe("findClarificationResponse", () => {
       id: "tool-1",
       type: "tool",
       name: "ask_clarification",
+      tool_call_id: "tool-1",
       content: "Which template?",
       additional_kwargs: {
         clarification: {
@@ -35,12 +36,14 @@ describe("findClarificationResponse", () => {
       id: "tool-1",
       type: "tool",
       name: "ask_clarification",
+      tool_call_id: "tool-1",
       content: "First question",
     } as const;
     const secondClarification = {
       id: "tool-2",
       type: "tool",
       name: "ask_clarification",
+      tool_call_id: "tool-2",
       content: "Second question",
     } as const;
 

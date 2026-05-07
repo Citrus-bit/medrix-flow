@@ -23,7 +23,7 @@ def task_tool(
     runtime: ToolRuntime[ContextT, ThreadState],
     description: str,
     prompt: str,
-    subagent_type: Literal["general-purpose", "bash", "academic-researcher"],
+    subagent_type: Literal["general-purpose", "bash", "academic-researcher", "cs-ai-experimenter", "bioinformatics-analyst"],
     tool_call_id: Annotated[str, InjectedToolCallId],
     max_turns: int | None = None,
 ) -> str:
@@ -43,6 +43,10 @@ def task_tool(
     - **academic-researcher**: Specialized for literature-heavy academic work that
       benefits from structured report generation, reference normalization, and
       evidence mapping.
+    - **cs-ai-experimenter**: Structured CS/AI experiment specialist for model
+      evaluation, diagnostics, and reproducible experiment bundles.
+    - **bioinformatics-analyst**: Bioinformatics specialist for bulk expression,
+      differential analysis, QC, and single-cell starter workflows.
 
     When to use this tool:
     - Complex tasks requiring multiple steps or tools
@@ -63,7 +67,7 @@ def task_tool(
     # Get subagent configuration
     config = get_subagent_config(subagent_type)
     if config is None:
-        return f"Error: Unknown subagent type '{subagent_type}'. Available: academic-researcher, bash, general-purpose"
+        return f"Error: Unknown subagent type '{subagent_type}'. Available: academic-researcher, bash, bioinformatics-analyst, cs-ai-experimenter, general-purpose"
 
     # Build config overrides
     overrides: dict = {}

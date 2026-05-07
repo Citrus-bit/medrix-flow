@@ -8,6 +8,10 @@ import yaml
 from pydantic import BaseModel
 
 from medrix_flow.config.paths import get_paths
+from medrix_flow.config.system_agents import (
+    get_system_agent_definition,
+    list_system_agent_definitions,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +47,13 @@ def load_agent_config(name: str | None) -> AgentConfig | None:
 
     if not AGENT_NAME_PATTERN.match(name):
         raise ValueError(f"Invalid agent name '{name}'. Must match pattern: {AGENT_NAME_PATTERN.pattern}")
+    if system_agent := get_system_agent_definition(name):
+        return AgentConfig(
+            name=system_agent.name,
+            description=system_agent.description,
+            model=system_agent.model,
+            tool_groups=system_agent.tool_groups,
+        )
     agent_dir = get_paths().agent_dir(name)
     config_file = agent_dir / "config.yaml"
 
@@ -81,6 +92,8 @@ def load_agent_soul(agent_name: str | None) -> str | None:
     Returns:
         The SOUL.md content as a string, or None if the file does not exist.
     """
+    if system_agent := get_system_agent_definition(agent_name):
+        return system_agent.soul
     agent_dir = get_paths().agent_dir(agent_name) if agent_name else get_paths().base_dir
     soul_path = agent_dir / SOUL_FILENAME
     if not soul_path.exists():
@@ -118,3 +131,20 @@ def list_custom_agents() -> list[AgentConfig]:
             logger.warning(f"Skipping agent '{entry.name}': {e}")
 
     return agents
+
+
+def list_system_agents() -> list[AgentConfig]:
+    """Return built-in visible system agents."""
+    return [
+        AgentConfig(
+            name=item.name,
+            description=item.description,
+            model=item.model,
+            tool_groups=item.tool_groups,
+        )
+        for item in list_system_agent_definitions()
+    ]
+
+
+def is_system_agent(name: str | None) -> bool:
+    return get_system_agent_definition(name) is not None

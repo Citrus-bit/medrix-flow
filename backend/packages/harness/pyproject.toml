@@ -36,6 +36,8 @@ dependencies = [
     "anndata>=0.12.13",
     "umap-learn>=0.5.12",
     "gseapy>=1.2.1",
+    "matplotlib>=3.10.9",
+    "seaborn>=0.13.2",
 ]
 
 [build-system]

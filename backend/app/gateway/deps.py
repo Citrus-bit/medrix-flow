@@ -12,6 +12,7 @@ from langgraph.types import Checkpointer
 from medrix_flow.agents.checkpointer.async_provider import make_checkpointer
 from medrix_flow.academic import AcademicRepository, AcademicResearchService
 from medrix_flow.config.paths import get_paths
+from medrix_flow.experiments import ExperimentRepository, ExperimentService
 from medrix_flow.runtime import MemoryStreamBridge, SQLiteFeedbackRepo, SQLiteRunEventStore, SQLiteRunStore
 from medrix_flow.runtime.db import SQLiteRuntimeDB
 from medrix_flow.runtime.runs import RunManager
@@ -28,20 +29,25 @@ async def runtime_dependencies(app: FastAPI) -> AsyncGenerator[None, None]:
         await db.connect()
         academic_db = SQLiteRuntimeDB(get_paths().academic_db_file)
         await academic_db.connect()
+        experiment_db = SQLiteRuntimeDB(get_paths().experiment_db_file)
+        await experiment_db.connect()
 
         app.state.runtime_db = db
         app.state.academic_db = academic_db
+        app.state.experiment_db = experiment_db
         app.state.checkpointer = await stack.enter_async_context(make_checkpointer())
         app.state.stream_bridge = MemoryStreamBridge()
         app.state.run_store = SQLiteRunStore(db)
         app.state.run_event_store = SQLiteRunEventStore(db)
         app.state.feedback_repo = SQLiteFeedbackRepo(db)
         app.state.academic_repo = AcademicRepository(academic_db)
+        app.state.experiment_repo = ExperimentRepository(experiment_db)
 
         await app.state.run_store.setup()
         await app.state.run_event_store.setup()
         await app.state.feedback_repo.setup()
         await app.state.academic_repo.setup()
+        await app.state.experiment_repo.setup()
 
         app.state.run_manager = RunManager(store=app.state.run_store)
         app.state.run_service = GatewayRunService(
@@ -53,9 +59,11 @@ async def runtime_dependencies(app: FastAPI) -> AsyncGenerator[None, None]:
             feedback_repo=app.state.feedback_repo,
         )
         app.state.academic_service = AcademicResearchService(app.state.academic_repo)
+        app.state.experiment_service = ExperimentService(app.state.experiment_repo)
         try:
             yield
         finally:
+            await experiment_db.close()
             await academic_db.close()
             await db.close()
 
@@ -75,3 +83,4 @@ get_checkpointer: Callable[[Request], Checkpointer] = _require("checkpointer", "
 get_run_manager: Callable[[Request], RunManager] = _require("run_manager", "Run manager")
 get_run_service: Callable[[Request], GatewayRunService] = _require("run_service", "Run service")
 get_academic_service: Callable[[Request], AcademicResearchService] = _require("academic_service", "Academic service")
+get_experiment_service: Callable[[Request], ExperimentService] = _require("experiment_service", "Experiment service")

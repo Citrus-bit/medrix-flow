@@ -64,11 +64,26 @@ export function AgentCard({ agent }: AgentCardProps) {
                 <CardTitle className="truncate text-base">
                   {agent.name}
                 </CardTitle>
-                {agent.model && (
-                  <Badge variant="secondary" className="mt-0.5 text-xs">
-                    {agent.model}
+                <div className="mt-0.5 flex flex-wrap gap-1">
+                  <Badge
+                    variant={agent.kind === "system" ? "default" : "secondary"}
+                    className="text-xs"
+                  >
+                    {agent.kind === "system"
+                      ? t.agents.systemAgent
+                      : t.agents.customAgent}
                   </Badge>
-                )}
+                  {agent.readonly && (
+                    <Badge variant="outline" className="text-xs">
+                      {t.agents.readonly}
+                    </Badge>
+                  )}
+                  {agent.model && (
+                    <Badge variant="secondary" className="text-xs">
+                      {agent.model}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -96,22 +111,24 @@ export function AgentCard({ agent }: AgentCardProps) {
             <MessageSquareIcon className="mr-1.5 h-3.5 w-3.5" />
             {t.agents.chat}
           </Button>
-          <div className="flex gap-1">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="text-destructive hover:text-destructive h-8 w-8 shrink-0"
-              onClick={() => setDeleteOpen(true)}
-              title={t.agents.delete}
-            >
-              <Trash2Icon className="h-3.5 w-3.5" />
-            </Button>
-          </div>
+          {!agent.readonly && (
+            <div className="flex gap-1">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="text-destructive hover:text-destructive h-8 w-8 shrink-0"
+                onClick={() => setDeleteOpen(true)}
+                title={t.agents.delete}
+              >
+                <Trash2Icon className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
         </CardFooter>
       </Card>
 
       {/* Delete Confirm */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      <Dialog open={deleteOpen && !agent.readonly} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t.agents.delete}</DialogTitle>

@@ -141,6 +141,9 @@ export interface Translations {
     agentCreated: string;
     startChatting: string;
     backToGallery: string;
+    systemAgent: string;
+    customAgent: string;
+    readonly: string;
   };
 
   // Breadcrumb
