@@ -57,4 +57,4 @@
 
 ## 备注
 - 本轮实现已经覆盖 P0、P1、P2 和配套验证。
-- 后续若继续追 DeerFlow，可优先看 runtime/runs、skills storage/service、frontend e2e 三条线。
+- 后续若继续追上游参考实现，可优先看 runtime/runs、skills storage/service、frontend e2e 三条线。

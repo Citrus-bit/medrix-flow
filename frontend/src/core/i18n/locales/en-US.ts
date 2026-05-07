@@ -50,6 +50,8 @@ export const enUS: Translations = {
     backendUnavailable: "Cannot connect to the backend service",
     backendUnavailableHint: "Try clicking Retry. If the problem persists, restart the server with: make stop && make dev",
     retryNow: "Retry",
+    refresh: "Refresh",
+    latest: "Latest",
   },
 
   // Welcome

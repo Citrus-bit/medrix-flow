@@ -1,4 +1,4 @@
-import { DownloadIcon, LoaderIcon, PackageIcon } from "lucide-react";
+import { DownloadIcon, LoaderIcon, PackageIcon, RefreshCwIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
@@ -26,10 +26,16 @@ export function ArtifactFileList({
   className,
   files,
   threadId,
+  latestFilepath,
+  onRefresh,
+  isRefreshing = false,
 }: {
   className?: string;
   files: string[];
   threadId: string;
+  latestFilepath?: string | null;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }) {
   const { t } = useI18n();
   const { select: selectArtifact, setOpen } = useArtifacts();
@@ -73,15 +79,39 @@ export function ArtifactFileList({
 
   return (
     <ul className={cn("flex w-full flex-col gap-4", className)}>
+      <li className="flex justify-end">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          disabled={!onRefresh || isRefreshing}
+        >
+          <RefreshCwIcon
+            className={cn("size-4", isRefreshing && "animate-spin")}
+          />
+          {t.common.refresh}
+        </Button>
+      </li>
       {files.map((file) => (
         <Card
           key={file}
-          className="relative cursor-pointer p-3"
+          className={cn(
+            "relative cursor-pointer p-3",
+            file === latestFilepath &&
+              "ring-primary/40 bg-primary/5 border-primary/30 ring-1",
+          )}
           onClick={() => handleClick(file)}
         >
           <CardHeader className="pr-2 pl-1">
             <CardTitle className="relative pl-8">
-              <div>{getFileName(file)}</div>
+              <div className="flex items-center gap-2">
+                <span>{getFileName(file)}</span>
+                {file === latestFilepath && (
+                  <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-[10px] font-medium">
+                    {t.common.latest}
+                  </span>
+                )}
+              </div>
               <div className="absolute top-2 -left-0.5">
                 {getFileIcon(file, "size-6")}
               </div>

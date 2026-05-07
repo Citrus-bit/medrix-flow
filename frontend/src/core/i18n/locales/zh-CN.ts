@@ -50,6 +50,8 @@ export const zhCN: Translations = {
     backendUnavailable: "无法连接后端服务",
     backendUnavailableHint: "请点击重试。如问题持续，请在终端执行：make stop && make dev",
     retryNow: "重试",
+    refresh: "刷新",
+    latest: "最新",
   },
 
   // Welcome

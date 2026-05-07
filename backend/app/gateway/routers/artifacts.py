@@ -1,17 +1,76 @@
 import logging
 import mimetypes
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, Response
+from pydantic import BaseModel, Field
 
 from app.gateway.path_utils import resolve_thread_virtual_path
+from medrix_flow.config.paths import VIRTUAL_PATH_PREFIX, get_paths
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["artifacts"])
+
+
+class ArtifactListItem(BaseModel):
+    """Visible artifact file in a thread outputs directory."""
+
+    filepath: str = Field(..., description="Sandbox-visible virtual artifact path")
+    filename: str = Field(..., description="Base filename")
+    size: int = Field(..., description="File size in bytes")
+    modified_at: str = Field(..., description="Last modified timestamp in ISO 8601 format")
+
+
+class ArtifactListResponse(BaseModel):
+    """Response payload for thread artifact listing."""
+
+    files: list[ArtifactListItem]
+
+
+def _is_hidden_output_path(path: Path, outputs_dir: Path) -> bool:
+    """Return whether a file lives under a hidden path segment."""
+    relative = path.relative_to(outputs_dir)
+    return any(part.startswith(".") for part in relative.parts)
+
+
+@router.get(
+    "/threads/{thread_id}/artifacts",
+    response_model=ArtifactListResponse,
+    summary="List Thread Artifacts",
+    description="List currently available files in the thread outputs directory.",
+)
+async def list_thread_artifacts(thread_id: str) -> ArtifactListResponse:
+    """List visible output files for a thread, sorted by latest modification time."""
+    try:
+        outputs_dir = get_paths().sandbox_outputs_dir(thread_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if not outputs_dir.exists():
+        return ArtifactListResponse(files=[])
+
+    files: list[ArtifactListItem] = []
+    for path in outputs_dir.rglob("*"):
+        if not path.is_file() or _is_hidden_output_path(path, outputs_dir):
+            continue
+        stat = path.stat()
+        relative = path.relative_to(outputs_dir)
+        files.append(
+            ArtifactListItem(
+                filepath=f"{VIRTUAL_PATH_PREFIX}/outputs/{relative.as_posix()}",
+                filename=path.name,
+                size=stat.st_size,
+                modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
+            )
+        )
+
+    files.sort(key=lambda item: item.modified_at, reverse=True)
+    return ArtifactListResponse(files=files)
 
 
 def is_text_file_by_content(path: Path, sample_size: int = 8192) -> bool:

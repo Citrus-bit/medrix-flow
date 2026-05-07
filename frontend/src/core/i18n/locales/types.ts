@@ -39,6 +39,8 @@ export interface Translations {
     backendUnavailable: string;
     backendUnavailableHint: string;
     retryNow: string;
+    refresh: string;
+    latest: string;
   };
 
   // Welcome

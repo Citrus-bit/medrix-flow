@@ -9,6 +9,7 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { useThreadArtifactInventory } from "@/core/artifacts/hooks";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
@@ -26,19 +27,34 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
   children,
   threadId,
 }) => {
-  const { thread } = useThread();
+  const { thread, isMock } = useThread();
   const threadIdRef = useRef(threadId);
   const layoutRef = useRef<GroupImperativeHandle>(null);
 
   const {
     artifacts,
+    latestArtifact,
     open: artifactsOpen,
     setOpen: setArtifactsOpen,
-    setArtifacts,
+    setArtifactInventory,
     select: selectArtifact,
     deselect,
     selectedArtifact,
   } = useArtifacts();
+  const {
+    artifacts: artifactInventory,
+    refetch: refetchArtifacts,
+    isFetching: isRefreshingArtifacts,
+  } = useThreadArtifactInventory({
+    threadId,
+    seededArtifacts: thread.values.artifacts ?? [],
+    enabled: !isMock,
+    refetchInterval: thread.isLoading ? 1500 : 2500,
+  });
+  const inventoryPaths = useMemo(
+    () => artifactInventory.map((item) => item.filepath),
+    [artifactInventory],
+  );
 
   const [autoSelectFirstArtifact, setAutoSelectFirstArtifact] = useState(true);
   useEffect(() => {
@@ -47,34 +63,30 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
       deselect();
     }
 
-    // Update artifacts from the current thread
-    setArtifacts(thread.values.artifacts);
+    setArtifactInventory(artifactInventory);
 
-    // DO NOT automatically deselect the artifact when switching threads, because the artifacts auto discovering is not work now.
-    // if (
-    //   selectedArtifact &&
-    //   !thread.values.artifacts?.includes(selectedArtifact)
-    // ) {
-    //   deselect();
-    // }
+    if (selectedArtifact && !inventoryPaths.includes(selectedArtifact)) {
+      deselect();
+    }
 
     if (
       env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" &&
       autoSelectFirstArtifact
     ) {
-      if (thread?.values?.artifacts?.length > 0) {
+      if (inventoryPaths.length > 0) {
         setAutoSelectFirstArtifact(false);
-        selectArtifact(thread.values.artifacts[0]!);
+        selectArtifact(inventoryPaths[0]!);
       }
     }
   }, [
+    artifactInventory,
+    inventoryPaths,
     threadId,
     autoSelectFirstArtifact,
     deselect,
     selectArtifact,
     selectedArtifact,
-    setArtifacts,
-    thread.values.artifacts,
+    setArtifactInventory,
   ]);
 
   const artifactPanelOpen = useMemo(() => {
@@ -141,7 +153,7 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
                   <XIcon />
                 </Button>
               </div>
-              {thread.values.artifacts?.length === 0 ? (
+              {artifacts.length === 0 ? (
                 <ConversationEmptyState
                   icon={<FilesIcon />}
                   title="No artifact selected"
@@ -155,8 +167,13 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
                   <main className="min-h-0 grow">
                     <ArtifactFileList
                       className="max-w-(--container-width-sm) p-4 pt-12"
-                      files={thread.values.artifacts ?? []}
+                      files={artifacts}
                       threadId={threadId}
+                      latestFilepath={latestArtifact}
+                      onRefresh={
+                        isMock ? undefined : () => void refetchArtifacts()
+                      }
+                      isRefreshing={isRefreshingArtifacts}
                     />
                   </main>
                 </div>

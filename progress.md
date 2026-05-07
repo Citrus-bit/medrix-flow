@@ -6,7 +6,7 @@
 - **状态：** completed
 - 执行的操作：
   - 审查 gateway、thread stream、message list、skills 相关入口
-  - 对比 deer-flow 的 runtime/gateway/frontend/CI 参考实现
+  - 对比上游参考实现的 runtime/gateway/frontend/CI 设计
   - 确认 run persistence 采用 sideband register，而不是重写 stream 入口
 
 ### 阶段 2：P0 后端 Runtime / Persistence / Gateway

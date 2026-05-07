@@ -8,17 +8,22 @@ export async function loadArtifactContent({
   filepath,
   threadId,
   isMock,
+  versionKey,
 }: {
   filepath: string;
   threadId: string;
   isMock?: boolean;
+  versionKey?: string;
 }) {
   let enhancedFilepath = filepath;
   if (filepath.endsWith(".skill")) {
     enhancedFilepath = filepath + "/SKILL.md";
   }
   const url = urlOfArtifact({ filepath: enhancedFilepath, threadId, isMock });
-  const response = await fetch(url);
+  const requestUrl = versionKey
+    ? `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(versionKey)}`
+    : url;
+  const response = await fetch(requestUrl);
   const text = await response.text();
   return text;
 }
