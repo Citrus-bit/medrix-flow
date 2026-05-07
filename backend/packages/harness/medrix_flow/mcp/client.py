@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from medrix_flow.config.extensions_config import ExtensionsConfig, McpServerConfig
+from medrix_flow.mcp.security import validate_mcp_server_config
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,8 @@ def build_server_params(server_name: str, config: McpServerConfig) -> dict[str, 
     Returns:
         Dictionary of server parameters for langchain-mcp-adapters.
     """
+    validate_mcp_server_config(server_name, config)
+
     transport_type = config.type or "stdio"
     params: dict[str, Any] = {"transport": transport_type}
 

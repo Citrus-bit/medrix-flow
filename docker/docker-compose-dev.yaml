@@ -95,6 +95,7 @@ services:
     working_dir: /app
     environment:
       - NODE_ENV=development
+      - MEDRIX_FLOW_ENV=development
       - WATCHPACK_POLLING=true
       - CI=true
     env_file:
@@ -140,6 +141,10 @@ services:
     working_dir: /app
     environment:
       - CI=true
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-}
+      - MEDRIX_FLOW_ENV=development
+      - MEDRIX_FLOW_UI_PASSWORD=${MEDRIX_FLOW_UI_PASSWORD:-}
+      - MEDRIX_GATEWAY_ADMIN_TOKEN=${MEDRIX_GATEWAY_ADMIN_TOKEN:-}
       - MEDRIX_FLOW_HOST_BASE_DIR=${MEDRIX_FLOW_ROOT}/backend/.medrix-flow
       - MEDRIX_FLOW_HOST_SKILLS_PATH=${MEDRIX_FLOW_ROOT}/skills
       - MEDRIX_FLOW_SANDBOX_HOST=host.docker.internal
@@ -189,6 +194,8 @@ services:
     working_dir: /app
     environment:
       - CI=true
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-}
+      - MEDRIX_FLOW_ENV=development
       - MEDRIX_FLOW_HOST_BASE_DIR=${MEDRIX_FLOW_ROOT}/backend/.medrix-flow
       - MEDRIX_FLOW_HOST_SKILLS_PATH=${MEDRIX_FLOW_ROOT}/skills
       - MEDRIX_FLOW_SANDBOX_HOST=host.docker.internal

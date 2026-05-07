@@ -136,7 +136,7 @@ fi
 echo "Starting LangGraph + Gateway + Frontend in parallel..."
 
 (cd backend && NO_COLOR=1 uv run langgraph dev --no-browser --allow-blocking $LANGGRAPH_EXTRA_FLAGS > ../logs/langgraph.log 2>&1) &
-(cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 $GATEWAY_EXTRA_FLAGS > ../logs/gateway.log 2>&1) &
+(cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host "${GATEWAY_HOST:-127.0.0.1}" --port "${GATEWAY_PORT:-8001}" $GATEWAY_EXTRA_FLAGS > ../logs/gateway.log 2>&1) &
 (cd frontend && $FRONTEND_CMD > ../logs/frontend.log 2>&1) &
 
 # Wait for all three services to become ready (max 120s — longest is Frontend)

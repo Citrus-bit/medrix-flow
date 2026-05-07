@@ -5,9 +5,10 @@ import re
 import shutil
 
 import yaml
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.gateway.auth import require_admin_access
 from medrix_flow.config.agents_config import (
     AgentConfig,
     is_system_agent,
@@ -176,6 +177,7 @@ async def get_agent(name: str) -> AgentResponse:
 
 @router.post(
     "/agents",
+    dependencies=[Depends(require_admin_access)],
     response_model=AgentResponse,
     status_code=201,
     summary="Create Custom Agent",
@@ -238,6 +240,7 @@ async def create_agent_endpoint(request: AgentCreateRequest) -> AgentResponse:
 
 @router.put(
     "/agents/{name}",
+    dependencies=[Depends(require_admin_access)],
     response_model=AgentResponse,
     summary="Update Custom Agent",
     description="Update an existing custom agent's config and/or SOUL.md.",
@@ -342,6 +345,7 @@ async def get_user_profile() -> UserProfileResponse:
 
 @router.put(
     "/user-profile",
+    dependencies=[Depends(require_admin_access)],
     response_model=UserProfileResponse,
     summary="Update User Profile",
     description="Write the global USER.md file that is injected into all custom agents.",
@@ -368,6 +372,7 @@ async def update_user_profile(request: UserProfileUpdateRequest) -> UserProfileR
 
 @router.delete(
     "/agents/{name}",
+    dependencies=[Depends(require_admin_access)],
     status_code=204,
     summary="Delete Custom Agent",
     description="Delete a custom agent and all its files (config, SOUL.md, memory).",

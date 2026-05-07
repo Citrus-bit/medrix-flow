@@ -15,6 +15,9 @@
 #   MEDRIX_FLOW_DOCKER_SOCKET          — Docker socket path, default /var/run/docker.sock
 #   MEDRIX_FLOW_REPO_ROOT              — repo root (used for skills host path in DooD)
 #   BETTER_AUTH_SECRET               — required for frontend auth/session security
+#   MEDRIX_FLOW_ENV=production       — required so Python services enforce production safeguards
+#   MEDRIX_FLOW_UI_PASSWORD          — required to unlock the web UI and nginx-protected APIs
+#   MEDRIX_GATEWAY_ADMIN_TOKEN       — optional extra API token for scripted/admin access
 #
 # LangSmith tracing is disabled by default (LANGCHAIN_TRACING_V2=false).
 # Set LANGCHAIN_TRACING_V2=true and LANGSMITH_API_KEY in .env to enable it.
@@ -49,6 +52,9 @@ services:
     container_name: medrix-flow-frontend
     environment:
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - MEDRIX_FLOW_ENV=${MEDRIX_FLOW_ENV:-production}
+      - MEDRIX_FLOW_UI_PASSWORD=${MEDRIX_FLOW_UI_PASSWORD}
+      - MEDRIX_GATEWAY_ADMIN_TOKEN=${MEDRIX_GATEWAY_ADMIN_TOKEN}
     env_file:
       - ../frontend/.env
     networks:
@@ -85,6 +91,10 @@ services:
     working_dir: /app
     environment:
       - CI=true
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - MEDRIX_FLOW_ENV=${MEDRIX_FLOW_ENV:-production}
+      - MEDRIX_FLOW_UI_PASSWORD=${MEDRIX_FLOW_UI_PASSWORD}
+      - MEDRIX_GATEWAY_ADMIN_TOKEN=${MEDRIX_GATEWAY_ADMIN_TOKEN}
       - MEDRIX_FLOW_HOME=/app/backend/.medrix-flow
       # DooD path/network translation
       - MEDRIX_FLOW_HOST_BASE_DIR=${MEDRIX_FLOW_HOME}
@@ -130,6 +140,8 @@ services:
           create_host_path: true
     environment:
       - CI=true
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET}
+      - MEDRIX_FLOW_ENV=${MEDRIX_FLOW_ENV:-production}
       - MEDRIX_FLOW_HOME=/app/backend/.medrix-flow
       - MEDRIX_FLOW_CONFIG_PATH=/app/config.yaml
       - MEDRIX_FLOW_EXTENSIONS_CONFIG_PATH=/app/extensions_config.json

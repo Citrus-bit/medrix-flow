@@ -56,3 +56,8 @@ config.yaml.bak
 .obsidian/
 # Added by code-review-graph
 .code-review-graph/
+
+# Local security audit notes and completion reports
+finish.md
+finish2.md
+security-audit-plan.md

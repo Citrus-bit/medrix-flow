@@ -6,9 +6,10 @@ and test connectivity to external services — all persisted to config.yaml / .e
 
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.gateway.auth import require_admin_access
 from medrix_flow.setup.service import (
     SaveModelsRequest,
     SetupConfigResponse,
@@ -16,10 +17,11 @@ from medrix_flow.setup.service import (
     refresh_env,
     save_setup_config_data,
 )
+from medrix_flow.setup.security import validate_optional_base_url, validate_setup_model_provider
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/setup", tags=["setup"])
+router = APIRouter(prefix="/api/setup", tags=["setup"], dependencies=[Depends(require_admin_access)])
 
 
 class TestModelRequest(BaseModel):
@@ -60,8 +62,11 @@ async def get_setup_config() -> SetupConfigResponse:
     description="Write model configs to config.yaml and API keys to .env, then hot-reload.",
 )
 async def save_models(req: SaveModelsRequest) -> dict:
-    save_setup_config_data(req)
-    return {"success": True, "message": "Configuration saved and reloaded."}
+    try:
+        save_setup_config_data(req)
+        return {"success": True, "message": "Configuration saved and reloaded."}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post(
@@ -74,6 +79,9 @@ async def test_model(req: TestModelRequest) -> TestResult:
     refresh_env()
     try:
         from medrix_flow.reflection import resolve_variable
+
+        validate_setup_model_provider(req.provider)
+        validate_optional_base_url(req.base_url)
 
         provider_class = resolve_variable(req.provider)
         kwargs: dict = {"model": req.model}

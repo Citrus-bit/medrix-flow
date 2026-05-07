@@ -77,7 +77,7 @@ mkdir -p logs
 echo "Starting LangGraph + Gateway + Frontend in parallel..."
 
 nohup sh -c 'cd backend && NO_COLOR=1 uv run langgraph dev --no-browser --allow-blocking --no-reload > ../logs/langgraph.log 2>&1' &
-nohup sh -c 'cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 > ../logs/gateway.log 2>&1' &
+nohup sh -c "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host \"\${GATEWAY_HOST:-127.0.0.1}\" --port \"\${GATEWAY_PORT:-8001}\" > ../logs/gateway.log 2>&1" &
 nohup sh -c 'cd frontend && pnpm run dev > ../logs/frontend.log 2>&1' &
 
 LANGGRAPH_READY=false

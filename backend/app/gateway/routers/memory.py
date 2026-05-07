@@ -1,12 +1,13 @@
 """Memory API router for retrieving and managing global memory data."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
+from app.gateway.auth import require_admin_access
 from medrix_flow.agents.memory.updater import get_memory_data, reload_memory_data
 from medrix_flow.config.memory_config import get_memory_config
 
-router = APIRouter(prefix="/api", tags=["memory"])
+router = APIRouter(prefix="/api", tags=["memory"], dependencies=[Depends(require_admin_access)])
 
 
 class ContextSection(BaseModel):

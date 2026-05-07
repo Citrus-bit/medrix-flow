@@ -23,6 +23,7 @@ from app.gateway.routers import (
     uploads,
 )
 from medrix_flow.config.app_config import get_app_config
+from medrix_flow.sandbox.security import enforce_safe_sandbox_configuration
 
 # Configure logging
 logging.basicConfig(
@@ -40,7 +41,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Load config and check necessary environment variables at startup
     try:
-        get_app_config()
+        config = get_app_config()
+        enforce_safe_sandbox_configuration(config)
         logger.info("Configuration loaded successfully")
     except Exception as e:
         error_msg = f"Failed to load configuration during gateway startup: {e}"

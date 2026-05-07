@@ -112,6 +112,12 @@ The platform also keeps strong delivery quality and operational visibility:
 - The current implementation prefers local `tectonic` and does not require `pdflatex`, `xelatex`, or `latexmk`
 - The preview pipeline also applies common compatibility fixes such as downloading remote images, injecting `subfig`, and normalizing some Unicode sub/superscripts
 
+### Production Security Requirements
+
+- Production deployments must explicitly set `MEDRIX_FLOW_ENV=production` so the Python services enable their production safety guards and reject `LocalSandboxProvider`
+- When nginx exposes the UI/API, `MEDRIX_FLOW_UI_PASSWORD` must be configured or `/workspace`, `/api/*`, `/api/langgraph/*`, and `/docs` will fail closed
+- For scripted access to protected endpoints, you can additionally configure `MEDRIX_GATEWAY_ADMIN_TOKEN` and send it as the `x-medrix-admin-token` header
+
 ### Skills and Extensions
 
 - Skills are auto-discovered from `skills/public` and `skills/custom`

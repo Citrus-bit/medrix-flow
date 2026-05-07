@@ -11,6 +11,11 @@ from dotenv import load_dotenv, set_key
 from pydantic import BaseModel, Field
 
 from medrix_flow.config.app_config import AppConfig, reload_app_config
+from medrix_flow.setup.security import (
+    validate_env_var_name,
+    validate_optional_base_url,
+    validate_setup_model_provider,
+)
 
 _ENV_VAR_PATTERN = re.compile(r"^\$([A-Za-z_][A-Za-z0-9_]*)$")
 
@@ -125,7 +130,10 @@ def save_setup_config_data(payload: SaveModelsRequest) -> None:
     models: list[dict[str, Any]] = []
 
     for model in payload.models:
+        validate_setup_model_provider(model.provider)
+        validate_optional_base_url(model.base_url)
         env_var = model.api_key_env_var or f"{model.name.upper().replace('-', '_')}_API_KEY"
+        validate_env_var_name(env_var)
 
         if model.api_key and model.api_key.strip():
             set_env_value(env_var, model.api_key.strip())
@@ -151,6 +159,7 @@ def save_setup_config_data(payload: SaveModelsRequest) -> None:
 
     if payload.tool_keys:
         for tool_key in payload.tool_keys:
+            validate_env_var_name(tool_key.env_var, allow_tool_key=True)
             if tool_key.api_key and tool_key.api_key.strip():
                 set_env_value(tool_key.env_var, tool_key.api_key.strip())
 

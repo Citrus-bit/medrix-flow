@@ -3,17 +3,18 @@ import json
 import logging
 import os
 import shutil
-from pathlib import Path
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from medrix_flow.config.extensions_config import ExtensionsConfig, get_extensions_config, reload_extensions_config
+from app.gateway.auth import require_admin_access
+from medrix_flow.config.extensions_config import ExtensionsConfig, McpServerConfig, get_extensions_config, reload_extensions_config
+from medrix_flow.mcp.security import validate_mcp_server_config
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api", tags=["mcp"])
+router = APIRouter(prefix="/api", tags=["mcp"], dependencies=[Depends(require_admin_access)])
 
 
 class McpOAuthConfigResponse(BaseModel):
@@ -94,7 +95,12 @@ async def get_mcp_configuration() -> McpConfigResponse:
         }
         ```
     """
-    config = get_extensions_config()
+    config_path = ExtensionsConfig.resolve_config_path()
+    if config_path is None:
+        config = ExtensionsConfig(mcp_servers={}, skills={})
+    else:
+        with open(config_path, encoding="utf-8") as handle:
+            config = ExtensionsConfig.model_validate(json.load(handle))
 
     return McpConfigResponse(mcp_servers={name: McpServerConfigResponse(**server.model_dump()) for name, server in config.mcp_servers.items()})
 
@@ -138,6 +144,9 @@ async def update_mcp_configuration(request: McpConfigUpdateRequest) -> McpConfig
         ```
     """
     try:
+        for server_name, server in request.mcp_servers.items():
+            validate_mcp_server_config(server_name, McpServerConfig(**server.model_dump()))
+
         # Get the current config path (or determine where to save it)
         config_path = ExtensionsConfig.resolve_config_path()
 
@@ -209,6 +218,18 @@ async def test_mcp_server(request: McpTestRequest) -> McpTestResponse:
     transport_type = request.type or "stdio"
 
     try:
+        validate_mcp_server_config(
+            "__test__",
+            McpServerConfig(
+                type=transport_type,
+                command=request.command,
+                args=request.args,
+                env=request.env,
+                url=request.url,
+                headers=request.headers,
+            ),
+        )
+
         if transport_type == "stdio":
             if not request.command:
                 return McpTestResponse(success=False, message="Command is required for stdio transport.")

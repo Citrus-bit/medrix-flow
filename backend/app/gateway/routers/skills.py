@@ -1,9 +1,10 @@
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.gateway.auth import require_admin_access
 from app.gateway.path_utils import resolve_thread_virtual_path
 from medrix_flow.skills import Skill, SkillCategory
 from medrix_flow.skills.installer import SkillAlreadyExistsError, resolve_skill_dir_from_archive, safe_extract_skill_archive
@@ -116,6 +117,7 @@ async def list_skills() -> SkillsListResponse:
 
 @router.post(
     "/skills/install",
+    dependencies=[Depends(require_admin_access)],
     response_model=SkillInstallResponse,
     summary="Install Skill",
     description="Install a skill from a .skill file (ZIP archive) located in the thread's user-data directory.",
@@ -160,7 +162,7 @@ async def get_custom_skill(skill_name: str) -> CustomSkillContentResponse:
         raise HTTPException(status_code=500, detail=f"Failed to get custom skill: {str(exc)}")
 
 
-@router.put("/skills/custom/{skill_name}", response_model=CustomSkillContentResponse, summary="Edit Custom Skill")
+@router.put("/skills/custom/{skill_name}", dependencies=[Depends(require_admin_access)], response_model=CustomSkillContentResponse, summary="Edit Custom Skill")
 async def update_custom_skill(skill_name: str, request: CustomSkillUpdateRequest) -> CustomSkillContentResponse:
     try:
         skill, content = _service().update_custom_skill(_sanitize_skill_name(skill_name), request.content)
@@ -174,7 +176,7 @@ async def update_custom_skill(skill_name: str, request: CustomSkillUpdateRequest
         raise HTTPException(status_code=500, detail=f"Failed to update custom skill: {str(exc)}")
 
 
-@router.delete("/skills/custom/{skill_name}", summary="Delete Custom Skill")
+@router.delete("/skills/custom/{skill_name}", dependencies=[Depends(require_admin_access)], summary="Delete Custom Skill")
 async def delete_custom_skill(skill_name: str) -> dict[str, bool]:
     try:
         _service().delete_custom_skill(_sanitize_skill_name(skill_name))
@@ -200,7 +202,7 @@ async def get_custom_skill_history(skill_name: str) -> CustomSkillHistoryRespons
         raise HTTPException(status_code=500, detail=f"Failed to read history: {str(exc)}")
 
 
-@router.post("/skills/custom/{skill_name}/rollback", response_model=CustomSkillContentResponse, summary="Rollback Custom Skill")
+@router.post("/skills/custom/{skill_name}/rollback", dependencies=[Depends(require_admin_access)], response_model=CustomSkillContentResponse, summary="Rollback Custom Skill")
 async def rollback_custom_skill(skill_name: str, request: SkillRollbackRequest) -> CustomSkillContentResponse:
     try:
         skill, content = _service().rollback_custom_skill(
@@ -238,6 +240,7 @@ async def get_skill(skill_name: str) -> SkillResponse:
 
 @router.put(
     "/skills/{skill_name}",
+    dependencies=[Depends(require_admin_access)],
     response_model=SkillResponse,
     summary="Update Skill",
     description="Update a skill's enabled status by modifying the extensions_config.json file.",

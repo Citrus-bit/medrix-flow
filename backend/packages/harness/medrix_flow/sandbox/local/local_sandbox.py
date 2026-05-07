@@ -34,9 +34,7 @@ class LocalSandbox(Sandbox):
 
     def execute_command(self, command: str) -> str:
         result = subprocess.run(
-            command,
-            executable=self._get_shell(),
-            shell=True,
+            [self._get_shell(), "-lc", command],
             capture_output=True,
             text=True,
             timeout=600,

@@ -112,6 +112,12 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 - 当前实现优先调用本机 `tectonic`，不依赖 `pdflatex`、`xelatex` 或 `latexmk`
 - 预览链路会自动补常见 LaTeX 兼容处理，例如下载远程图片、补充 `subfig`、清理部分 Unicode 上下标
 
+### 生产环境安全要求
+
+- 生产部署必须显式设置 `MEDRIX_FLOW_ENV=production`，这样 Python 侧才会启用生产安全守卫并拒绝 `LocalSandboxProvider`
+- 通过 nginx 暴露 UI/API 时，必须设置 `MEDRIX_FLOW_UI_PASSWORD`，否则 `/workspace`、`/api/*`、`/api/langgraph/*`、`/docs` 会进入 fail-closed 保护
+- 如需脚本化调用受保护接口，可额外设置 `MEDRIX_GATEWAY_ADMIN_TOKEN`，并通过请求头 `x-medrix-admin-token` 访问
+
 ### Skills 与扩展
 
 - Skills 从项目根目录的 `skills/public` 与 `skills/custom` 自动发现

@@ -63,6 +63,21 @@ def test_build_server_params_rejects_unsupported_transport():
         build_server_params("bad-transport", config)
 
 
+def test_build_server_params_rejects_shell_command():
+    config = McpServerConfig(type="stdio", command="bash", args=["-lc", "echo hi"])
+
+    with pytest.raises(ValueError, match="not allowed"):
+        build_server_params("bad-shell", config)
+
+
+def test_build_server_params_rejects_inline_eval_flags(monkeypatch):
+    monkeypatch.setattr("medrix_flow.mcp.security.shutil.which", lambda _cmd: "/usr/bin/python3")
+    config = McpServerConfig(type="stdio", command="python3", args=["-c", "print('hi')"])
+
+    with pytest.raises(ValueError, match="blocked inline-eval flags"):
+        build_server_params("bad-inline-eval", config)
+
+
 def test_build_servers_config_returns_empty_when_no_enabled_servers():
     extensions = ExtensionsConfig(
         mcp_servers={
