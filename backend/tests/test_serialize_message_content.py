@@ -3,7 +3,7 @@
 Ensures that structured content (list-of-blocks) is properly extracted to
 plain text, preventing raw Python repr strings from reaching the UI.
 
-See: https://github.com/bytedance/medrix-flow/issues/1149
+See: https://github.com/Citrus-bit/medrix-flow/issues/1149
 """
 
 from langchain_core.messages import ToolMessage

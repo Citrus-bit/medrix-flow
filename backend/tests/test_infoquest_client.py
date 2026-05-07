@@ -330,8 +330,6 @@ class TestImageSearch:
         mock_get_client.assert_called_once()
         mock_client.image_search.assert_called_once_with("test query")
 
-    # In /Users/bytedance/python/medrix-flowv2/medrix-flow/backend/tests/test_infoquest_client.py
-
     @patch("medrix_flow.community.infoquest.tools._get_infoquest_client")
     def test_image_search_tool_with_parameters(self, mock_get_client):
         """Test image_search_tool function with all parameters (extra parameters will be ignored)."""

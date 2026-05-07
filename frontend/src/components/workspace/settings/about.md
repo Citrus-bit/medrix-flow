@@ -1,4 +1,4 @@
-# 🧬 [About MedrixFlow 2.0](https://github.com/bytedance/medrix-flow)
+# 🧬 [About MedrixFlow 2.0](https://github.com/Citrus-bit/medrix-flow)
 
 > **From Open Source, Back to Open Source**
 
@@ -10,7 +10,7 @@ different levels of tasks that could take minutes to hours.
 
 ## 🌟 GitHub Repository
 
-Explore MedrixFlow on GitHub: [github.com/bytedance/medrix-flow](https://github.com/bytedance/medrix-flow)
+Explore MedrixFlow on GitHub: [github.com/Citrus-bit/medrix-flow](https://github.com/Citrus-bit/medrix-flow)
 
 ## 🌐 Official Website
 

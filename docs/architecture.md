@@ -4,8 +4,8 @@
 
 ## 1. 项目概述
 
-<!-- 来源归属: 本项目基于开源上游 `bytedance/deer-flow` fork，依据其 MIT 许可进行二次开发 -->
-MedrixFlow 是一个基于开源上游项目 fork 并大幅二次开发的全栈 AI 代理编排平台。后端基于 LangGraph 实现多代理协作与状态管理，前端基于 Next.js 16 提供现代化交互界面。
+<!-- 来源归属: 本项目继承自一个开源上游项目，归属信息见根目录 LICENSE 文件 -->
+MedrixFlow 是一个全栈 AI 代理编排平台。后端基于 LangGraph 实现多代理协作与状态管理，前端基于 Next.js 16 提供现代化交互界面。
 
 **核心定位**: AI 超级代理系统 — 沙箱执行 · 持久化记忆 · 多代理协作 · 可扩展工具生态
 
@@ -328,10 +328,10 @@ medrix-flow/
 
 ## 8. 设计决策
 
-### 8.1 基于上游开源项目 fork
+### 8.1 基于上游开源项目演进
 
-<!-- 归属说明: 初始仓库 fork 自 `bytedance/deer-flow`（MIT 许可），初始提交 `eb2b5ee`。以下列出 fork 后的主要演进点 -->
-MedrixFlow 基于 `bytedance/deer-flow` fork 而来（初始提交: `eb2b5ee`），后续进行了大量二次开发：
+<!-- 归属说明: 上游项目的版权声明统一收敛到根目录 LICENSE 文件；此处仅记录 fork 后的主要演进点 -->
+MedrixFlow 从一个开源上游项目 fork 而来（完整归属见 LICENSE），后续进行了大量二次开发：
 - 品牌重命名与视觉系统重做
 - 端口调整（2026 → 1000）
 - 安全加固（SandboxAuditMiddleware、security.py）
