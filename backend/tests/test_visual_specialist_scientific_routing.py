@@ -12,4 +12,4 @@ def test_visual_specialist_prompt_contains_scientific_routing_contract() -> None
     assert "deterministic_diagram" in prompt
     assert "ai_scientific_illustration" in prompt
     assert "scientific-image-prompting" in prompt
-    assert "gemini-3-pro-image-preview" in prompt
+    assert "currently active image provider/model from Settings" in prompt

@@ -65,7 +65,9 @@ Parameters:
 - `--reference-images`: Absolute paths to reference images (optional, space-separated)
 - `--output-file`: Absolute path to output image file (required)
 - `--aspect-ratio`: Aspect ratio of the generated image (optional, default: 16:9)
-- `--model`: Optional Google AI Studio image model
+- `--provider`: Optional image provider override (`google-ai-studio` or `openai-compatible`)
+- `--model`: Optional image model override
+- `--base-url`: Optional OpenAI-compatible image base URL override
 - `--image-size`: Optional `1K`, `2K`, or `4K`
 - `--output-mime-type`: Optional `image/png` or `image/jpeg`
 - `--scientific-mode`: Enables scientific illustration guardrails and 4K/PNG defaults
@@ -74,6 +76,7 @@ Parameters:
 
 [!NOTE]
 Do NOT read the python file, just call it with the parameters.
+If the user has already configured an active image provider in Settings, use that provider/model by default and do not hardcode Gemini unless the user explicitly asked for Google AI Studio.
 
 ## Scientific Illustration Mode
 
@@ -93,10 +96,11 @@ python /mnt/skills/public/image-generation/scripts/generate.py \
   --manifest-file /mnt/user-data/outputs/generation_manifest.json \
   --aspect-ratio 16:9 \
   --scientific-mode \
-  --model gemini-3-pro-image-preview \
   --image-size 4K \
   --output-mime-type image/png
 ```
+
+Only add `--provider`, `--model`, or `--base-url` when the user explicitly wants to override the configured default provider.
 
 ## Character Generation Example
 

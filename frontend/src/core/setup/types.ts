@@ -18,14 +18,33 @@ export interface ToolKeyItem {
   env_var: string;
 }
 
+export type ImageProviderKind = "google-ai-studio" | "openai-compatible";
+
+export interface ImageProviderConfig {
+  provider: ImageProviderKind;
+  enabled: boolean;
+  model: string | null;
+  base_url: string | null;
+  api_key: string | null;
+  api_key_env_var: string;
+}
+
+export interface ImageGenerationConfig {
+  active_provider: ImageProviderKind;
+  google_ai_studio: ImageProviderConfig;
+  openai_compatible: ImageProviderConfig;
+}
+
 export interface SetupConfig {
   models: ModelSetupItem[];
   tool_keys: ToolKeyItem[];
+  image_generation: ImageGenerationConfig;
 }
 
 export interface SaveModelsRequest {
   models: ModelSetupItem[];
   tool_keys: ToolKeyItem[] | null;
+  image_generation: ImageGenerationConfig | null;
 }
 
 export interface TestModelRequest {
@@ -38,6 +57,13 @@ export interface TestModelRequest {
 export interface TestToolKeyRequest {
   service: string;
   api_key: string;
+}
+
+export interface TestImageProviderRequest {
+  provider: ImageProviderKind;
+  model: string;
+  api_key: string;
+  base_url: string | null;
 }
 
 export interface TestResult {

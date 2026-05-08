@@ -111,7 +111,8 @@ For scientific illustration requests, prepare these files in outputs:
 - chosen `figure_type`
 - why AIGC is appropriate here
 - what was intentionally excluded to avoid fake data presentation
-- model/size target: `gemini-3-pro-image-preview`, `4K`, `PNG`
+- provider/model choice, including whether it came from the active Settings configuration or an explicit override
+- size/output target: `4K`, `PNG`
 
 `ai_disclosure.md` must explicitly state that the image is a conceptual or illustrative figure generated with AI assistance and should not be interpreted as raw experimental evidence.
 
@@ -126,10 +127,11 @@ python /mnt/skills/public/image-generation/scripts/generate.py \
   --manifest-file /mnt/user-data/outputs/generation_manifest.json \
   --aspect-ratio 16:9 \
   --scientific-mode \
-  --model gemini-3-pro-image-preview \
   --image-size 4K \
   --output-mime-type image/png
 ```
+
+Default to the active image provider/model configured in Settings. Only add `--provider`, `--model`, or `--base-url` when the user explicitly wants to override the configured provider.
 
 If the user asked for a lower-cost draft, use:
 - `--draft-mode`

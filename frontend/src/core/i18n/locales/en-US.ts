@@ -419,17 +419,27 @@ export const enUS: Translations = {
 
   setup: {
     title: "Setup",
-    description: "Configure your LLM models, tool API keys, and academic retrieval API keys.",
+    description: "Configure your LLM models, image generation providers, tool API keys, and academic retrieval API keys.",
     modelsTitle: "Model Configuration",
     modelsDescription:
       "Add and manage your LLM model providers. Each model needs a provider, model name, and API key.",
-    toolKeysTitle: "Tool / Image / Academic API Keys",
+    toolKeysTitle: "Tool / Academic API Keys",
     toolKeysDescription:
-      "Configure API keys for web search (Tavily), web fetch (Jina), Google AI Studio image generation, and academic retrieval enhancement (OpenAlex, Semantic Scholar).",
+      "Configure API keys for web search (Tavily), web fetch (Jina), and academic retrieval enhancement (OpenAlex, Semantic Scholar).",
+    imageGenerationTitle: "Image Generation",
+    imageGenerationDescription:
+      "Choose the active image generation provider and configure either Google AI Studio or an OpenAI-compatible third-party image API.",
+    activeImageProvider: "Active Image Provider",
+    googleAiStudio: "Google AI Studio",
+    openaiCompatible: "Third-party OpenAI-compatible",
     addModel: "Add Model",
     model: "Model",
     provider: "Provider",
+    apiKey: "API Key",
+    baseUrl: "Base URL",
     testConnection: "Test",
+    activeProviderBadge: "Active",
+    imageGenerationMissingFields: "Missing required fields for the active image provider:",
     saveAll: "Save Configuration",
     saveSuccess: "Configuration saved successfully.",
     noChanges: "No unsaved changes.",

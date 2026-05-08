@@ -404,17 +404,27 @@ export const zhCN: Translations = {
 
   setup: {
     title: "配置",
-    description: "配置你的 LLM 模型、工具 API 密钥和学术检索 API 密钥。",
+    description: "配置你的 LLM 模型、文生图提供商、工具 API 密钥和学术检索 API 密钥。",
     modelsTitle: "模型配置",
     modelsDescription:
       "添加和管理 LLM 模型提供商。每个模型需要提供商类型、模型名称和 API 密钥。",
-    toolKeysTitle: "工具 / 文生图 / 学术 API 密钥",
+    toolKeysTitle: "工具 / 学术 API 密钥",
     toolKeysDescription:
-      "配置网络搜索（Tavily）、网页抓取（Jina）、Google AI Studio 文生图以及学术检索增强（OpenAlex、Semantic Scholar）的 API 密钥。",
+      "配置网络搜索（Tavily）、网页抓取（Jina）以及学术检索增强（OpenAlex、Semantic Scholar）的 API 密钥。",
+    imageGenerationTitle: "文生图配置",
+    imageGenerationDescription:
+      "选择当前生效的文生图提供商，并分别配置 Google AI Studio 或 OpenAI 兼容第三方图像接口。",
+    activeImageProvider: "当前生效的文生图提供商",
+    googleAiStudio: "Google AI Studio",
+    openaiCompatible: "第三方 OpenAI 兼容接口",
     addModel: "添加模型",
     model: "模型",
     provider: "提供商",
+    apiKey: "API Key",
+    baseUrl: "Base URL",
     testConnection: "测试",
+    activeProviderBadge: "当前生效",
+    imageGenerationMissingFields: "当前生效的文生图提供商缺少必填项：",
     saveAll: "保存配置",
     saveSuccess: "配置保存成功。",
     noChanges: "没有未保存的更改。",

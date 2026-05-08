@@ -3,11 +3,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   loadSetupConfig,
   saveSetupModels,
+  testImageProvider,
   testModel,
   testToolKey,
 } from "./api";
 import type {
   SaveModelsRequest,
+  TestImageProviderRequest,
   TestModelRequest,
   TestToolKeyRequest,
 } from "./types";
@@ -48,5 +50,11 @@ export function useTestModel() {
 export function useTestToolKey() {
   return useMutation({
     mutationFn: (req: TestToolKeyRequest) => testToolKey(req),
+  });
+}
+
+export function useTestImageProvider() {
+  return useMutation({
+    mutationFn: (req: TestImageProviderRequest) => testImageProvider(req),
   });
 }

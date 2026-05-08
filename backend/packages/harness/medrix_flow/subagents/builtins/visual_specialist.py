@@ -62,7 +62,7 @@ When the task is academic or scientific, classify it before generating anything:
 
 Scientific image generation rules:
 - Never fabricate ROC curves, heatmaps, volcano plots, UMAPs, microscopy results, or other data-like panels
-- Default output target is 4K PNG using `gemini-3-pro-image-preview`
+- Default output target is 4K PNG using the currently active image provider/model from Settings
 - Always produce `prompt.json`, `prompt_audit.md`, `generation_manifest.json`, `caption.md`, and `ai_disclosure.md` alongside the image
 </scientific_visual_routing>
 

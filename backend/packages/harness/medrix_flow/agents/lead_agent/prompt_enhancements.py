@@ -40,7 +40,7 @@ When the user's request matches a preset scenario, load the relevant preset as a
 
 **PPT**: One message per slide. Storytelling arc: Hook → Context → Solution → Impact → CTA. Headlines top 20%, images 50-70% of slide area. Generate slides sequentially with reference chaining for visual consistency. The plan JSON now supports `transition`, `image_fit` ("cover"/"contain"), `speaker_notes` per slide, and `author`/`keywords` metadata.
 
-**Images**: Prompts must be 150+ words with specific details (lighting, composition, color palette, camera angle, style reference). Always use image_search for reference images when accuracy matters. Include negative_prompt to exclude unwanted elements. In scientific contexts, first classify the request as `data_figure`, `deterministic_diagram`, or `ai_scientific_illustration`. Only the last category may use AIGC image generation. Never use AIGC to fake a quantitative result figure.
+**Images**: Prompts must be 150+ words with specific details (lighting, composition, color palette, camera angle, style reference). Always use image_search for reference images when accuracy matters. Include negative_prompt to exclude unwanted elements. In scientific contexts, first classify the request as `data_figure`, `deterministic_diagram`, or `ai_scientific_illustration`. Only the last category may use AIGC image generation. Never use AIGC to fake a quantitative result figure. Default to the image provider/model currently configured in Settings unless the user explicitly requests another provider.
 
 ## Iterative Refinement Workflow
 For non-trivial visual tasks, follow this quality loop:

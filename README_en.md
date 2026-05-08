@@ -259,7 +259,7 @@ When you first open the page, the setup panel will **automatically pop up** to g
 
 1. **Add a Model**: On the "Configuration" page, select a provider (OpenAI / Anthropic / Google Gemini / DeepSeek / OpenAI Compatible) and enter the model name
 2. **Enter API Key**: Input your API Key and click the "Test" button to verify connectivity
-3. **Configure Tool / Academic Keys** (optional): If you need web search, Google AI Studio scientific image generation, or academic retrieval enhancement, enter Tavily / Jina / Google AI Studio / OpenAlex / Semantic Scholar API keys
+3. **Configure Image / Tool / Academic Keys** (optional): If you need scientific image generation, web search, or academic retrieval enhancement, choose an active image provider (Google AI Studio or OpenAI-compatible), then enter the required API keys for image generation, Tavily / Jina, and OpenAlex / Semantic Scholar
 4. **Save Configuration** — Done! Configuration is automatically persisted and the service hot-reloads
 
 > You can reopen the configuration panel at any time via the bottom-left "Settings & More" → "Settings" → "Configuration" tab.
@@ -407,7 +407,7 @@ Edit `config.yaml` in the project root directory directly. Main configuration se
 Configuration values prefixed with `$` are automatically resolved as environment variables. Common variables:
 
 - Model API Keys: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `DEEPSEEK_API_KEY`, `GOOGLE_API_KEY`
-- Tool / image / academic API Keys: `TAVILY_API_KEY`, `JINA_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `GITHUB_TOKEN`, `OPENALEX_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY`
+- Tool / image / academic API Keys: `TAVILY_API_KEY`, `JINA_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`, `IMAGE_GEN_ACTIVE_PROVIDER`, `IMAGE_GEN_GOOGLE_MODEL`, `IMAGE_GEN_OPENAI_MODEL`, `IMAGE_GEN_OPENAI_BASE_URL`, `IMAGE_GEN_OPENAI_API_KEY`, `GITHUB_TOKEN`, `OPENALEX_API_KEY`, `SEMANTIC_SCHOLAR_API_KEY`
 - Config overrides: `MEDRIX_FLOW_CONFIG_PATH`, `MEDRIX_FLOW_EXTENSIONS_CONFIG_PATH`
 
 ### MCP and Skills Configuration (`extensions_config.json`)

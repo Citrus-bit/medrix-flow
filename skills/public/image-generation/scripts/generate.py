@@ -2,6 +2,7 @@ import base64
 import json
 import mimetypes
 import os
+import sys
 from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
@@ -9,14 +10,35 @@ from pathlib import Path
 import requests
 from PIL import Image
 
+try:
+    from medrix_flow.utils import google_image as google_image_utils
+except ModuleNotFoundError:
+    harness_path = Path(__file__).resolve().parents[4] / "backend" / "packages" / "harness"
+    if harness_path.exists():
+        sys.path.insert(0, str(harness_path))
+    from medrix_flow.utils import google_image as google_image_utils
+
+IMAGE_PROVIDER_GOOGLE = "google-ai-studio"
+IMAGE_PROVIDER_OPENAI = "openai-compatible"
 DEFAULT_IMAGE_MODEL = "gemini-3-pro-image-preview"
-DEFAULT_DRAFT_MODEL = "gemini-2.5-flash-image"
+DEFAULT_DRAFT_MODEL = google_image_utils.GOOGLE_IMAGE_SMOKE_MODEL
 DEFAULT_IMAGE_SIZE = "2K"
 SCIENTIFIC_IMAGE_SIZE = "4K"
 DEFAULT_OUTPUT_MIME_TYPE = "image/jpeg"
 SCIENTIFIC_OUTPUT_MIME_TYPE = "image/png"
 SUPPORTED_IMAGE_SIZES = {"1K", "2K", "4K"}
 SUPPORTED_OUTPUT_MIME_TYPES = {"image/jpeg", "image/png"}
+SUPPORTED_OPENAI_COMPATIBLE_ASPECT_RATIOS = {"1:1", "16:9", "9:16"}
+OPENAI_COMPATIBLE_SIZE_MAP = {
+    "1:1": {"1K": "1024x1024", "2K": "2048x2048", "4K": "4096x4096"},
+    "16:9": {"1K": "1024x576", "2K": "2048x1152", "4K": "4096x2304"},
+    "9:16": {"1K": "576x1024", "2K": "1152x2048", "4K": "2304x4096"},
+}
+IMAGE_GEN_ACTIVE_PROVIDER_ENV = "IMAGE_GEN_ACTIVE_PROVIDER"
+IMAGE_GEN_GOOGLE_MODEL_ENV = "IMAGE_GEN_GOOGLE_MODEL"
+IMAGE_GEN_OPENAI_MODEL_ENV = "IMAGE_GEN_OPENAI_MODEL"
+IMAGE_GEN_OPENAI_BASE_URL_ENV = "IMAGE_GEN_OPENAI_BASE_URL"
+IMAGE_GEN_OPENAI_API_KEY_ENV = "IMAGE_GEN_OPENAI_API_KEY"
 SCIENTIFIC_GUARDRAIL = (
     "This is a scientific illustration request, not a quantitative data figure. "
     "Do not fabricate plots, axes, p-values, ROC curves, heatmaps, volcano plots, or other measured results. "
@@ -46,8 +68,33 @@ def validate_image(image_path: str) -> bool:
         return False
 
 
+def get_non_empty_env_value(var_name: str) -> str | None:
+    value = os.getenv(var_name)
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def normalize_base_url(base_url: str | None) -> str | None:
+    if not base_url:
+        return None
+    return base_url.strip().rstrip("/") or None
+
+
 def resolve_google_ai_studio_api_key() -> str | None:
-    return os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    return get_non_empty_env_value("GEMINI_API_KEY") or get_non_empty_env_value("GOOGLE_API_KEY")
+
+
+def resolve_openai_compatible_api_key() -> str | None:
+    return get_non_empty_env_value(IMAGE_GEN_OPENAI_API_KEY_ENV)
+
+
+def resolve_provider_name(provider: str | None) -> str:
+    resolved_provider = provider or get_non_empty_env_value(IMAGE_GEN_ACTIVE_PROVIDER_ENV) or IMAGE_PROVIDER_GOOGLE
+    if resolved_provider not in {IMAGE_PROVIDER_GOOGLE, IMAGE_PROVIDER_OPENAI}:
+        raise ValueError(f"Unsupported provider: {resolved_provider}")
+    return resolved_provider
 
 
 def resolve_output_mime_type(output_file: str, requested_mime_type: str | None, scientific_mode: bool) -> str:
@@ -70,10 +117,43 @@ def resolve_image_size(requested_image_size: str | None, scientific_mode: bool) 
     return image_size
 
 
-def resolve_model_name(model: str | None, draft_mode: bool = False) -> str:
+def resolve_model_name(provider: str, model: str | None, draft_mode: bool = False) -> str:
     if model:
         return model
-    return DEFAULT_DRAFT_MODEL if draft_mode else DEFAULT_IMAGE_MODEL
+    if provider == IMAGE_PROVIDER_GOOGLE:
+        if draft_mode:
+            return DEFAULT_DRAFT_MODEL
+        return get_non_empty_env_value(IMAGE_GEN_GOOGLE_MODEL_ENV) or DEFAULT_IMAGE_MODEL
+    resolved = get_non_empty_env_value(IMAGE_GEN_OPENAI_MODEL_ENV)
+    if not resolved:
+        raise RuntimeError("OpenAI-compatible image provider model is not configured. Set IMAGE_GEN_OPENAI_MODEL or pass --model.")
+    return resolved
+
+
+def resolve_provider_base_url(provider: str, base_url: str | None) -> str | None:
+    if provider != IMAGE_PROVIDER_OPENAI:
+        return None
+    resolved = normalize_base_url(base_url) or normalize_base_url(get_non_empty_env_value(IMAGE_GEN_OPENAI_BASE_URL_ENV))
+    if not resolved:
+        raise RuntimeError(
+            "OpenAI-compatible image provider base URL is not configured. "
+            "Set IMAGE_GEN_OPENAI_BASE_URL or pass --base-url."
+        )
+    return resolved
+
+
+def resolve_provider_api_key(provider: str) -> str:
+    if provider == IMAGE_PROVIDER_GOOGLE:
+        api_key = resolve_google_ai_studio_api_key()
+        if not api_key:
+            raise RuntimeError("Google AI Studio API key is not set. Configure GEMINI_API_KEY or GOOGLE_API_KEY.")
+        return api_key
+    api_key = resolve_openai_compatible_api_key()
+    if not api_key:
+        raise RuntimeError(
+            "OpenAI-compatible image provider API key is not set. Configure IMAGE_GEN_OPENAI_API_KEY."
+        )
+    return api_key
 
 
 def load_prompt_payload(prompt_file: str) -> tuple[str, dict | None]:
@@ -90,43 +170,49 @@ def guess_reference_mime_type(reference_image: str) -> str:
     return guessed or "image/jpeg"
 
 
-def build_generation_request(
+def map_openai_compatible_size(aspect_ratio: str, image_size: str) -> str:
+    if aspect_ratio not in SUPPORTED_OPENAI_COMPATIBLE_ASPECT_RATIOS:
+        raise RuntimeError(
+            f"OpenAI-compatible image provider does not support aspect ratio '{aspect_ratio}'. "
+            "Supported values are 1:1, 16:9, and 9:16."
+        )
+    return OPENAI_COMPATIBLE_SIZE_MAP[aspect_ratio][image_size]
+
+
+def build_openai_compatible_generation_request(
     *,
     prompt_text: str,
-    inline_parts: list[dict],
-    aspect_ratio: str,
     model: str,
     image_size: str,
-    output_mime_type: str,
-) -> tuple[str, dict]:
-    response_image_config: dict[str, str] = {"aspectRatio": aspect_ratio}
-    if model != DEFAULT_DRAFT_MODEL:
-        response_image_config["imageSize"] = image_size
-    return (
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-        {
-            "generationConfig": {"responseFormat": {"image": response_image_config}},
-            "contents": [{"parts": [*inline_parts, {"text": prompt_text}]}],
-        },
-    )
+    aspect_ratio: str,
+) -> dict:
+    return {
+        "model": model,
+        "prompt": prompt_text,
+        "n": 1,
+        "size": map_openai_compatible_size(aspect_ratio, image_size),
+        "response_format": "b64_json",
+    }
 
 
-def extract_image_part(payload: dict) -> dict:
-    candidates = payload.get("candidates") or []
-    if not candidates:
-        raise RuntimeError("Image generation returned no candidates")
-    parts = ((candidates[0] or {}).get("content") or {}).get("parts") or []
-    for part in parts:
-        if not isinstance(part, dict):
-            continue
-        inline = part.get("inlineData") or part.get("inline_data")
-        if isinstance(inline, dict) and inline.get("data"):
-            return inline
-    raise RuntimeError("Image generation returned no image data")
+def extract_openai_compatible_image(payload: dict, timeout_seconds: int) -> tuple[bytes, str | None]:
+    data = payload.get("data") or []
+    if not data:
+        raise RuntimeError("OpenAI-compatible image provider returned no data")
+    first = data[0] or {}
+    if isinstance(first, dict):
+        b64_payload = first.get("b64_json")
+        if b64_payload:
+            return base64.b64decode(b64_payload), None
+        image_url = first.get("url")
+        if image_url:
+            response = requests.get(image_url, timeout=timeout_seconds)
+            response.raise_for_status()
+            return response.content, response.headers.get("Content-Type")
+    raise RuntimeError("OpenAI-compatible image provider returned no image content")
 
 
-def save_generated_image(image_part: dict, output_file: str) -> dict[str, int | None]:
-    image_bytes = base64.b64decode(image_part["data"])
+def save_generated_image_bytes(image_bytes: bytes, output_file: str) -> dict[str, int | None]:
     Path(output_file).parent.mkdir(parents=True, exist_ok=True)
     Path(output_file).write_bytes(image_bytes)
 
@@ -158,7 +244,9 @@ def generate_image(
     output_file: str,
     aspect_ratio: str = "16:9",
     *,
+    provider: str | None = None,
     model: str | None = None,
+    base_url: str | None = None,
     image_size: str | None = None,
     output_mime_type: str | None = None,
     scientific_mode: bool = False,
@@ -170,7 +258,9 @@ def generate_image(
     if scientific_mode:
         prompt_text = f"{SCIENTIFIC_GUARDRAIL}\n\n{prompt_text}"
     parts = []
-    resolved_model = resolve_model_name(model, draft_mode=draft_mode)
+    resolved_provider = resolve_provider_name(provider)
+    resolved_model = resolve_model_name(resolved_provider, model, draft_mode=draft_mode)
+    resolved_base_url = resolve_provider_base_url(resolved_provider, base_url)
     resolved_image_size = resolve_image_size(image_size, scientific_mode)
     resolved_output_mime_type = resolve_output_mime_type(output_file, output_mime_type, scientific_mode)
     
@@ -197,35 +287,66 @@ def generate_image(
             }
         )
 
-    api_key = resolve_google_ai_studio_api_key()
-    if not api_key:
-        raise RuntimeError("Google AI Studio API key is not set. Configure GEMINI_API_KEY or GOOGLE_API_KEY.")
+    if resolved_provider == IMAGE_PROVIDER_OPENAI and valid_reference_images:
+        raise RuntimeError(
+            "OpenAI-compatible image provider v1 does not support reference-guided image generation. "
+            "Switch to Google AI Studio or remove reference images."
+        )
 
-    url, request_payload = build_generation_request(
-        prompt_text=prompt_text,
-        inline_parts=parts,
-        aspect_ratio=aspect_ratio,
-        model=resolved_model,
-        image_size=resolved_image_size,
-        output_mime_type=resolved_output_mime_type,
-    )
-    response = requests.post(
-        url,
-        headers={
-            "x-goog-api-key": api_key,
-            "Content-Type": "application/json",
-        },
-        json=request_payload,
-        timeout=timeout_seconds,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    image_part = extract_image_part(payload)
-    actual_dimensions = save_generated_image(image_part, output_file)
+    api_key = resolve_provider_api_key(resolved_provider)
+    actual_mime_type = resolved_output_mime_type
+    retry_count = 0
+    if resolved_provider == IMAGE_PROVIDER_GOOGLE:
+        result = google_image_utils.execute_google_image_request(
+            requests_module=requests,
+            api_key=api_key,
+            model=resolved_model,
+            prompt_text=prompt_text,
+            inline_parts=parts,
+            aspect_ratio=aspect_ratio,
+            image_size=resolved_image_size,
+            timeout_seconds=timeout_seconds,
+        )
+        payload = result.payload
+        retry_count = result.retry_count
+        image_part = google_image_utils.extract_google_image_part(payload)
+        actual_mime_type = image_part.get("mimeType") or image_part.get("mime_type") or resolved_output_mime_type
+        image_bytes = base64.b64decode(image_part["data"])
+    else:
+        response = requests.post(
+            f"{resolved_base_url}/images/generations",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=build_openai_compatible_generation_request(
+                prompt_text=prompt_text,
+                model=resolved_model,
+                image_size=resolved_image_size,
+                aspect_ratio=aspect_ratio,
+            ),
+            timeout=timeout_seconds,
+        )
+        try:
+            response.raise_for_status()
+        except Exception as exc:
+            raise RuntimeError(
+                f"OpenAI-compatible image provider rejected {map_openai_compatible_size(aspect_ratio, resolved_image_size)} output for model '{resolved_model}'."
+            ) from exc
+        payload = response.json()
+        image_bytes, actual_mime_type = extract_openai_compatible_image(payload, timeout_seconds)
+        actual_mime_type = actual_mime_type or resolved_output_mime_type
+
+    actual_dimensions = save_generated_image_bytes(image_bytes, output_file)
 
     manifest_path = manifest_file or str(Path(output_file).with_name("generation_manifest.json"))
+    config_source = "explicit-override" if any([provider, model, base_url]) else "settings-default"
     manifest = {
+        "provider": resolved_provider,
         "model": resolved_model,
+        "resolved_model": resolved_model,
+        "resolved_base_url": resolved_base_url,
+        "config_source": config_source,
         "image_size": resolved_image_size,
         "output_mime_type": resolved_output_mime_type,
         "aspect_ratio": aspect_ratio,
@@ -241,11 +362,11 @@ def generate_image(
         "actual_output": {
             "width": actual_dimensions["width"],
             "height": actual_dimensions["height"],
-            "mime_type": image_part.get("mimeType") or image_part.get("mime_type") or resolved_output_mime_type,
+            "mime_type": actual_mime_type,
         },
         "manifest_created_at": datetime.now(UTC).isoformat(),
-        "retry_count": 0,
-        "retried": False,
+        "retry_count": retry_count,
+        "retried": retry_count > 0,
     }
     write_generation_manifest(manifest_path, manifest)
     return f"Successfully generated image to {output_file}. Manifest written to {manifest_path}"
@@ -278,10 +399,22 @@ if __name__ == "__main__":
         help="Aspect ratio of the generated image",
     )
     parser.add_argument(
+        "--provider",
+        required=False,
+        default=None,
+        help="Image provider override: google-ai-studio or openai-compatible",
+    )
+    parser.add_argument(
         "--model",
         required=False,
         default=None,
         help="Google AI Studio image generation model name",
+    )
+    parser.add_argument(
+        "--base-url",
+        required=False,
+        default=None,
+        help="OpenAI-compatible image generation base URL override",
     )
     parser.add_argument(
         "--image-size",
@@ -321,7 +454,9 @@ if __name__ == "__main__":
                 args.reference_images,
                 args.output_file,
                 args.aspect_ratio,
+                provider=args.provider,
                 model=args.model,
+                base_url=args.base_url,
                 image_size=args.image_size,
                 output_mime_type=args.output_mime_type,
                 scientific_mode=args.scientific_mode,

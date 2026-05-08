@@ -11,7 +11,13 @@ from starlette.requests import Request
 
 from app.gateway.auth import get_proxy_authorization_token, is_loopback_request, require_admin_access
 from app.gateway.routers import mcp, setup
-from medrix_flow.setup.service import SetupConfigResponse
+from medrix_flow.setup.service import (
+    DEFAULT_GOOGLE_IMAGE_MODEL,
+    IMAGE_PROVIDER_GOOGLE,
+    ImageGenerationConfig,
+    ImageProviderConfig,
+    SetupConfigResponse,
+)
 
 
 def _build_request(client_host: str, headers: dict[str, str] | None = None) -> Request:
@@ -89,13 +95,36 @@ def test_setup_routes_still_work_for_loopback_clients() -> None:
 
     with patch(
         "app.gateway.routers.setup.get_setup_config_data",
-        return_value=SetupConfigResponse(models=[], tool_keys=[]),
+        return_value=SetupConfigResponse(
+            models=[],
+            tool_keys=[],
+            image_generation=ImageGenerationConfig(
+                active_provider=IMAGE_PROVIDER_GOOGLE,
+                google_ai_studio=ImageProviderConfig(
+                    provider=IMAGE_PROVIDER_GOOGLE,
+                    enabled=True,
+                    model=DEFAULT_GOOGLE_IMAGE_MODEL,
+                    api_key="",
+                    api_key_env_var="GEMINI_API_KEY",
+                ),
+                openai_compatible=ImageProviderConfig(
+                    provider="openai-compatible",
+                    enabled=False,
+                    model=None,
+                    base_url=None,
+                    api_key="",
+                    api_key_env_var="IMAGE_GEN_OPENAI_API_KEY",
+                ),
+            ),
+        ),
     ):
         with TestClient(app) as client:
             response = client.get("/api/setup/config")
 
     assert response.status_code == 200
-    assert response.json() == {"models": [], "tool_keys": []}
+    assert response.json()["models"] == []
+    assert response.json()["tool_keys"] == []
+    assert response.json()["image_generation"]["active_provider"] == IMAGE_PROVIDER_GOOGLE
 
 
 def test_mcp_config_returns_raw_env_placeholders(monkeypatch, tmp_path) -> None:

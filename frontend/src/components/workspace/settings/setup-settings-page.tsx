@@ -26,12 +26,23 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/core/i18n/hooks";
 import {
+  getActiveImageProviderMissingFields,
+  normalizeImageProviderBaseUrl,
+} from "@/core/setup/image-generation";
+import {
   useSaveSetup,
   useSetupConfig,
+  useTestImageProvider,
   useTestModel,
   useTestToolKey,
 } from "@/core/setup/hooks";
-import type { ModelSetupItem, ToolKeyItem } from "@/core/setup/types";
+import type {
+  ImageGenerationConfig,
+  ImageProviderConfig,
+  ImageProviderKind,
+  ModelSetupItem,
+  ToolKeyItem,
+} from "@/core/setup/types";
 
 import { SettingsSection } from "./settings-section";
 
@@ -89,6 +100,10 @@ function emptyModel(): ModelSetupItem {
   };
 }
 
+function imageProviderKey(provider: ImageProviderKind): "google_ai_studio" | "openai_compatible" {
+  return provider === "google-ai-studio" ? "google_ai_studio" : "openai_compatible";
+}
+
 export function SetupSettingsPage() {
   const { t } = useI18n();
   const { config, isLoading, error, refetch } = useSetupConfig();
@@ -96,7 +111,9 @@ export function SetupSettingsPage() {
 
   const [models, setModels] = useState<ModelSetupItem[]>([]);
   const [toolKeys, setToolKeys] = useState<ToolKeyItem[]>([]);
+  const [imageGeneration, setImageGeneration] = useState<ImageGenerationConfig | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [imageValidationError, setImageValidationError] = useState("");
   const [loadingSlow, setLoadingSlow] = useState(false);
 
   useEffect(() => {
@@ -111,7 +128,9 @@ export function SetupSettingsPage() {
     if (config) {
       setModels(config.models);
       setToolKeys(config.tool_keys);
+      setImageGeneration(config.image_generation);
       setDirty(false);
+      setImageValidationError("");
     }
   }, [config]);
 
@@ -143,18 +162,79 @@ export function SetupSettingsPage() {
     [],
   );
 
+  const updateActiveImageProvider = useCallback((provider: ImageProviderKind) => {
+    setImageGeneration((prev) => {
+      if (!prev) {
+        return prev;
+      }
+      return {
+        ...prev,
+        active_provider: provider,
+        google_ai_studio: {
+          ...prev.google_ai_studio,
+          enabled: provider === "google-ai-studio",
+        },
+        openai_compatible: {
+          ...prev.openai_compatible,
+          enabled: provider === "openai-compatible",
+        },
+      };
+    });
+    setImageValidationError("");
+    setDirty(true);
+  }, []);
+
+  const updateImageProvider = useCallback(
+    (provider: ImageProviderKind, patch: Partial<ImageProviderConfig>) => {
+      setImageGeneration((prev) => {
+        if (!prev) {
+          return prev;
+        }
+        const key = imageProviderKey(provider);
+        return {
+          ...prev,
+          [key]: {
+            ...prev[key],
+            ...patch,
+          },
+        };
+      });
+      setImageValidationError("");
+      setDirty(true);
+    },
+    [],
+  );
+
   const handleSave = useCallback(() => {
+    if (!imageGeneration) {
+      return;
+    }
+    const missingFields = getActiveImageProviderMissingFields(imageGeneration);
+    if (missingFields.length > 0) {
+      const fieldLabels = missingFields.map((field) =>
+        field === "model"
+          ? t.setup.model
+          : field === "api_key"
+            ? t.setup.apiKey
+            : t.setup.baseUrl,
+      );
+      const message = `${t.setup.imageGenerationMissingFields} ${fieldLabels.join(", ")}`;
+      setImageValidationError(message);
+      toast.error(message);
+      return;
+    }
     saveMutation.mutate(
-      { models, tool_keys: toolKeys },
+      { models, tool_keys: toolKeys, image_generation: imageGeneration },
       {
         onSuccess: () => {
           toast.success(t.setup.saveSuccess);
           setDirty(false);
+          setImageValidationError("");
         },
         onError: (err) => toast.error(err.message),
       },
     );
-  }, [models, toolKeys, saveMutation, t]);
+  }, [imageGeneration, models, toolKeys, saveMutation, t]);
 
   if (isLoading) {
     return (
@@ -251,6 +331,20 @@ export function SetupSettingsPage() {
         </div>
       </SettingsSection>
 
+      {imageGeneration && (
+        <SettingsSection
+          title={t.setup.imageGenerationTitle}
+          description={t.setup.imageGenerationDescription}
+        >
+          <ImageGenerationSection
+            config={imageGeneration}
+            validationError={imageValidationError}
+            onActiveProviderChange={updateActiveImageProvider}
+            onProviderChange={updateImageProvider}
+          />
+        </SettingsSection>
+      )}
+
       <div className="flex items-center gap-3">
         <Button onClick={handleSave} disabled={!dirty || saveMutation.isPending}>
           {saveMutation.isPending && (
@@ -264,6 +358,57 @@ export function SetupSettingsPage() {
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+function ImageGenerationSection({
+  config,
+  validationError,
+  onActiveProviderChange,
+  onProviderChange,
+}: {
+  config: ImageGenerationConfig;
+  validationError: string;
+  onActiveProviderChange: (provider: ImageProviderKind) => void;
+  onProviderChange: (provider: ImageProviderKind, patch: Partial<ImageProviderConfig>) => void;
+}) {
+  const { t } = useI18n();
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-xs font-medium">{t.setup.activeImageProvider}</label>
+        <Select
+          value={config.active_provider}
+          onValueChange={(value) => onActiveProviderChange(value as ImageProviderKind)}
+        >
+          <SelectTrigger className="mt-1 w-full sm:w-[320px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="google-ai-studio">{t.setup.googleAiStudio}</SelectItem>
+            <SelectItem value="openai-compatible">{t.setup.openaiCompatible}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <ImageProviderCard
+        label={t.setup.googleAiStudio}
+        config={config.google_ai_studio}
+        active={config.active_provider === "google-ai-studio"}
+        onChange={(patch) => onProviderChange("google-ai-studio", patch)}
+      />
+      <ImageProviderCard
+        label={t.setup.openaiCompatible}
+        config={config.openai_compatible}
+        active={config.active_provider === "openai-compatible"}
+        onChange={(patch) => onProviderChange("openai-compatible", patch)}
+      />
+
+      {validationError && (
+        <div className="text-xs text-red-500">{validationError}</div>
+      )}
     </div>
   );
 }
@@ -482,17 +627,11 @@ function ToolKeyCard({
       ? { label: "Tavily", placeholder: "Enter Tavily API key" }
       : item.service === "jina"
         ? { label: "Jina", placeholder: "Enter Jina API key" }
-        : item.service === "google-ai-studio"
-          ? {
-              label: "Google AI Studio",
-              placeholder: "Enter Google AI Studio API key",
-              envLabel: "GEMINI_API_KEY / GOOGLE_API_KEY",
-            }
         : item.service === "openalex"
           ? { label: "OpenAlex", placeholder: "Enter OpenAlex API key" }
           : { label: "Semantic Scholar", placeholder: "Enter Semantic Scholar API key" };
   const label = serviceMeta.label;
-  const envLabel = "envLabel" in serviceMeta ? serviceMeta.envLabel : item.env_var;
+  const envLabel = item.env_var;
 
   return (
     <div className="bg-muted/40 space-y-3 rounded-lg border p-4">
@@ -535,6 +674,139 @@ function ToolKeyCard({
           {t.setup.testConnection}
         </Button>
       </div>
+      {testStatus === "success" && (
+        <span className="flex items-center gap-1 text-xs text-green-600">
+          <CheckCircle2Icon className="size-3.5" /> {testMsg}
+        </span>
+      )}
+      {testStatus === "error" && (
+        <span className="flex items-center gap-1 text-xs text-red-500">
+          <XCircleIcon className="size-3.5" /> {testMsg}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ImageProviderCard({
+  label,
+  config,
+  active,
+  onChange,
+}: {
+  label: string;
+  config: ImageProviderConfig;
+  active: boolean;
+  onChange: (patch: Partial<ImageProviderConfig>) => void;
+}) {
+  const { t } = useI18n();
+  const testMutation = useTestImageProvider();
+  const [testStatus, setTestStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [testMsg, setTestMsg] = useState("");
+  const [showKey, setShowKey] = useState(false);
+
+  const handleTest = () => {
+    if (!config.api_key || !config.model) return;
+    setTestStatus("loading");
+    testMutation.mutate(
+      {
+        provider: config.provider,
+        model: config.model,
+        api_key: config.api_key,
+        base_url: normalizeImageProviderBaseUrl(config.base_url),
+      },
+      {
+        onSuccess: (r) => {
+          setTestStatus(r.success ? "success" : "error");
+          setTestMsg(r.message);
+        },
+        onError: (err) => {
+          setTestStatus("error");
+          setTestMsg(err.message);
+        },
+      },
+    );
+  };
+  const isTestDisabled =
+    testStatus === "loading" ||
+    !config.api_key ||
+    !config.model ||
+    (config.provider === "openai-compatible" && !normalizeImageProviderBaseUrl(config.base_url));
+
+  return (
+    <div className={`bg-muted/40 space-y-3 rounded-lg border p-4 ${active ? "border-primary/60" : ""}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-medium">{label}</h4>
+            {active && (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                {t.setup.activeProviderBadge}
+              </span>
+            )}
+          </div>
+          <p className="text-muted-foreground mt-1 text-xs">{config.api_key_env_var}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {config.provider === "openai-compatible" && (
+          <div>
+            <label className="text-xs font-medium">{t.setup.baseUrl}</label>
+            <Input
+              value={config.base_url ?? ""}
+              onChange={(e) => onChange({ base_url: e.target.value || null })}
+              placeholder="https://api.example.com/v1"
+            />
+          </div>
+        )}
+        <div>
+          <label className="text-xs font-medium">{t.setup.model}</label>
+          <Input
+            value={config.model ?? ""}
+            onChange={(e) => onChange({ model: e.target.value || null })}
+            placeholder={config.provider === "google-ai-studio" ? "gemini-3-pro-image-preview" : "gpt-image-1"}
+          />
+        </div>
+        <div className={config.provider === "google-ai-studio" ? "" : "md:col-span-2"}>
+          <label className="text-xs font-medium">{t.setup.apiKey}</label>
+          <div className="flex items-center gap-1.5">
+            <Input
+              type={showKey ? "text" : "password"}
+              value={config.api_key ?? ""}
+              onChange={(e) => onChange({ api_key: e.target.value || null })}
+              placeholder={config.provider === "google-ai-studio" ? "AIza..." : "sk-..."}
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey((v) => !v)}
+              className="text-muted-foreground hover:text-foreground shrink-0 p-1 transition-colors"
+            >
+              {showKey ? (
+                <EyeOffIcon className="size-4" />
+              ) : (
+                <EyeIcon className="size-4" />
+              )}
+            </button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTest}
+              disabled={isTestDisabled}
+            >
+              {testStatus === "loading" ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <ZapIcon className="size-3.5" />
+              )}
+              {t.setup.testConnection}
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {testStatus === "success" && (
         <span className="flex items-center gap-1 text-xs text-green-600">
           <CheckCircle2Icon className="size-3.5" /> {testMsg}

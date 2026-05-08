@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 from dotenv import load_dotenv, set_key
 from pydantic import BaseModel, Field
+from typing_extensions import Literal
 
 from medrix_flow.config.app_config import AppConfig, reload_app_config
 from medrix_flow.setup.security import (
@@ -18,6 +19,16 @@ from medrix_flow.setup.security import (
 )
 
 _ENV_VAR_PATTERN = re.compile(r"^\$([A-Za-z_][A-Za-z0-9_]*)$")
+_VALID_ENV_VAR_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
+IMAGE_PROVIDER_GOOGLE = "google-ai-studio"
+IMAGE_PROVIDER_OPENAI = "openai-compatible"
+IMAGE_PROVIDER_KINDS = {IMAGE_PROVIDER_GOOGLE, IMAGE_PROVIDER_OPENAI}
+DEFAULT_GOOGLE_IMAGE_MODEL = "gemini-3-pro-image-preview"
+IMAGE_GEN_ACTIVE_PROVIDER_ENV = "IMAGE_GEN_ACTIVE_PROVIDER"
+IMAGE_GEN_GOOGLE_MODEL_ENV = "IMAGE_GEN_GOOGLE_MODEL"
+IMAGE_GEN_OPENAI_MODEL_ENV = "IMAGE_GEN_OPENAI_MODEL"
+IMAGE_GEN_OPENAI_BASE_URL_ENV = "IMAGE_GEN_OPENAI_BASE_URL"
+IMAGE_GEN_OPENAI_API_KEY_ENV = "IMAGE_GEN_OPENAI_API_KEY"
 
 
 class ModelSetupItem(BaseModel):
@@ -40,14 +51,31 @@ class ToolKeyItem(BaseModel):
     env_var: str = Field(..., description="Environment variable name")
 
 
+class ImageProviderConfig(BaseModel):
+    provider: Literal["google-ai-studio", "openai-compatible"]
+    enabled: bool = Field(False)
+    model: str | None = Field(None)
+    base_url: str | None = Field(None)
+    api_key: str | None = Field(None)
+    api_key_env_var: str = Field(...)
+
+
+class ImageGenerationConfig(BaseModel):
+    active_provider: Literal["google-ai-studio", "openai-compatible"] = Field(IMAGE_PROVIDER_GOOGLE)
+    google_ai_studio: ImageProviderConfig
+    openai_compatible: ImageProviderConfig
+
+
 class SetupConfigResponse(BaseModel):
     models: list[ModelSetupItem]
     tool_keys: list[ToolKeyItem]
+    image_generation: ImageGenerationConfig
 
 
 class SaveModelsRequest(BaseModel):
     models: list[ModelSetupItem]
     tool_keys: list[ToolKeyItem] | None = None
+    image_generation: ImageGenerationConfig | None = None
 
 
 def find_config_path() -> Path:
@@ -78,6 +106,14 @@ def get_env_value(var_name: str) -> str | None:
     return os.getenv(var_name)
 
 
+def get_non_empty_env_value(var_name: str) -> str | None:
+    value = get_env_value(var_name)
+    if value is None:
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
 def set_env_value(var_name: str, value: str) -> None:
     env_path = find_env_path()
     if not env_path.exists():
@@ -86,8 +122,160 @@ def set_env_value(var_name: str, value: str) -> None:
     os.environ[var_name] = value
 
 
+def set_optional_env_value(var_name: str, value: str | None) -> None:
+    set_env_value(var_name, value or "")
+
+
 def get_google_ai_studio_key() -> str:
-    return get_env_value("GEMINI_API_KEY") or get_env_value("GOOGLE_API_KEY") or ""
+    return get_non_empty_env_value("GEMINI_API_KEY") or get_non_empty_env_value("GOOGLE_API_KEY") or ""
+
+
+def normalize_base_url(base_url: str | None) -> str | None:
+    if not base_url:
+        return None
+    return base_url.strip().rstrip("/") or None
+
+
+def normalize_model_env_var_name(name: str) -> str:
+    candidate = re.sub(r"[^A-Za-z0-9_]", "_", (name or "").upper())
+    candidate = re.sub(r"_+", "_", candidate).strip("_")
+    if not candidate:
+        candidate = "MODEL_API_KEY"
+    if not candidate[0].isalpha():
+        candidate = f"MODEL_{candidate}"
+    if not candidate.endswith("_API_KEY"):
+        candidate = f"{candidate}_API_KEY"
+    return candidate
+
+
+def resolve_model_env_var_name(raw_name: str | None) -> str | None:
+    if not raw_name:
+        return None
+    if _VALID_ENV_VAR_PATTERN.fullmatch(raw_name):
+        return raw_name
+    return normalize_model_env_var_name(raw_name)
+
+
+def get_model_api_key(raw_env_var: str | None) -> tuple[str | None, str]:
+    if not raw_env_var:
+        return None, ""
+    normalized_env_var = resolve_model_env_var_name(raw_env_var)
+    actual_key = get_non_empty_env_value(raw_env_var) or ""
+    if not actual_key and normalized_env_var and normalized_env_var != raw_env_var:
+        actual_key = get_non_empty_env_value(normalized_env_var) or ""
+    return normalized_env_var, actual_key
+
+
+def resolve_image_provider_kind(provider: str | None) -> str:
+    if provider in IMAGE_PROVIDER_KINDS:
+        return provider
+    return IMAGE_PROVIDER_GOOGLE
+
+
+def default_image_provider_config(provider: Literal["google-ai-studio", "openai-compatible"]) -> ImageProviderConfig:
+    api_key_env_var = "GEMINI_API_KEY" if provider == IMAGE_PROVIDER_GOOGLE else IMAGE_GEN_OPENAI_API_KEY_ENV
+    model = DEFAULT_GOOGLE_IMAGE_MODEL if provider == IMAGE_PROVIDER_GOOGLE else None
+    return ImageProviderConfig(
+        provider=provider,
+        enabled=False,
+        model=model,
+        base_url=None,
+        api_key=None,
+        api_key_env_var=api_key_env_var,
+    )
+
+
+def build_image_generation_config(raw: dict[str, Any]) -> ImageGenerationConfig:
+    raw_image_generation = raw.get("image_generation") or {}
+    raw_google = raw_image_generation.get("google_ai_studio") or {}
+    raw_openai = raw_image_generation.get("openai_compatible") or {}
+    active_provider = resolve_image_provider_kind(
+        raw_image_generation.get("active_provider") or get_non_empty_env_value(IMAGE_GEN_ACTIVE_PROVIDER_ENV)
+    )
+    google_model = (
+        raw_google.get("model")
+        or get_non_empty_env_value(IMAGE_GEN_GOOGLE_MODEL_ENV)
+        or DEFAULT_GOOGLE_IMAGE_MODEL
+    )
+    openai_model = raw_openai.get("model") or get_non_empty_env_value(IMAGE_GEN_OPENAI_MODEL_ENV)
+    openai_base_url = normalize_base_url(
+        raw_openai.get("base_url") or get_non_empty_env_value(IMAGE_GEN_OPENAI_BASE_URL_ENV)
+    )
+
+    return ImageGenerationConfig(
+        active_provider=active_provider,
+        google_ai_studio=ImageProviderConfig(
+            provider=IMAGE_PROVIDER_GOOGLE,
+            enabled=active_provider == IMAGE_PROVIDER_GOOGLE,
+            model=google_model,
+            api_key=get_google_ai_studio_key(),
+            api_key_env_var="GEMINI_API_KEY",
+        ),
+        openai_compatible=ImageProviderConfig(
+            provider=IMAGE_PROVIDER_OPENAI,
+            enabled=active_provider == IMAGE_PROVIDER_OPENAI,
+            model=openai_model,
+            base_url=openai_base_url,
+            api_key=get_non_empty_env_value(IMAGE_GEN_OPENAI_API_KEY_ENV) or "",
+            api_key_env_var=IMAGE_GEN_OPENAI_API_KEY_ENV,
+        ),
+    )
+
+
+def apply_legacy_google_image_key(
+    image_generation: ImageGenerationConfig,
+    tool_keys: list[ToolKeyItem] | None,
+) -> ImageGenerationConfig:
+    if not tool_keys:
+        return image_generation
+    for tool_key in tool_keys:
+        if tool_key.service == IMAGE_PROVIDER_GOOGLE and tool_key.api_key and tool_key.api_key.strip():
+            image_generation.google_ai_studio.api_key = tool_key.api_key.strip()
+            break
+    return image_generation
+
+
+def validate_image_generation_config(
+    image_generation: ImageGenerationConfig,
+    *,
+    require_active_fields: bool = True,
+) -> ImageGenerationConfig:
+    active_provider = resolve_image_provider_kind(image_generation.active_provider)
+    image_generation.active_provider = active_provider
+
+    image_generation.google_ai_studio.provider = IMAGE_PROVIDER_GOOGLE
+    image_generation.google_ai_studio.enabled = active_provider == IMAGE_PROVIDER_GOOGLE
+    image_generation.google_ai_studio.api_key_env_var = "GEMINI_API_KEY"
+    image_generation.google_ai_studio.base_url = None
+    image_generation.google_ai_studio.model = (image_generation.google_ai_studio.model or "").strip() or DEFAULT_GOOGLE_IMAGE_MODEL
+    image_generation.google_ai_studio.api_key = (image_generation.google_ai_studio.api_key or "").strip() or None
+
+    image_generation.openai_compatible.provider = IMAGE_PROVIDER_OPENAI
+    image_generation.openai_compatible.enabled = active_provider == IMAGE_PROVIDER_OPENAI
+    image_generation.openai_compatible.api_key_env_var = IMAGE_GEN_OPENAI_API_KEY_ENV
+    image_generation.openai_compatible.model = (image_generation.openai_compatible.model or "").strip() or None
+    image_generation.openai_compatible.api_key = (image_generation.openai_compatible.api_key or "").strip() or None
+    if image_generation.openai_compatible.base_url:
+        validate_optional_base_url(image_generation.openai_compatible.base_url)
+    image_generation.openai_compatible.base_url = normalize_base_url(image_generation.openai_compatible.base_url)
+
+    if not require_active_fields:
+        return image_generation
+
+    if active_provider == IMAGE_PROVIDER_GOOGLE:
+        if not image_generation.google_ai_studio.model:
+            raise ValueError("Active image provider 'google-ai-studio' requires a model.")
+        if not image_generation.google_ai_studio.api_key:
+            raise ValueError("Active image provider 'google-ai-studio' requires an API key.")
+    elif active_provider == IMAGE_PROVIDER_OPENAI:
+        if not image_generation.openai_compatible.model:
+            raise ValueError("Active image provider 'openai-compatible' requires a model.")
+        if not image_generation.openai_compatible.base_url:
+            raise ValueError("Active image provider 'openai-compatible' requires a base URL.")
+        if not image_generation.openai_compatible.api_key:
+            raise ValueError("Active image provider 'openai-compatible' requires an API key.")
+
+    return image_generation
 
 
 def get_setup_config_data() -> SetupConfigResponse:
@@ -102,8 +290,7 @@ def get_setup_config_data() -> SetupConfigResponse:
         actual_key = ""
 
         if isinstance(api_key_raw, str) and api_key_raw.startswith("$"):
-            env_var = api_key_raw[1:]
-            actual_key = get_env_value(env_var) or ""
+            env_var, actual_key = get_model_api_key(api_key_raw[1:])
         elif api_key_raw:
             actual_key = str(api_key_raw)
 
@@ -126,11 +313,6 @@ def get_setup_config_data() -> SetupConfigResponse:
     tool_keys = [
         ToolKeyItem(service="tavily", api_key=get_env_value("TAVILY_API_KEY") or "", env_var="TAVILY_API_KEY"),
         ToolKeyItem(service="jina", api_key=get_env_value("JINA_API_KEY") or "", env_var="JINA_API_KEY"),
-        ToolKeyItem(
-            service="google-ai-studio",
-            api_key=get_google_ai_studio_key(),
-            env_var="GEMINI_API_KEY",
-        ),
         ToolKeyItem(service="openalex", api_key=get_env_value("OPENALEX_API_KEY") or "", env_var="OPENALEX_API_KEY"),
         ToolKeyItem(
             service="semantic-scholar",
@@ -139,7 +321,11 @@ def get_setup_config_data() -> SetupConfigResponse:
         ),
     ]
 
-    return SetupConfigResponse(models=models, tool_keys=tool_keys)
+    return SetupConfigResponse(
+        models=models,
+        tool_keys=tool_keys,
+        image_generation=build_image_generation_config(raw),
+    )
 
 
 def save_setup_config_data(payload: SaveModelsRequest) -> None:
@@ -149,7 +335,7 @@ def save_setup_config_data(payload: SaveModelsRequest) -> None:
     for model in payload.models:
         validate_setup_model_provider(model.provider)
         validate_optional_base_url(model.base_url)
-        env_var = model.api_key_env_var or f"{model.name.upper().replace('-', '_')}_API_KEY"
+        env_var = resolve_model_env_var_name(model.api_key_env_var) or normalize_model_env_var_name(model.name or model.model)
         validate_env_var_name(env_var)
 
         if model.api_key and model.api_key.strip():
@@ -174,6 +360,34 @@ def save_setup_config_data(payload: SaveModelsRequest) -> None:
         models.append(entry)
 
     raw["models"] = models
+
+    require_active_image_provider_fields = payload.image_generation is not None
+    image_generation = payload.image_generation or build_image_generation_config(raw)
+    image_generation = apply_legacy_google_image_key(image_generation, payload.tool_keys)
+    image_generation = validate_image_generation_config(
+        image_generation,
+        require_active_fields=require_active_image_provider_fields,
+    )
+    raw["image_generation"] = {
+        "active_provider": image_generation.active_provider,
+        "google_ai_studio": {
+            "model": image_generation.google_ai_studio.model,
+        },
+        "openai_compatible": {
+            "model": image_generation.openai_compatible.model,
+            "base_url": image_generation.openai_compatible.base_url,
+        },
+    }
+
+    set_env_value(IMAGE_GEN_ACTIVE_PROVIDER_ENV, image_generation.active_provider)
+    set_env_value(IMAGE_GEN_GOOGLE_MODEL_ENV, image_generation.google_ai_studio.model or DEFAULT_GOOGLE_IMAGE_MODEL)
+    set_optional_env_value(IMAGE_GEN_OPENAI_MODEL_ENV, image_generation.openai_compatible.model)
+    set_optional_env_value(IMAGE_GEN_OPENAI_BASE_URL_ENV, image_generation.openai_compatible.base_url)
+    if image_generation.google_ai_studio.api_key:
+        set_env_value("GEMINI_API_KEY", image_generation.google_ai_studio.api_key)
+        set_env_value("GOOGLE_API_KEY", image_generation.google_ai_studio.api_key)
+    if image_generation.openai_compatible.api_key:
+        set_env_value(IMAGE_GEN_OPENAI_API_KEY_ENV, image_generation.openai_compatible.api_key)
 
     if payload.tool_keys:
         for tool_key in payload.tool_keys:

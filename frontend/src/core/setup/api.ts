@@ -4,12 +4,25 @@ import { getBackendBaseURL } from "@/core/config";
 import type {
   SaveModelsRequest,
   SetupConfig,
+  TestImageProviderRequest,
   TestModelRequest,
   TestResult,
   TestToolKeyRequest,
 } from "./types";
 
 const base = () => getBackendBaseURL();
+
+async function buildApiError(res: Response, fallback: string): Promise<Error> {
+  try {
+    const payload = (await res.json()) as { detail?: string };
+    if (payload?.detail) {
+      return new Error(payload.detail);
+    }
+  } catch {
+    // Ignore response parsing failures and fall back to the generic message.
+  }
+  return new Error(fallback);
+}
 
 export async function loadSetupConfig(): Promise<SetupConfig> {
   const res = await fetchWithTimeout(`${base()}/api/setup/config`);
@@ -23,7 +36,7 @@ export async function saveSetupModels(req: SaveModelsRequest): Promise<{ success
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req),
   });
-  if (!res.ok) throw new Error(`Failed to save config: ${res.status}`);
+  if (!res.ok) throw await buildApiError(res, `Failed to save config: ${res.status}`);
   return res.json() as Promise<{ success: boolean; message: string }>;
 }
 
@@ -34,7 +47,7 @@ export async function testModel(req: TestModelRequest): Promise<TestResult> {
     body: JSON.stringify(req),
     timeoutMs: 30_000,
   });
-  if (!res.ok) throw new Error(`Test request failed: ${res.status}`);
+  if (!res.ok) throw await buildApiError(res, `Test request failed: ${res.status}`);
   return res.json() as Promise<TestResult>;
 }
 
@@ -45,6 +58,17 @@ export async function testToolKey(req: TestToolKeyRequest): Promise<TestResult> 
     body: JSON.stringify(req),
     timeoutMs: 30_000,
   });
-  if (!res.ok) throw new Error(`Test request failed: ${res.status}`);
+  if (!res.ok) throw await buildApiError(res, `Test request failed: ${res.status}`);
+  return res.json() as Promise<TestResult>;
+}
+
+export async function testImageProvider(req: TestImageProviderRequest): Promise<TestResult> {
+  const res = await fetchWithTimeout(`${base()}/api/setup/test-image-provider`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+    timeoutMs: 30_000,
+  });
+  if (!res.ok) throw await buildApiError(res, `Test request failed: ${res.status}`);
   return res.json() as Promise<TestResult>;
 }

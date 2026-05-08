@@ -16,7 +16,7 @@
 # ============================================================================
 # Bump this number when the config schema changes.
 # Run `make config-upgrade` to merge new fields into your local config.yaml.
-config_version: 3
+config_version: 4
 
 # ============================================================================
 # Models Configuration
@@ -163,6 +163,19 @@ models:
   #   base_url: https://openrouter.ai/api/v1
   #   max_tokens: 8192
   #   temperature: 0.7
+
+# ============================================================================
+# Image Generation Configuration
+# ============================================================================
+# Configure the default provider/model used by scientific illustrations and other AIGC image tasks.
+
+image_generation:
+  active_provider: google-ai-studio
+  google_ai_studio:
+    model: gemini-3-pro-image-preview
+  openai_compatible:
+    model: null
+    base_url: null
 
 # ============================================================================
 # Tool Groups Configuration
