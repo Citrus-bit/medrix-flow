@@ -99,19 +99,13 @@ def build_generation_request(
     image_size: str,
     output_mime_type: str,
 ) -> tuple[str, dict]:
+    response_image_config: dict[str, str] = {"aspectRatio": aspect_ratio}
+    if model != DEFAULT_DRAFT_MODEL:
+        response_image_config["imageSize"] = image_size
     return (
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
         {
-            "generationConfig": {
-                "responseModalities": ["TEXT", "IMAGE"],
-                "responseFormat": {
-                    "image": {
-                        "aspectRatio": aspect_ratio,
-                        "imageSize": image_size,
-                        "mimeType": output_mime_type,
-                    }
-                },
-            },
+            "generationConfig": {"responseFormat": {"image": response_image_config}},
             "contents": [{"parts": [*inline_parts, {"text": prompt_text}]}],
         },
     )

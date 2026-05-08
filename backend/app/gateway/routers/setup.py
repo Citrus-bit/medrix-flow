@@ -175,16 +175,7 @@ async def test_tool_key(req: TestToolKeyRequest) -> TestResult:
                 },
                 json={
                     "contents": [{"parts": [{"text": "Generate a simple blue scientific icon on a white background."}]}],
-                    "generationConfig": {
-                        "responseModalities": ["TEXT", "IMAGE"],
-                        "responseFormat": {
-                            "image": {
-                                "mimeType": "image/png",
-                                "aspectRatio": "1:1",
-                                "imageSize": "1K",
-                            }
-                        },
-                    },
+                    "generationConfig": {"responseModalities": ["Image"]},
                 },
                 timeout=30,
             )

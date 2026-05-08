@@ -80,3 +80,6 @@ def test_setup_test_tool_key_supports_google_ai_studio() -> None:
     assert response.status_code == 200
     assert response.json() == {"success": True, "message": "Google AI Studio API key is valid for image generation."}
     mock_post.assert_called_once()
+    request_json = mock_post.call_args.kwargs["json"]
+    assert request_json["generationConfig"]["responseModalities"] == ["Image"]
+    assert "responseFormat" not in request_json["generationConfig"]

@@ -101,7 +101,7 @@ def test_generate_image_uses_google_ai_studio_alias_and_writes_manifest(tmp_path
     assert captured["url"].endswith("/models/gemini-3-pro-image-preview:generateContent")
     assert captured["headers"]["x-goog-api-key"] == "google-studio-key"
     assert captured["json"]["generationConfig"]["responseFormat"]["image"]["imageSize"] == "4K"
-    assert captured["json"]["generationConfig"]["responseFormat"]["image"]["mimeType"] == "image/png"
+    assert captured["json"]["generationConfig"]["responseFormat"]["image"]["aspectRatio"] == "16:9"
     assert output_file.exists()
     manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
     assert manifest["scientific_mode"] is True
@@ -192,3 +192,46 @@ def test_generate_image_manifest_prompt_falls_back_to_rendered_prompt(monkeypatc
 
     manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
     assert manifest["prompt"] == manifest["rendered_prompt"]
+
+
+def test_generate_image_omits_image_size_for_flash_image_smoke_requests(monkeypatch, tmp_path):
+    module = _load_image_generation_module()
+
+    prompt_file = tmp_path / "prompt.txt"
+    prompt_file.write_text("simple draft prompt", encoding="utf-8")
+    output_file = tmp_path / "draft.png"
+    captured: dict = {}
+
+    def fake_post(url, *, headers, json, timeout):
+        captured["json"] = json
+        return _FakeResponse(
+            {
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [
+                                {
+                                    "inlineData": {
+                                        "mimeType": "image/png",
+                                        "data": base64.b64encode(_png_bytes()).decode("utf-8"),
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setenv("GEMINI_API_KEY", "gemini-key")
+    monkeypatch.setattr(module.requests, "post", fake_post)
+
+    module.generate_image(
+        str(prompt_file),
+        [],
+        str(output_file),
+        draft_mode=True,
+    )
+
+    assert captured["json"]["generationConfig"]["responseFormat"]["image"]["aspectRatio"] == "16:9"
+    assert "imageSize" not in captured["json"]["generationConfig"]["responseFormat"]["image"]
