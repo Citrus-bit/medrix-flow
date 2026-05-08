@@ -54,6 +54,7 @@ class TestClientInit:
     def test_default_params(self, client):
         assert client._model_name is None
         assert client._thinking_enabled is True
+        assert client._reasoning_effort is None
         assert client._subagent_enabled is False
         assert client._plan_mode is False
         assert client._agent_name is None
@@ -65,12 +66,14 @@ class TestClientInit:
             c = MedrixFlowClient(
                 model_name="gpt-4",
                 thinking_enabled=False,
+                reasoning_effort="high",
                 subagent_enabled=True,
                 plan_mode=True,
                 agent_name="test-agent"
             )
         assert c._model_name == "gpt-4"
         assert c._thinking_enabled is False
+        assert c._reasoning_effort == "high"
         assert c._subagent_enabled is True
         assert c._plan_mode is True
         assert c._agent_name == "test-agent"
@@ -437,13 +440,29 @@ class TestEnsureAgent:
         """_ensure_agent does not recreate if config key unchanged."""
         mock_agent = MagicMock()
         client._agent = mock_agent
-        client._agent_config_key = (None, True, False, False)
+        client._agent_config_key = (None, True, None, False, False)
 
         config = client._get_runnable_config("t1")
         client._ensure_agent(config)
 
         # Should still be the same mock — no recreation
         assert client._agent is mock_agent
+
+    def test_passes_reasoning_effort_to_model_factory(self, client):
+        """_ensure_agent threads reasoning_effort into create_chat_model()."""
+        mock_agent = MagicMock()
+        config = client._get_runnable_config("t1", reasoning_effort="high")
+
+        with (
+            patch("medrix_flow.client.create_chat_model") as mock_create_chat_model,
+            patch("medrix_flow.client.create_agent", return_value=mock_agent),
+            patch("medrix_flow.client._build_middlewares", return_value=[]),
+            patch("medrix_flow.client.apply_prompt_template", return_value="prompt"),
+            patch.object(client, "_get_tools", return_value=[]),
+        ):
+            client._ensure_agent(config)
+
+        assert mock_create_chat_model.call_args.kwargs["reasoning_effort"] == "high"
 
 
 # ---------------------------------------------------------------------------
@@ -1255,7 +1274,16 @@ class TestScenarioAgentRecreation:
         agents_created = []
 
         def fake_ensure(config):
-            key = tuple(config.get("configurable", {}).get(k) for k in ["model_name", "thinking_enabled", "is_plan_mode", "subagent_enabled"])
+            key = tuple(
+                config.get("configurable", {}).get(k)
+                for k in [
+                    "model_name",
+                    "thinking_enabled",
+                    "reasoning_effort",
+                    "is_plan_mode",
+                    "subagent_enabled",
+                ]
+            )
             agents_created.append(key)
             client._agent = agent
 

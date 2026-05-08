@@ -4,11 +4,13 @@ import json
 import sys
 
 import pytest
+from langchain_core.messages import HumanMessage, ToolMessage
 from langchain_core.tools import tool as langchain_tool
 
 from medrix_flow.config.tool_search_config import ToolSearchConfig, load_tool_search_config_from_dict
 from medrix_flow.tools.builtins.tool_search import (
     DeferredToolRegistry,
+    extract_selected_tool_names,
     get_deferred_registry,
     reset_deferred_registry,
     set_deferred_registry,
@@ -218,6 +220,16 @@ class TestToolSearchTool:
         names = {d["name"] for d in parsed}
         assert names == {"github_create_issue", "github_list_repos"}
 
+    def test_extract_selected_tool_names_from_payload(self, registry):
+        from medrix_flow.tools.builtins.tool_search import tool_search
+
+        set_deferred_registry(registry)
+        result = tool_search.invoke({"query": "select:github_create_issue,slack_send_message"})
+        assert extract_selected_tool_names(result) == {
+            "github_create_issue",
+            "slack_send_message",
+        }
+
 
 # ── Prompt Section Tests ──
 
@@ -361,3 +373,43 @@ class TestDeferredToolFilterMiddleware:
 
         # dict_tool has no .name attr → getattr returns None → not in deferred_names → kept
         assert len(filtered.tools) == 2
+
+    def test_reenables_selected_deferred_tools_after_tool_search(self, registry):
+        from medrix_flow.agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
+        from medrix_flow.tools.builtins.tool_search import tool_search
+
+        set_deferred_registry(registry)
+        middleware = DeferredToolFilterMiddleware()
+
+        active_tool = _make_mock_tool("my_active_tool", "An active tool")
+        deferred_tool = registry.entries[0].tool  # github_create_issue
+        tool_search_result = tool_search.invoke({"query": "select:github_create_issue"})
+
+        class FakeRequest:
+            def __init__(self, tools, messages=None):
+                self.tools = tools
+                self.messages = messages or []
+
+            def override(self, **kwargs):
+                return FakeRequest(
+                    kwargs.get("tools", self.tools),
+                    kwargs.get("messages", self.messages),
+                )
+
+        request = FakeRequest(
+            tools=[active_tool, deferred_tool],
+            messages=[
+                HumanMessage(content="Need GitHub help"),
+                ToolMessage(
+                    content=tool_search_result,
+                    tool_call_id="tc-tool-search",
+                    name="tool_search",
+                ),
+            ],
+        )
+        filtered = middleware._filter_tools(request)
+
+        assert {tool.name for tool in filtered.tools} == {
+            "my_active_tool",
+            "github_create_issue",
+        }

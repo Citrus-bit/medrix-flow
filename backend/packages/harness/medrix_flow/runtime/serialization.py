@@ -48,13 +48,16 @@ def serialize_message(message: Any) -> dict[str, Any]:
             payload["name"] = message.name
         return payload
     if isinstance(message, ToolMessage):
-        return {
+        payload = {
             "type": "tool",
             "content": extract_text(message.content),
             "name": getattr(message, "name", None),
             "tool_call_id": getattr(message, "tool_call_id", None),
             "id": getattr(message, "id", None),
         }
+        if getattr(message, "additional_kwargs", None):
+            payload["additional_kwargs"] = message.additional_kwargs
+        return payload
     if isinstance(message, HumanMessage):
         payload = {"type": "human", "content": message.content, "id": getattr(message, "id", None)}
         if getattr(message, "additional_kwargs", None):

@@ -13,6 +13,7 @@ import json
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from langchain.tools import BaseTool
 from langchain_core.tools import tool
@@ -126,6 +127,44 @@ def reset_deferred_registry() -> None:
     """Reset the deferred registry singleton. Useful for testing."""
     global _registry
     _registry = None
+
+
+def extract_selected_tool_names(payload: Any) -> set[str]:
+    """Extract deferred tool names from a tool_search result payload.
+
+    The tool returns a JSON array of OpenAI-style function definitions. We only
+    need the tool names so the next model turn can re-enable the matching
+    deferred schemas.
+    """
+    if isinstance(payload, list):
+        text = "".join(part for part in payload if isinstance(part, str))
+    elif isinstance(payload, str):
+        text = payload
+    else:
+        return set()
+
+    try:
+        parsed = json.loads(text)
+    except (TypeError, json.JSONDecodeError):
+        return set()
+
+    if not isinstance(parsed, list):
+        return set()
+
+    names: set[str] = set()
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        if not isinstance(name, str):
+            function = item.get("function")
+            if isinstance(function, dict):
+                nested_name = function.get("name")
+                if isinstance(nested_name, str):
+                    name = nested_name
+        if isinstance(name, str) and name:
+            names.add(name)
+    return names
 
 
 # ── Tool ──

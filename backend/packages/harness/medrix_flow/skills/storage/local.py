@@ -18,7 +18,7 @@ from medrix_flow.skills.installer import (
     safe_extract_skill_archive,
     scan_skill_archive_contents_or_raise,
 )
-from medrix_flow.skills.loader import invalidate_skills_cache, load_skills
+from medrix_flow.skills.loader import invalidate_skills_cache
 from medrix_flow.skills.storage.base import SkillStorage
 
 
@@ -37,6 +37,8 @@ class LocalSkillStorage(SkillStorage):
         return self._host_root
 
     def load_skills(self, *, enabled_only: bool = False) -> list:
+        from medrix_flow.skills.loader import load_skills
+
         return load_skills(
             skills_path=self._host_root,
             use_config=False,

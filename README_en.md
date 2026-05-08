@@ -26,8 +26,8 @@ MedrixFlow is a full-stack AI agent orchestration platform for academic writing,
 MedrixFlow now includes a dedicated, traceable pipeline for formal academic reporting:
 
 - **Built-in academic subagent**: `academic-researcher` handles topic decomposition, query expansion, candidate paper screening, evidence card generation, outline building, and reference export
-- **Multi-source academic adapters**: `OpenAlex`, `Crossref`, `arXiv`, and `PubMed` are enabled by default, with optional `Semantic Scholar` enrichment, followed by metadata normalization, deduplication, and ranking
-- **Formal report exports**: a single research project can produce `report.md`, `references.md`, `references.bib`, `evidence_map.json`, and optionally `graph.json`
+- **Formal-source-first CS/AI stack**: the default `cs_ai` path uses `DBLP`, `OpenReview`, `ACL Anthology`, `Semantic Scholar`, `OpenAlex`, `Crossref`, and `arXiv`, with conference/journal versions preferred as the canonical reference
+- **Formal report exports**: a single research project can produce `report.md`, `references.md`, `references.bib`, `evidence_map.json`, `retrieval_audit.json`, and optionally `graph.json`
 - **Local evidence persistence**: research projects, paper metadata, evidence cards, outline mappings, and formatted references are stored locally in SQLite for incremental reuse
 
 ### 2. Experiment Specialist Agents: CS/AI and Bioinformatics
@@ -214,7 +214,7 @@ The platform also keeps strong delivery quality and operational visibility:
 ## Academic Writing Additions
 
 - **Literature review / related work**: given a topic, MedrixFlow can use `academic-researcher` with `academic-deep-research` to expand queries, search multiple academic sources, deduplicate, and build a core paper pool with evidence mappings
-- **APA 7 references**: formal report workflows can export normalized `references.md` and `references.bib`, which is much closer to real paper, thesis, and course-report writing needs
+- **APA 7 references**: formal report workflows export all verified canonical references for the current project without an export cap, along with `references.md`, `references.bib`, and `retrieval_audit.json`
 - **Experiment-backed writing**: `cs-ai-lab` and `bioinformatics-lab` can turn structured datasets or expression analyses into figures, tables, methods, and results bundles, reducing the gap between prose and evidence
 - **Local evidence reuse**: academic and experiment projects can be incrementally reused in the same thread, so follow-up literature, references, and experiments do not have to start from scratch
 - **Artifact-first delivery**: the right-side artifact panel is now better suited for locating newly generated reports, figures, and references without repeatedly asking the agent to resend them
@@ -259,7 +259,7 @@ When you first open the page, the setup panel will **automatically pop up** to g
 
 1. **Add a Model**: On the "Configuration" page, select a provider (OpenAI / Anthropic / Google Gemini / DeepSeek / OpenAI Compatible) and enter the model name
 2. **Enter API Key**: Input your API Key and click the "Test" button to verify connectivity
-3. **Configure Tool Keys** (optional): If you need web search capabilities, enter Tavily / Jina API Keys
+3. **Configure Tool / Academic Keys** (optional): If you need web search and academic retrieval enhancement, enter Tavily / Jina / OpenAlex / Semantic Scholar API keys
 4. **Save Configuration** — Done! Configuration is automatically persisted and the service hot-reloads
 
 > You can reopen the configuration panel at any time via the bottom-left "Settings & More" → "Settings" → "Configuration" tab.

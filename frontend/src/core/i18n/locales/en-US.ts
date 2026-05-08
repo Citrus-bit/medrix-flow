@@ -419,13 +419,13 @@ export const enUS: Translations = {
 
   setup: {
     title: "Setup",
-    description: "Configure your LLM models and tool API keys.",
+    description: "Configure your LLM models, tool API keys, and academic retrieval API keys.",
     modelsTitle: "Model Configuration",
     modelsDescription:
       "Add and manage your LLM model providers. Each model needs a provider, model name, and API key.",
-    toolKeysTitle: "Tool API Keys",
+    toolKeysTitle: "Tool / Academic API Keys",
     toolKeysDescription:
-      "Configure API keys for web search (Tavily) and web fetch (Jina) tools.",
+      "Configure API keys for web search (Tavily), web fetch (Jina), and academic retrieval enhancement (OpenAlex, Semantic Scholar).",
     addModel: "Add Model",
     model: "Model",
     provider: "Provider",

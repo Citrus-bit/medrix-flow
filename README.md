@@ -26,8 +26,8 @@ MedrixFlow 是一个面向学术写作、文献综述、实验报告和研究交
 围绕正式学术报告的核心链路，MedrixFlow 新增了一条可追溯的研究专线：
 
 - **内置学术子代理**：`academic-researcher` 专门负责主题拆解、扩展检索、候选论文筛选、证据卡沉淀、大纲构建与参考文献导出
-- **多源学术适配**：默认接入 `OpenAlex`、`Crossref`、`arXiv`、`PubMed`，可选启用 `Semantic Scholar`，统一做元数据标准化、去重与排序
-- **正式报告导出**：单次研究任务可沉淀 `report.md`、`references.md`、`references.bib`、`evidence_map.json`，并按需导出 `graph.json`
+- **CS/AI 正式文献优先**：`cs_ai` 默认走 `DBLP`、`OpenReview`、`ACL Anthology`、`Semantic Scholar`、`OpenAlex`、`Crossref`、`arXiv` 的组合栈，并优先选择 conference/journal 正式版作为 canonical reference
+- **正式报告导出**：单次研究任务可沉淀 `report.md`、`references.md`、`references.bib`、`evidence_map.json`、`retrieval_audit.json`，并按需导出 `graph.json`
 - **本地证据存储**：研究项目、论文元数据、证据卡、章节映射与引用格式化结果都落到本地 SQLite，便于后续增量补文献与复用
 
 ### 2. 实验专家 Agent：CS/AI 与生信双路径
@@ -213,7 +213,7 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 ## 学术写作新增能力
 
 - **文献综述 / related work**：给定研究主题后，可走 `academic-researcher` + `academic-deep-research` 工作流，自动完成检索式扩展、多源抓取、去重、核心论文池构建与证据映射
-- **APA 7 References**：正式报告链路支持参考文献规范化导出，自动输出 `references.md` 与 `references.bib`，更适合论文、实验报告、综述和课程作业
+- **APA 7 References**：正式报告链路会导出当前项目中全部已核验 canonical references，不设导出上限，并自动生成 `references.md`、`references.bib` 与 `retrieval_audit.json`
 - **实验支撑写作**：`cs-ai-lab` 与 `bioinformatics-lab` 可直接把表格实验或生信分析结果转成 figures / tables / methods / results bundle，减少“论文只有文字没有实验”的断层
 - **本地证据沉淀**：学术项目与实验项目都可在本地持续复用，便于同一 thread 反复补文献、补实验、补 references，而不是每次都从零开始
 - **文件交付友好**：右侧 artifact 面板更适合查找新报告、新图表和新参考文献文件，避免生成完毕后仍要反复让代理“再发一遍”
@@ -258,7 +258,7 @@ make dev       # 启动所有服务（LangGraph + Gateway + Frontend + Nginx）
 
 1. **添加模型**：在「配置」页面选择提供商（OpenAI / Anthropic / Google Gemini / DeepSeek / OpenAI Compatible），填入模型名称
 2. **填入 API Key**：输入对应的 API Key，点击「测试」按钮验证连通性
-3. **配置工具密钥**（可选）：如需网页搜索功能，填入 Tavily / Jina 的 API Key
+3. **配置工具 / 学术密钥**（可选）：如需网页搜索与学术检索增强，填入 Tavily / Jina / OpenAlex / Semantic Scholar 的 API Key
 4. **保存配置** - 完成！配置自动持久化，服务自动热重载
 
 > 后续可随时通过左下角「设置和更多」->「设置」->「配置」重新打开配置面板。

@@ -30,11 +30,12 @@ class ModelSetupItem(BaseModel):
     max_tokens: int | None = Field(None, description="Max tokens")
     temperature: float | None = Field(None, description="Sampling temperature")
     supports_thinking: bool = Field(False)
+    supports_reasoning_effort: bool = Field(False)
     supports_vision: bool = Field(False)
 
 
 class ToolKeyItem(BaseModel):
-    service: str = Field(..., description="Service name: tavily or jina")
+    service: str = Field(..., description="Service name: tavily, jina, openalex, or semantic-scholar")
     api_key: str | None = Field(None, description="API key (plain on write, masked on read)")
     env_var: str = Field(..., description="Environment variable name")
 
@@ -113,6 +114,7 @@ def get_setup_config_data() -> SetupConfigResponse:
                 max_tokens=item.get("max_tokens"),
                 temperature=item.get("temperature"),
                 supports_thinking=item.get("supports_thinking", True),
+                supports_reasoning_effort=item.get("supports_reasoning_effort", False),
                 supports_vision=item.get("supports_vision", True),
             )
         )
@@ -120,6 +122,12 @@ def get_setup_config_data() -> SetupConfigResponse:
     tool_keys = [
         ToolKeyItem(service="tavily", api_key=get_env_value("TAVILY_API_KEY") or "", env_var="TAVILY_API_KEY"),
         ToolKeyItem(service="jina", api_key=get_env_value("JINA_API_KEY") or "", env_var="JINA_API_KEY"),
+        ToolKeyItem(service="openalex", api_key=get_env_value("OPENALEX_API_KEY") or "", env_var="OPENALEX_API_KEY"),
+        ToolKeyItem(
+            service="semantic-scholar",
+            api_key=get_env_value("SEMANTIC_SCHOLAR_API_KEY") or "",
+            env_var="SEMANTIC_SCHOLAR_API_KEY",
+        ),
     ]
 
     return SetupConfigResponse(models=models, tool_keys=tool_keys)
@@ -144,8 +152,9 @@ def save_setup_config_data(payload: SaveModelsRequest) -> None:
             "use": model.provider,
             "model": model.model,
             "api_key": f"${env_var}",
-            "supports_thinking": True,
-            "supports_vision": True,
+            "supports_thinking": model.supports_thinking,
+            "supports_reasoning_effort": model.supports_reasoning_effort,
+            "supports_vision": model.supports_vision,
         }
         if model.base_url:
             entry["base_url"] = model.base_url

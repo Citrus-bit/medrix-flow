@@ -1,5 +1,6 @@
 import asyncio
 from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -179,6 +180,40 @@ def test_checkpoint_diff_materialization_persists_only_new_messages():
         assert stored.persisted_message_count == 3
         assert stored.status is RunStatus.success
 
+        await db.close()
+
+    asyncio.run(scenario())
+
+
+def test_gateway_run_threads_reasoning_effort_into_embedded_client():
+    async def scenario():
+        service, db = await _make_runtime_service()
+
+        fake_client = MagicMock()
+        fake_client.stream.return_value = iter([])
+
+        with (
+            patch("app.gateway.services.get_paths") as mock_get_paths,
+            patch("app.gateway.services.get_sync_checkpointer", return_value="sync-checkpointer"),
+            patch("app.gateway.services.MedrixFlowClient", return_value=fake_client) as mock_client_cls,
+        ):
+            mock_get_paths.return_value.ensure_thread_dirs.return_value = None
+            record = await service.start_run(
+                "thread-1",
+                runs.RunCreateRequest(
+                    assistant_id="lead_agent",
+                    input={"messages": [HumanMessage(content="hello")]},
+                    context={
+                        "model_name": "gpt-5.4",
+                        "thinking_enabled": True,
+                        "reasoning_effort": "high",
+                    },
+                ),
+            )
+            assert record.task is not None
+            await record.task
+
+        assert mock_client_cls.call_args.kwargs["reasoning_effort"] == "high"
         await db.close()
 
     asyncio.run(scenario())

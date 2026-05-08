@@ -20,6 +20,8 @@ import json
 import logging
 import mimetypes
 import os
+import shutil
+import tempfile
 import uuid
 from collections.abc import Generator
 from dataclasses import dataclass, field
@@ -102,6 +104,7 @@ class MedrixFlowClient:
         *,
         model_name: str | None = None,
         thinking_enabled: bool = True,
+        reasoning_effort: str | None = None,
         subagent_enabled: bool = False,
         plan_mode: bool = False,
         agent_name: str | None = None,
@@ -117,6 +120,7 @@ class MedrixFlowClient:
                 Without a checkpointer, each call is stateless.
             model_name: Override the default model name from config.
             thinking_enabled: Enable model's extended thinking.
+            reasoning_effort: Optional reasoning depth override for capable models.
             subagent_enabled: Enable subagent delegation.
             plan_mode: Enable TodoList middleware for plan mode.
             agent_name: Name of the agent to use.
@@ -131,6 +135,7 @@ class MedrixFlowClient:
         self._checkpointer = checkpointer
         self._model_name = model_name
         self._thinking_enabled = thinking_enabled
+        self._reasoning_effort = reasoning_effort
         self._subagent_enabled = subagent_enabled
         self._plan_mode = plan_mode
         self._agent_name = agent_name
@@ -177,6 +182,7 @@ class MedrixFlowClient:
             "thread_id": thread_id,
             "model_name": overrides.get("model_name", self._model_name),
             "thinking_enabled": overrides.get("thinking_enabled", self._thinking_enabled),
+            "reasoning_effort": overrides.get("reasoning_effort", self._reasoning_effort),
             "is_plan_mode": overrides.get("plan_mode", self._plan_mode),
             "subagent_enabled": overrides.get("subagent_enabled", self._subagent_enabled),
         }
@@ -191,6 +197,7 @@ class MedrixFlowClient:
         key = (
             cfg.get("model_name"),
             cfg.get("thinking_enabled"),
+            cfg.get("reasoning_effort"),
             cfg.get("is_plan_mode"),
             cfg.get("subagent_enabled"),
         )
@@ -199,12 +206,17 @@ class MedrixFlowClient:
             return
 
         thinking_enabled = cfg.get("thinking_enabled", True)
+        reasoning_effort = cfg.get("reasoning_effort")
         model_name = cfg.get("model_name")
         subagent_enabled = cfg.get("subagent_enabled", False)
         max_concurrent_subagents = cfg.get("max_concurrent_subagents", 3)
 
         kwargs: dict[str, Any] = {
-            "model": create_chat_model(name=model_name, thinking_enabled=thinking_enabled),
+            "model": create_chat_model(
+                name=model_name,
+                thinking_enabled=thinking_enabled,
+                reasoning_effort=reasoning_effort,
+            ),
             "tools": self._get_tools(model_name=model_name, subagent_enabled=subagent_enabled),
             "middleware": _build_middlewares(config, model_name=model_name, agent_name=self._agent_name),
             "system_prompt": apply_prompt_template(
@@ -218,13 +230,23 @@ class MedrixFlowClient:
         if checkpointer is None:
             from medrix_flow.agents.checkpointer import get_checkpointer
 
-            checkpointer = get_checkpointer()
+            try:
+                checkpointer = get_checkpointer()
+            except Exception:
+                logger.warning("Failed to initialize default checkpointer; continuing without persistence.", exc_info=True)
+                checkpointer = None
         if checkpointer is not None:
             kwargs["checkpointer"] = checkpointer
 
         self._agent = create_agent(**kwargs)
         self._agent_config_key = key
-        logger.info("Agent created: agent_name=%s, model=%s, thinking=%s", self._agent_name, model_name, thinking_enabled)
+        logger.info(
+            "Agent created: agent_name=%s, model=%s, thinking=%s, reasoning_effort=%s",
+            self._agent_name,
+            model_name,
+            thinking_enabled,
+            reasoning_effort,
+        )
 
     @staticmethod
     def _get_tools(*, model_name: str | None, subagent_enabled: bool):
@@ -244,13 +266,16 @@ class MedrixFlowClient:
                 d["usage_metadata"] = msg.usage_metadata
             return d
         if isinstance(msg, ToolMessage):
-            return {
+            payload = {
                 "type": "tool",
                 "content": MedrixFlowClient._extract_text(msg.content),
                 "name": getattr(msg, "name", None),
                 "tool_call_id": getattr(msg, "tool_call_id", None),
                 "id": getattr(msg, "id", None),
             }
+            if getattr(msg, "additional_kwargs", None):
+                payload["additional_kwargs"] = msg.additional_kwargs
+            return payload
         if isinstance(msg, HumanMessage):
             return {"type": "human", "content": msg.content, "id": getattr(msg, "id", None)}
         if isinstance(msg, SystemMessage):
@@ -607,7 +632,10 @@ class MedrixFlowClient:
             OSError: If the config file cannot be written.
         """
         service = SkillService()
-        updated = service.update_skill_enabled(name, enabled=enabled)
+        try:
+            updated = service.update_skill_enabled(name, enabled=enabled)
+        except FileNotFoundError as exc:
+            raise ValueError(str(exc)) from exc
         self._agent = None
         return {
             "name": updated.name,

@@ -8,6 +8,7 @@ export interface ModelSetupItem {
   max_tokens: number | null;
   temperature: number | null;
   supports_thinking: boolean;
+  supports_reasoning_effort: boolean;
   supports_vision: boolean;
 }
 

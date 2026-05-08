@@ -16,6 +16,7 @@ from typing import override
 from langchain.agents import AgentState
 from langchain.agents.middleware import AgentMiddleware
 from langchain.agents.middleware.types import ModelCallResult, ModelRequest, ModelResponse
+from langchain_core.messages import HumanMessage, ToolMessage
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,19 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
     via tool_search at runtime.
     """
 
+    @staticmethod
+    def _collect_activated_tool_names(messages: list) -> set[str]:
+        """Return deferred tool names selected by tool_search since the last user turn."""
+        from medrix_flow.tools.builtins.tool_search import extract_selected_tool_names
+
+        activated: set[str] = set()
+        for message in reversed(messages):
+            if isinstance(message, HumanMessage):
+                break
+            if isinstance(message, ToolMessage) and getattr(message, "name", None) == "tool_search":
+                activated.update(extract_selected_tool_names(message.content))
+        return activated
+
     def _filter_tools(self, request: ModelRequest) -> ModelRequest:
         from medrix_flow.tools.builtins.tool_search import get_deferred_registry
 
@@ -36,7 +50,12 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
             return request
 
         deferred_names = {e.name for e in registry.entries}
-        active_tools = [t for t in request.tools if getattr(t, "name", None) not in deferred_names]
+        activated_names = self._collect_activated_tool_names(list(getattr(request, "messages", []) or []))
+        active_tools = [
+            t
+            for t in request.tools
+            if getattr(t, "name", None) not in deferred_names or getattr(t, "name", None) in activated_names
+        ]
 
         if len(active_tools) < len(request.tools):
             logger.debug(f"Filtered {len(request.tools) - len(active_tools)} deferred tool schema(s) from model binding")

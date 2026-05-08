@@ -48,7 +48,7 @@ def format_apa7_reference(paper: PaperRecord) -> ReferenceEntry:
     elif completeness == "complete":
         completeness = "missing-venue"
 
-    if paper.provider == "arxiv" and not venue_text:
+    if paper.is_preprint and not venue_text:
         parts.append("arXiv.")
 
     if url:
@@ -57,19 +57,23 @@ def format_apa7_reference(paper: PaperRecord) -> ReferenceEntry:
         completeness = "incomplete"
 
     formatted = " ".join(part.strip() for part in parts if part.strip())
+    included = (
+        completeness in {"complete", "missing-venue", "missing-year", "missing-author"}
+        and bool(paper.provider and paper.canonical_source)
+    )
     return ReferenceEntry(
         paper_id=paper.paper_id,
         style="apa7",
         formatted_text=re.sub(r"\s+", " ", formatted).strip(),
         doi_url=doi_link,
         completeness=completeness,
-        included_in_final=completeness in {"complete", "missing-venue", "missing-year", "missing-author"},
+        included_in_final=included,
     )
 
 
 def _bibtex_type(paper: PaperRecord) -> str:
     venue = (paper.venue or "").lower()
-    if paper.provider == "arxiv":
+    if paper.is_preprint:
         return "misc"
     if "conference" in venue or "proceedings" in venue or "workshop" in venue:
         return "inproceedings"

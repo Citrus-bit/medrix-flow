@@ -5,6 +5,7 @@ import os
 import re
 import xml.etree.ElementTree as ET
 from collections.abc import Sequence
+from html import unescape
 from typing import Protocol
 from urllib.parse import urlencode
 
@@ -12,6 +13,7 @@ import httpx
 
 from medrix_flow.runtime.utils import now_iso
 
+from .quality import hydrate_quality_metadata, is_nlp_topic
 from .types import PaperAuthor, PaperRecord
 from .utils import (
     extract_keywords,
@@ -22,6 +24,7 @@ from .utils import (
     normalize_arxiv_id,
     normalize_doi,
     normalize_pmid,
+    normalize_whitespace,
     split_author_name,
     summarize_abstract,
 )
@@ -87,7 +90,8 @@ class HTTPAcademicAdapter:
             provider=provider,
             provider_id=provider_id,
         )
-        return PaperRecord(
+        return hydrate_quality_metadata(
+            PaperRecord(
             paper_id=f"{project_id}:{provider}:{provider_id or canonical_id}",
             project_id=project_id,
             canonical_id=canonical_id,
@@ -113,7 +117,71 @@ class HTTPAcademicAdapter:
             raw_source=raw_source or {},
             created_at=created_at,
             updated_at=created_at,
+            )
         )
+
+
+class DBLPAdapter(HTTPAcademicAdapter):
+    name = "dblp"
+
+    async def search(self, query: str, *, project_id: str, limit: int) -> list[PaperRecord]:
+        params = {
+            "q": query,
+            "h": str(min(limit, 12)),
+            "format": "json",
+        }
+        url = f"https://dblp.org/search/publ/api?{urlencode(params)}"
+        try:
+            async with await self._client(headers={"Accept": "application/json"}) as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                payload = response.json()
+        except Exception:
+            logger.warning("DBLP search failed for query=%s", query, exc_info=True)
+            return []
+
+        hits = ((payload.get("result") or {}).get("hits") or {}).get("hit") or []
+        if isinstance(hits, dict):
+            hits = [hits]
+
+        papers: list[PaperRecord] = []
+        for hit in hits[:limit]:
+            info = hit.get("info") or {}
+            title = _strip_markup(info.get("title"))
+            if not title:
+                continue
+            authors = _dblp_authors(((info.get("authors") or {}).get("author")))
+            year_text = str(info.get("year") or "")
+            year = int(year_text) if year_text.isdigit() else None
+            venue = info.get("venue") or info.get("booktitle") or info.get("journal")
+            doi = info.get("doi")
+            ee = info.get("ee")
+            if isinstance(ee, list):
+                source_url = next((item for item in ee if isinstance(item, str) and item.startswith("http")), None)
+            else:
+                source_url = ee if isinstance(ee, str) else None
+            papers.append(
+                self._paper(
+                    project_id=project_id,
+                    provider=self.name,
+                    provider_id=info.get("key") or doi or source_url,
+                    title=title,
+                    authors=authors,
+                    year=year,
+                    venue=venue,
+                    abstract=None,
+                    doi=doi,
+                    source_url=source_url,
+                    oa_url=source_url,
+                    metadata_only=True,
+                    raw_source={
+                        "type": info.get("type"),
+                        "dblp_key": info.get("key"),
+                        "venue": venue,
+                    },
+                )
+            )
+        return papers
 
 
 class OpenAlexAdapter(HTTPAcademicAdapter):
@@ -195,6 +263,37 @@ def _openalex_abstract(item: dict) -> str | None:
     if not positions:
         return None
     return " ".join(token for _index, token in sorted(positions.items()))
+
+
+def _strip_markup(value: str | None) -> str | None:
+    if not value:
+        return None
+    return normalize_whitespace(re.sub(r"<[^>]+>", " ", unescape(value)))
+
+
+def _dblp_authors(value) -> list[PaperAuthor]:
+    if not value:
+        return []
+    items = value if isinstance(value, list) else [value]
+    authors: list[PaperAuthor] = []
+    for idx, item in enumerate(items):
+        if isinstance(item, dict):
+            display_name = item.get("text") or item.get("#text") or item.get("name")
+        else:
+            display_name = str(item)
+        display_name = normalize_whitespace(display_name)
+        if not display_name:
+            continue
+        given, family = split_author_name(display_name)
+        authors.append(
+            PaperAuthor(
+                display_name=display_name,
+                given_name=given,
+                family_name=family,
+                ordinal=idx,
+            )
+        )
+    return authors
 
 
 class CrossrefAdapter(HTTPAcademicAdapter):
@@ -374,6 +473,234 @@ def normalize_xml_text(value: str | None) -> str | None:
     return re.sub(r"\s+", " ", value).strip()
 
 
+def _openreview_value(value) -> str | None:
+    if isinstance(value, dict):
+        raw = value.get("value")
+        return normalize_whitespace(str(raw)) if raw is not None else None
+    if value is None:
+        return None
+    return normalize_whitespace(str(value))
+
+
+def _openreview_list(value) -> list[str]:
+    if isinstance(value, dict):
+        payload = value.get("value")
+        if isinstance(payload, list):
+            return [normalize_whitespace(str(item)) for item in payload if normalize_whitespace(str(item))]
+    if isinstance(value, list):
+        return [normalize_whitespace(str(item)) for item in value if normalize_whitespace(str(item))]
+    return []
+
+
+def _is_high_quality_openreview_note(*, venue: str | None, venueid: str | None) -> bool:
+    combined = f"{venue or ''} {venueid or ''}".lower()
+    if not combined or "corr" in combined or "public_article" in combined:
+        return False
+    return any(token in combined for token in _OPENREVIEW_VENUE_HINTS)
+
+
+def _looks_like_acl_family(source_name: str | None, source_url: str | None) -> bool:
+    combined = f"{source_name or ''} {source_url or ''}".lower()
+    return any(token in combined for token in _ACL_FAMILY_HINTS)
+
+
+def _year_from_text(value: str | None) -> int | None:
+    if not value:
+        return None
+    match = re.search(r"\b(19|20)\d{2}\b", value)
+    return int(match.group(0)) if match else None
+
+
+def _extract_doi_from_text(value: str | None) -> str | None:
+    if not value:
+        return None
+    match = re.search(r"\b10\.\d{4,9}/[-._;()/:A-Z0-9]+\b", value, flags=re.IGNORECASE)
+    return match.group(0) if match else None
+
+
+def _openreview_absolute_url(value: str | None, *, note_id: str | None = None, pdf: bool = False) -> str | None:
+    normalized = normalize_whitespace(value)
+    if normalized:
+        if normalized.startswith("http://") or normalized.startswith("https://"):
+            return normalized
+        if normalized.startswith("/"):
+            return f"https://openreview.net{normalized}"
+    if note_id:
+        route = "pdf" if pdf else "forum"
+        return f"https://openreview.net/{route}?id={note_id}"
+    return None
+
+
+_OPENREVIEW_VENUE_HINTS = {
+    "aaai",
+    "acl",
+    "colm",
+    "cvpr",
+    "eccv",
+    "emnlp",
+    "iccv",
+    "iclr",
+    "icml",
+    "ijcai",
+    "naacl",
+    "neurips",
+    "sigir",
+    "tmlr",
+    "wsdm",
+    "www",
+}
+
+_ACL_FAMILY_HINTS = {
+    "aclanthology.org",
+    "acl ",
+    " emnlp",
+    " naacl",
+    " tacl",
+    " coling",
+    " findings of the association for computational linguistics",
+    "association for computational linguistics",
+}
+
+
+class OpenReviewAdapter(HTTPAcademicAdapter):
+    name = "openreview"
+
+    async def search(self, query: str, *, project_id: str, limit: int) -> list[PaperRecord]:
+        params = {
+            "term": query,
+            "limit": str(min(limit, 8)),
+        }
+        url = f"https://api2.openreview.net/notes/search?{urlencode(params)}"
+        try:
+            async with await self._client() as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                payload = response.json()
+        except Exception:
+            logger.warning("OpenReview search failed for query=%s", query, exc_info=True)
+            return []
+
+        papers: list[PaperRecord] = []
+        for note in payload.get("notes", [])[:limit]:
+            note_id = note.get("id")
+            content = note.get("content") or {}
+            title = _openreview_value(content.get("title"))
+            venue = _openreview_value(content.get("venue"))
+            venueid = _openreview_value(content.get("venueid"))
+            if not title or not _is_high_quality_openreview_note(venue=venue, venueid=venueid):
+                continue
+            authors = []
+            for idx, display_name in enumerate(_openreview_list(content.get("authors"))):
+                given, family = split_author_name(display_name)
+                authors.append(
+                    PaperAuthor(
+                        display_name=display_name,
+                        given_name=given,
+                        family_name=family,
+                        ordinal=idx,
+                    )
+                )
+            source_url = _openreview_absolute_url(_openreview_value(content.get("html")), note_id=note_id)
+            pdf_url = _openreview_absolute_url(_openreview_value(content.get("pdf")), note_id=note_id, pdf=True)
+            abstract = _openreview_value(content.get("abstract"))
+            doi = _extract_doi_from_text("\n".join(filter(None, [source_url, _openreview_value(content.get("_bibtex"))])))
+            papers.append(
+                self._paper(
+                    project_id=project_id,
+                    provider=self.name,
+                    provider_id=note_id,
+                    title=title,
+                    authors=authors,
+                    year=_year_from_text(_openreview_value(content.get("venue")) or _openreview_value(content.get("_bibtex"))),
+                    venue=venue,
+                    abstract=abstract,
+                    doi=doi,
+                    source_url=source_url,
+                    oa_url=pdf_url or source_url,
+                    metadata_only=not bool(abstract),
+                    raw_source={
+                        "status": "accepted",
+                        "venueid": venueid,
+                        "pdf": pdf_url,
+                    },
+                )
+            )
+        return papers
+
+
+class ACLAnthologyAdapter(HTTPAcademicAdapter):
+    name = "acl-anthology"
+
+    async def search(self, query: str, *, project_id: str, limit: int) -> list[PaperRecord]:
+        params = {"search": query, "per_page": str(min(limit * 2, 20))}
+        if api_key := os.getenv("OPENALEX_API_KEY"):
+            params["api_key"] = api_key
+        url = f"https://api.openalex.org/works?{urlencode(params)}"
+        try:
+            async with await self._client() as client:
+                response = await client.get(url)
+                response.raise_for_status()
+                payload = response.json()
+        except Exception:
+            logger.warning("ACL Anthology search failed for query=%s", query, exc_info=True)
+            return []
+
+        papers: list[PaperRecord] = []
+        for item in payload.get("results", []):
+            source = item.get("primary_location", {}).get("source", {}) or {}
+            source_name = normalize_whitespace(source.get("display_name"))
+            source_url = (
+                (item.get("best_oa_location") or {}).get("landing_page_url")
+                or (item.get("best_oa_location") or {}).get("pdf_url")
+                or item.get("doi")
+                or item.get("id")
+            )
+            if not _looks_like_acl_family(source_name, source_url):
+                continue
+            title = item.get("display_name") or item.get("title") or ""
+            if not title:
+                continue
+            authors: list[PaperAuthor] = []
+            for idx, authorship in enumerate(item.get("authorships", []) or []):
+                author_info = authorship.get("author", {}) or {}
+                display_name = author_info.get("display_name")
+                if not display_name:
+                    continue
+                given, family = split_author_name(display_name)
+                authors.append(
+                    PaperAuthor(
+                        display_name=display_name,
+                        given_name=given,
+                        family_name=family,
+                        ordinal=idx,
+                    )
+                )
+            papers.append(
+                self._paper(
+                    project_id=project_id,
+                    provider=self.name,
+                    provider_id=item.get("id"),
+                    title=title,
+                    authors=authors,
+                    year=item.get("publication_year") if isinstance(item.get("publication_year"), int) else None,
+                    venue=source_name or source.get("host_organization_name"),
+                    abstract=_openalex_abstract(item),
+                    doi=item.get("doi"),
+                    cited_by_count=item.get("cited_by_count"),
+                    source_url=source_url,
+                    oa_url=(item.get("best_oa_location") or {}).get("pdf_url"),
+                    metadata_only=False,
+                    raw_source={
+                        "upstream_provider": "openalex",
+                        "referenced_works": item.get("referenced_works", []),
+                    },
+                )
+            )
+            if len(papers) >= limit:
+                break
+        return papers
+
+
 class PubMedAdapter(HTTPAcademicAdapter):
     name = "pubmed"
 
@@ -457,9 +784,6 @@ class SemanticScholarAdapter(HTTPAcademicAdapter):
 
     async def search(self, query: str, *, project_id: str, limit: int) -> list[PaperRecord]:
         api_key = os.getenv("SEMANTIC_SCHOLAR_API_KEY")
-        if not api_key:
-            return []
-
         params = {
             "query": query,
             "limit": str(min(limit, 10)),
@@ -479,7 +803,8 @@ class SemanticScholarAdapter(HTTPAcademicAdapter):
         }
         url = f"https://api.semanticscholar.org/graph/v1/paper/search?{urlencode(params)}"
         try:
-            async with await self._client(headers={"x-api-key": api_key}) as client:
+            headers = {"x-api-key": api_key} if api_key else None
+            async with await self._client(headers=headers) as client:
                 response = await client.get(url)
                 response.raise_for_status()
                 payload = response.json()
@@ -530,12 +855,27 @@ class SemanticScholarAdapter(HTTPAcademicAdapter):
         return papers
 
 
-def build_default_adapters(domain: str) -> Sequence[AcademicSourceAdapter]:
-    adapters: list[AcademicSourceAdapter] = [OpenAlexAdapter(), CrossrefAdapter()]
+def build_default_adapters(
+    domain: str,
+    *,
+    topic: str = "",
+    scope: str | None = None,
+    source_profile: str | None = None,
+) -> Sequence[AcademicSourceAdapter]:
+    adapters: list[AcademicSourceAdapter] = []
+    if domain == "cs_ai":
+        if source_profile in {None, "", "default", "cs_ai_premium"}:
+            adapters.append(DBLPAdapter())
+            adapters.append(OpenReviewAdapter())
+            if is_nlp_topic(topic, scope):
+                adapters.append(ACLAnthologyAdapter())
+            adapters.append(SemanticScholarAdapter())
+            adapters.extend([OpenAlexAdapter(), CrossrefAdapter(), ArxivAdapter()])
+            return adapters
+    adapters = [OpenAlexAdapter(), CrossrefAdapter()]
     if domain in {"general", "cs_ai"}:
+        adapters.append(SemanticScholarAdapter())
         adapters.append(ArxivAdapter())
     if domain == "biomedical":
         adapters.append(PubMedAdapter())
-    if os.getenv("SEMANTIC_SCHOLAR_API_KEY"):
-        adapters.append(SemanticScholarAdapter())
     return adapters

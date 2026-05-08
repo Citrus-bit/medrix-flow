@@ -55,6 +55,13 @@ class PaperRecord(BaseModel):
     source_url: str | None = None
     oa_url: str | None = None
     metadata_only: bool = False
+    source_kind: str = "metadata"
+    venue_type: str = "unknown"
+    venue_tier: str = "unknown"
+    publication_status: str = "unknown"
+    is_preprint: bool = False
+    canonical_source: str | None = None
+    quality_signals: dict[str, Any] = Field(default_factory=dict)
     keywords: list[str] = Field(default_factory=list)
     methods: list[str] = Field(default_factory=list)
     populations: list[str] = Field(default_factory=list)
@@ -140,6 +147,10 @@ class IngestResult(BaseModel):
     raw_candidate_count: int
     paper_count: int
     selected_papers: list[PaperRecord]
+    provider_breakdown: dict[str, int] = Field(default_factory=dict)
+    venue_breakdown: dict[str, int] = Field(default_factory=dict)
+    preprint_ratio: float = 0.0
+    canonical_reference_count: int = 0
 
 
 class SynthesisResult(BaseModel):

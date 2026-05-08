@@ -8,7 +8,13 @@ from urllib.parse import urlparse
 from medrix_flow.config import get_app_config
 
 _ENV_VAR_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
-_ALLOWED_TOOL_KEY_ENV_VARS = {"INFOQUEST_API_KEY", "JINA_API_KEY", "TAVILY_API_KEY"}
+_ALLOWED_TOOL_KEY_ENV_VARS = {
+    "INFOQUEST_API_KEY",
+    "JINA_API_KEY",
+    "OPENALEX_API_KEY",
+    "SEMANTIC_SCHOLAR_API_KEY",
+    "TAVILY_API_KEY",
+}
 _DEFAULT_ALLOWED_MODEL_PROVIDERS = {
     "langchain_anthropic:ChatAnthropic",
     "langchain_google_genai:ChatGoogleGenerativeAI",

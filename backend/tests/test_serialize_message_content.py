@@ -9,6 +9,7 @@ See: https://github.com/Citrus-bit/medrix-flow/issues/1149
 from langchain_core.messages import ToolMessage
 
 from medrix_flow.client import MedrixFlowClient
+from medrix_flow.runtime.serialization import serialize_message as serialize_runtime_message
 
 # ---------------------------------------------------------------------------
 # _serialize_message
@@ -104,6 +105,32 @@ class TestSerializeToolMessageContent:
         result = MedrixFlowClient._serialize_message(msg)
         # int → not str, not list → falls to str()
         assert result["content"] == "42"
+
+    def test_preserves_additional_kwargs(self):
+        msg = ToolMessage(
+            content="Need confirmation",
+            tool_call_id="tc1",
+            name="ask_clarification",
+            additional_kwargs={"clarification": {"question": "Continue?"}},
+        )
+        result = MedrixFlowClient._serialize_message(msg)
+        assert result["additional_kwargs"] == {
+            "clarification": {"question": "Continue?"},
+        }
+
+
+class TestRuntimeSerializeToolMessageContent:
+    def test_preserves_additional_kwargs(self):
+        msg = ToolMessage(
+            content="Need confirmation",
+            tool_call_id="tc1",
+            name="ask_clarification",
+            additional_kwargs={"clarification": {"question": "Continue?"}},
+        )
+        result = serialize_runtime_message(msg)
+        assert result["additional_kwargs"] == {
+            "clarification": {"question": "Continue?"},
+        }
 
 
 # ---------------------------------------------------------------------------

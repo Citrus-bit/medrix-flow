@@ -270,6 +270,7 @@ class GatewayRunService:
                 checkpointer=get_sync_checkpointer(),
                 model_name=context.get("model_name"),
                 thinking_enabled=context.get("thinking_enabled", True),
+                reasoning_effort=context.get("reasoning_effort"),
                 subagent_enabled=context.get("subagent_enabled", False),
                 plan_mode=context.get("is_plan_mode", False),
                 agent_name=agent_name,

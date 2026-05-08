@@ -1,4 +1,5 @@
 from medrix_flow.academic.formatters import format_apa7_reference, format_bibtex_entry
+from medrix_flow.academic.quality import hydrate_quality_metadata
 from medrix_flow.academic.types import PaperAuthor, PaperRecord
 from medrix_flow.runtime.utils import now_iso
 
@@ -13,29 +14,31 @@ def _paper(
     provider: str = "openalex",
     arxiv_id: str | None = None,
 ) -> PaperRecord:
-    return PaperRecord(
-        paper_id="paper-1",
-        project_id="project-1",
-        canonical_id="paper-1",
-        title=title,
-        authors=authors,
-        year=year,
-        venue=venue,
-        abstract="A detailed abstract.",
-        doi=doi,
-        arxiv_id=arxiv_id,
-        provider=provider,
-        provider_id="provider-1",
-        source_url="https://example.org/paper-1",
-        oa_url=None,
-        metadata_only=False,
-        keywords=[],
-        methods=[],
-        populations=[],
-        conflict_flags=[],
-        raw_source={},
-        created_at=now_iso(),
-        updated_at=now_iso(),
+    return hydrate_quality_metadata(
+        PaperRecord(
+            paper_id="paper-1",
+            project_id="project-1",
+            canonical_id="paper-1",
+            title=title,
+            authors=authors,
+            year=year,
+            venue=venue,
+            abstract="A detailed abstract.",
+            doi=doi,
+            arxiv_id=arxiv_id,
+            provider=provider,
+            provider_id="provider-1",
+            source_url="https://arxiv.org/abs/2501.12345" if provider == "arxiv" else "https://example.org/paper-1",
+            oa_url=None,
+            metadata_only=False,
+            keywords=[],
+            methods=[],
+            populations=[],
+            conflict_flags=[],
+            raw_source={},
+            created_at=now_iso(),
+            updated_at=now_iso(),
+        )
     )
 
 

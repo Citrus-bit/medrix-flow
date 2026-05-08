@@ -34,7 +34,7 @@ def _paper(
     return PaperRecord(
         paper_id=f"{provider}:{provider_id}",
         project_id="project-x",
-        canonical_id=f"{provider}:{provider_id}",
+        canonical_id=f"doi:{doi.lower()}" if doi else f"{provider}:{provider_id}",
         title=title,
         authors=[PaperAuthor(display_name="Alice Smith", given_name="Alice", family_name="Smith", ordinal=0)],
         year=year,
@@ -145,11 +145,107 @@ def test_academic_service_synthesizes_exports_and_graph(tmp_path, monkeypatch):
         result = await service.synthesize_project(project.project_id, output_dir=output_dir, include_graph=True)
 
         export_files = {Path(path).name for path in result.export_files}
-        assert {"report.md", "references.md", "references.bib", "evidence_map.json", "graph.json"} <= export_files
+        assert {
+            "report.md",
+            "references.md",
+            "references.bib",
+            "evidence_map.json",
+            "graph.json",
+            "retrieval_audit.json",
+        } <= export_files
         assert len([entry for entry in result.references if entry.included_in_final]) >= 3
         assert len(result.graph.nodes) >= 4
         assert len(result.graph.edges) >= 4
         assert any("Candidate Innovation Directions" in Path(path).read_text(encoding="utf-8") for path in result.export_files if path.endswith("report.md"))
+
+        await db.close()
+
+    asyncio.run(scenario())
+
+
+def test_academic_service_prefers_published_versions_and_exports_all_verified_references(tmp_path, monkeypatch):
+    async def scenario() -> None:
+        monkeypatch.setenv("MEDRIX_FLOW_HOME", str(tmp_path))
+        paths_module._paths = None
+
+        db = SQLiteRuntimeDB(":memory:")
+        await db.connect()
+        repo = AcademicRepository(db)
+        await repo.setup()
+
+        matched_doi = "10.5555/final-version"
+        papers = [
+            _paper(
+                provider="arxiv",
+                provider_id="2501.11111",
+                title="Retrieval-augmented evaluation for large language models",
+                year=2025,
+                venue="arXiv",
+                doi=matched_doi,
+                abstract="A benchmark study on large language model evaluation with retrieval augmentation.",
+            ),
+            _paper(
+                provider="dblp",
+                provider_id="conf/neurips/final-version",
+                title="Retrieval-augmented evaluation for large language models",
+                year=2025,
+                venue="NeurIPS",
+                doi=matched_doi,
+                abstract="A benchmark study on large language model evaluation with retrieval augmentation.",
+            ),
+        ]
+        papers.extend(
+            [
+                _paper(
+                    provider="crossref",
+                    provider_id=f"paper-{idx}",
+                    title=f"Verified study {idx}",
+                    year=2024,
+                    venue="Journal of Evaluation Science",
+                    doi=f"10.6000/{idx}",
+                    abstract="A verified study with sufficient metadata for APA export.",
+                )
+                for idx in range(30)
+            ]
+        )
+
+        class RollingAdapter:
+            name = "mixed"
+
+            def __init__(self, rows: list[PaperRecord]) -> None:
+                self._rows = rows
+                self._offset = 0
+
+            async def search(self, query: str, *, project_id: str, limit: int) -> list[PaperRecord]:
+                start = self._offset
+                end = min(start + limit, len(self._rows))
+                self._offset = end
+                batch = self._rows[start:end]
+                return [
+                    paper.model_copy(
+                        update={
+                            "project_id": project_id,
+                            "paper_id": f"{project_id}:{paper.paper_id}:{idx}",
+                        }
+                    )
+                    for idx, paper in enumerate(batch, start=start)
+                ]
+
+        service = AcademicResearchService(repo, adapters=[RollingAdapter(papers)])
+        project = await service.create_project(thread_id="thread-refs", topic="retrieval augmented generation evaluation")
+        ingested = await service.ingest_project(project.project_id, max_candidates=120, core_paper_limit=20)
+
+        stored = await repo.list_project_papers(project.project_id)
+        canonical = next(paper for paper in stored if paper.canonical_id == f"doi:{matched_doi}")
+        assert canonical.provider == "dblp"
+        assert canonical.is_preprint is False
+
+        result = await service.synthesize_project(project.project_id, output_dir=tmp_path / "outputs", include_graph=False)
+        included = [entry for entry in result.references if entry.included_in_final]
+
+        assert len(ingested.selected_papers) <= 20
+        assert len(included) >= 30
+        assert all("arxiv.org" not in entry.formatted_text.lower() for entry in included if "Retrieval-augmented evaluation" in entry.formatted_text)
 
         await db.close()
 

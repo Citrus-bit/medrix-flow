@@ -24,6 +24,23 @@ class AcademicRepository:
     def __init__(self, db: SQLiteRuntimeDB) -> None:
         self._db = db
 
+    async def _ensure_paper_columns(self) -> None:
+        cursor = await self._db.conn.execute("PRAGMA table_info(papers)")
+        rows = await cursor.fetchall()
+        existing = {row["name"] for row in rows}
+        migrations = [
+            ("source_kind", "ALTER TABLE papers ADD COLUMN source_kind TEXT NOT NULL DEFAULT 'metadata'"),
+            ("venue_type", "ALTER TABLE papers ADD COLUMN venue_type TEXT NOT NULL DEFAULT 'unknown'"),
+            ("venue_tier", "ALTER TABLE papers ADD COLUMN venue_tier TEXT NOT NULL DEFAULT 'unknown'"),
+            ("publication_status", "ALTER TABLE papers ADD COLUMN publication_status TEXT NOT NULL DEFAULT 'unknown'"),
+            ("is_preprint", "ALTER TABLE papers ADD COLUMN is_preprint INTEGER NOT NULL DEFAULT 0"),
+            ("canonical_source", "ALTER TABLE papers ADD COLUMN canonical_source TEXT"),
+            ("quality_signals_json", "ALTER TABLE papers ADD COLUMN quality_signals_json TEXT NOT NULL DEFAULT '{}'"),
+        ]
+        for column, statement in migrations:
+            if column not in existing:
+                await self._db.conn.execute(statement)
+
     async def setup(self) -> None:
         async with self._db.lock:
             await self._db.conn.executescript(
@@ -74,6 +91,13 @@ class AcademicRepository:
                     source_url TEXT,
                     oa_url TEXT,
                     metadata_only INTEGER NOT NULL DEFAULT 0,
+                    source_kind TEXT NOT NULL DEFAULT 'metadata',
+                    venue_type TEXT NOT NULL DEFAULT 'unknown',
+                    venue_tier TEXT NOT NULL DEFAULT 'unknown',
+                    publication_status TEXT NOT NULL DEFAULT 'unknown',
+                    is_preprint INTEGER NOT NULL DEFAULT 0,
+                    canonical_source TEXT,
+                    quality_signals_json TEXT NOT NULL DEFAULT '{}',
                     keywords_json TEXT NOT NULL,
                     methods_json TEXT NOT NULL,
                     populations_json TEXT NOT NULL,
@@ -178,6 +202,7 @@ class AcademicRepository:
                 );
                 """
             )
+            await self._ensure_paper_columns()
             await self._db.conn.commit()
 
     async def create_project(
@@ -343,11 +368,12 @@ class AcademicRepository:
                         INSERT INTO papers (
                             paper_id, project_id, canonical_id, title, year, venue, abstract,
                             doi, pmid, pmcid, arxiv_id, cited_by_count, provider, provider_id,
-                            source_url, oa_url, metadata_only, keywords_json, methods_json,
+                            source_url, oa_url, metadata_only, source_kind, venue_type, venue_tier,
+                            publication_status, is_preprint, canonical_source, quality_signals_json, keywords_json, methods_json,
                             populations_json, conflict_flags_json, raw_source_json,
                             relevance_score, recency_score, completeness_score, rank_score,
                             created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         self._paper_to_row_tuple(paper),
                     )
@@ -357,7 +383,9 @@ class AcademicRepository:
                         UPDATE papers SET
                             title = ?, year = ?, venue = ?, abstract = ?, doi = ?, pmid = ?, pmcid = ?, arxiv_id = ?,
                             cited_by_count = ?, provider = ?, provider_id = ?, source_url = ?, oa_url = ?,
-                            metadata_only = ?, keywords_json = ?, methods_json = ?, populations_json = ?,
+                            metadata_only = ?, source_kind = ?, venue_type = ?, venue_tier = ?,
+                            publication_status = ?, is_preprint = ?, canonical_source = ?, quality_signals_json = ?,
+                            keywords_json = ?, methods_json = ?, populations_json = ?,
                             conflict_flags_json = ?, raw_source_json = ?, relevance_score = ?, recency_score = ?,
                             completeness_score = ?, rank_score = ?, updated_at = ?
                         WHERE paper_id = ?
@@ -377,6 +405,13 @@ class AcademicRepository:
                             paper.source_url,
                             paper.oa_url,
                             int(paper.metadata_only),
+                            paper.source_kind,
+                            paper.venue_type,
+                            paper.venue_tier,
+                            paper.publication_status,
+                            int(paper.is_preprint),
+                            paper.canonical_source,
+                            json.dumps(paper.quality_signals, ensure_ascii=False),
                             json.dumps(paper.keywords, ensure_ascii=False),
                             json.dumps(paper.methods, ensure_ascii=False),
                             json.dumps(paper.populations, ensure_ascii=False),
@@ -758,6 +793,13 @@ class AcademicRepository:
             paper.source_url,
             paper.oa_url,
             int(paper.metadata_only),
+            paper.source_kind,
+            paper.venue_type,
+            paper.venue_tier,
+            paper.publication_status,
+            int(paper.is_preprint),
+            paper.canonical_source,
+            json.dumps(paper.quality_signals, ensure_ascii=False),
             json.dumps(paper.keywords, ensure_ascii=False),
             json.dumps(paper.methods, ensure_ascii=False),
             json.dumps(paper.populations, ensure_ascii=False),
@@ -792,6 +834,13 @@ class AcademicRepository:
             source_url=row["source_url"],
             oa_url=row["oa_url"],
             metadata_only=bool(row["metadata_only"]),
+            source_kind=row["source_kind"],
+            venue_type=row["venue_type"],
+            venue_tier=row["venue_tier"],
+            publication_status=row["publication_status"],
+            is_preprint=bool(row["is_preprint"]),
+            canonical_source=row["canonical_source"],
+            quality_signals=json.loads(row["quality_signals_json"] or "{}"),
             keywords=json.loads(row["keywords_json"] or "[]"),
             methods=json.loads(row["methods_json"] or "[]"),
             populations=json.loads(row["populations_json"] or "[]"),

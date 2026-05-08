@@ -84,6 +84,7 @@ function emptyModel(): ModelSetupItem {
     max_tokens: null,
     temperature: null,
     supports_thinking: true,
+    supports_reasoning_effort: false,
     supports_vision: true,
   };
 }
@@ -476,7 +477,15 @@ function ToolKeyCard({
     );
   };
 
-  const label = item.service === "tavily" ? "Tavily" : "Jina";
+  const serviceMeta =
+    item.service === "tavily"
+      ? { label: "Tavily", placeholder: "Enter Tavily API key" }
+      : item.service === "jina"
+        ? { label: "Jina", placeholder: "Enter Jina API key" }
+        : item.service === "openalex"
+          ? { label: "OpenAlex", placeholder: "Enter OpenAlex API key" }
+          : { label: "Semantic Scholar", placeholder: "Enter Semantic Scholar API key" };
+  const label = serviceMeta.label;
 
   return (
     <div className="bg-muted/40 space-y-3 rounded-lg border p-4">
@@ -490,7 +499,7 @@ function ToolKeyCard({
               type={showKey ? "text" : "password"}
               value={item.api_key ?? ""}
               onChange={(e) => onChange(e.target.value)}
-              placeholder={`Enter ${label} API key`}
+              placeholder={serviceMeta.placeholder}
             />
             <button
               type="button"

@@ -69,6 +69,10 @@ def test_academic_router_end_to_end():
         )
         assert ingested.status_code == 200
         assert ingested.json()["paper_count"] >= 1
+        assert ingested.json()["provider_breakdown"]["openalex"] >= 1
+        assert "Scholarly Systems" in ingested.json()["venue_breakdown"]
+        assert ingested.json()["canonical_reference_count"] >= 1
+        assert ingested.json()["preprint_ratio"] == 0.0
 
         synthesized = client.post(
             f"/api/academic/projects/{project_id}/synthesize",
@@ -80,6 +84,8 @@ def test_academic_router_end_to_end():
         project = client.get(f"/api/academic/projects/{project_id}")
         assert project.status_code == 200
         assert project.json()["project"]["status"] == "synthesized"
+        assert project.json()["provider_breakdown"]["openalex"] >= 1
+        assert project.json()["canonical_reference_count"] >= 1
 
         references = client.get(f"/api/academic/projects/{project_id}/references?style=apa7")
         assert references.status_code == 200

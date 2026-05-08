@@ -22,6 +22,9 @@ class AcademicIngestRequest(BaseModel):
     max_candidates: int = Field(default=120, ge=10, le=240)
     core_paper_limit: int = Field(default=24, ge=10, le=40)
     use_local_uploads: bool = True
+    source_profile: str | None = None
+    quality_mode: str | None = None
+    preprint_policy: str | None = None
 
 
 class AcademicSynthesizeRequest(BaseModel):
@@ -51,6 +54,9 @@ async def ingest_project(project_id: str, body: AcademicIngestRequest, request: 
             max_candidates=body.max_candidates,
             core_paper_limit=body.core_paper_limit,
             use_local_uploads=body.use_local_uploads,
+            source_profile=body.source_profile,
+            quality_mode=body.quality_mode,
+            preprint_policy=body.preprint_policy,
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc

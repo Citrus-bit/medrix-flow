@@ -32,7 +32,7 @@ class TestModelRequest(BaseModel):
 
 
 class TestToolKeyRequest(BaseModel):
-    service: str = Field(..., description="tavily or jina")
+    service: str = Field(..., description="tavily, jina, openalex, or semantic-scholar")
     api_key: str = Field(..., description="API key to test")
 
 
@@ -104,7 +104,7 @@ async def test_model(req: TestModelRequest) -> TestResult:
     "/test-tool-key",
     response_model=TestResult,
     summary="Test Tool API Key",
-    description="Verify that a Tavily or Jina API key is valid.",
+    description="Verify that a tool or academic API key is valid.",
 )
 async def test_tool_key(req: TestToolKeyRequest) -> TestResult:
     refresh_env()
@@ -138,6 +138,31 @@ async def test_tool_key(req: TestToolKeyRequest) -> TestResult:
             if resp.status_code == 200:
                 return TestResult(success=True, message="Jina API key is valid.")
             return TestResult(success=False, message=f"Jina returned status {resp.status_code}.")
+
+        elif service == "openalex":
+            import requests as http_requests
+
+            resp = http_requests.get(
+                "https://api.openalex.org/works",
+                params={"search": "transformer", "per_page": 1, "api_key": api_key},
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                return TestResult(success=True, message="OpenAlex API key is valid.")
+            return TestResult(success=False, message=f"OpenAlex returned status {resp.status_code}.")
+
+        elif service == "semantic-scholar":
+            import requests as http_requests
+
+            resp = http_requests.get(
+                "https://api.semanticscholar.org/graph/v1/paper/search",
+                params={"query": "transformer", "limit": 1, "fields": "title"},
+                headers={"x-api-key": api_key},
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                return TestResult(success=True, message="Semantic Scholar API key is valid.")
+            return TestResult(success=False, message=f"Semantic Scholar returned status {resp.status_code}.")
 
         else:
             return TestResult(success=False, message=f"Unknown service: {service}")
