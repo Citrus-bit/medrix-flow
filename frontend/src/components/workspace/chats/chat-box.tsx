@@ -44,7 +44,6 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
   const {
     artifacts: artifactInventory,
     refetch: refetchArtifacts,
-    isFetching: isRefreshingArtifacts,
   } = useThreadArtifactInventory({
     threadId,
     seededArtifacts: thread.values.artifacts ?? [],
@@ -171,9 +170,8 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
                       threadId={threadId}
                       latestFilepath={latestArtifact}
                       onRefresh={
-                        isMock ? undefined : () => void refetchArtifacts()
+                        isMock ? undefined : () => refetchArtifacts()
                       }
-                      isRefreshing={isRefreshingArtifacts}
                     />
                   </main>
                 </div>

@@ -1,5 +1,5 @@
 import { DownloadIcon, LoaderIcon, PackageIcon, RefreshCwIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -28,36 +28,18 @@ export function ArtifactFileList({
   threadId,
   latestFilepath,
   onRefresh,
-  isRefreshing = false,
 }: {
   className?: string;
   files: string[];
   threadId: string;
   latestFilepath?: string | null;
-  onRefresh?: () => void;
-  isRefreshing?: boolean;
+  onRefresh?: () => void | Promise<unknown>;
 }) {
   const { t } = useI18n();
   const { select: selectArtifact, setOpen } = useArtifacts();
   const [installingFile, setInstallingFile] = useState<string | null>(null);
   const [refreshFeedbackActive, setRefreshFeedbackActive] = useState(false);
-
-  useEffect(() => {
-    if (isRefreshing) {
-      setRefreshFeedbackActive(true);
-      return;
-    }
-
-    if (!refreshFeedbackActive) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setRefreshFeedbackActive(false);
-    }, 220);
-
-    return () => window.clearTimeout(timeout);
-  }, [isRefreshing, refreshFeedbackActive]);
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   const handleClick = useCallback(
     (filepath: string) => {
@@ -95,14 +77,22 @@ export function ArtifactFileList({
     [threadId, installingFile],
   );
 
-  const handleRefreshClick = useCallback(() => {
-    if (!onRefresh || isRefreshing) {
+  const handleRefreshClick = useCallback(async () => {
+    if (!onRefresh || isManualRefreshing) {
       return;
     }
 
     setRefreshFeedbackActive(true);
-    onRefresh();
-  }, [isRefreshing, onRefresh]);
+    setIsManualRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setIsManualRefreshing(false);
+      window.setTimeout(() => {
+        setRefreshFeedbackActive(false);
+      }, 220);
+    }
+  }, [isManualRefreshing, onRefresh]);
 
   return (
     <ul className={cn("flex w-full flex-col gap-4", className)}>
@@ -116,13 +106,13 @@ export function ArtifactFileList({
           variant="outline"
           size="sm"
           onClick={handleRefreshClick}
-          disabled={!onRefresh || isRefreshing}
+          disabled={!onRefresh || isManualRefreshing}
         >
           <RefreshCwIcon
             className={cn(
               "size-4 transition-transform duration-150",
               refreshFeedbackActive && "scale-90",
-              isRefreshing && "animate-spin",
+              isManualRefreshing && "animate-spin",
             )}
           />
           {t.common.refresh}
@@ -170,7 +160,12 @@ export function ArtifactFileList({
                   {t.common.install}
                 </Button>
               )}
-              <Button asChild variant="ghost">
+              <Button
+                asChild
+                variant="ghost"
+                size="icon-sm"
+                className="text-muted-foreground hover:text-foreground rounded-full"
+              >
                 <a
                   href={urlOfArtifact({
                     filepath: file,
@@ -179,10 +174,11 @@ export function ArtifactFileList({
                   })}
                   target="_blank"
                   rel="noreferrer"
+                  aria-label={t.common.download}
+                  title={t.common.download}
                   onClick={(e) => e.stopPropagation()}
                 >
                   <DownloadIcon className="size-4" />
-                  {t.common.download}
                 </a>
               </Button>
             </CardAction>
