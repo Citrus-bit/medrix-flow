@@ -20,9 +20,9 @@ Use this skill when the user asks for:
 3. Do not invent references, DOI metadata, or claims that are not grounded in the generated evidence bundle.
 4. Treat the generated `report.md`, `references.md`, `references.bib`, and `evidence_map.json` as the source of truth.
 5. When writing final prose in chat, use the artifact bundle first and only then polish wording.
-6. For manuscript-style requests, default to LaTeX + PDF: write `manuscript.tex`, keep `references.bib`, generate `citation_audit.json`, and present the `.tex` file so PDF export is attempted.
+6. For manuscript-style requests, default to LaTeX + PDF and prefer `manuscript_export` so writing, citation audit, PDF compilation, and artifact presentation happen in one enforced step.
 7. Read or audit `references.bib` before inserting inline LaTeX citations. Use exact BibTeX keys only; do not use `\nocite{*}` unless the user explicitly asks to list every reference without inline citation placement.
-8. If citation or PDF generation fails, report the exact failed tool and error. Do not claim tools are unavailable when file tools, `citation_audit`, or `present_files` are available.
+8. If citation or PDF generation fails, report the exact failed tool and error. Do not claim tools are unavailable when file tools, `manuscript_export`, `citation_audit`, or `present_files` are available.
 
 ## Recommended Workflow
 
@@ -44,10 +44,10 @@ This will automatically:
 For a paper, manuscript, review article draft, or experiment paper:
 
 - create or reuse `references.bib`
-- write `manuscript.tex` under `/mnt/user-data/outputs`
-- call `citation_audit(bibtex_path="/mnt/user-data/outputs/references.bib", tex_path="/mnt/user-data/outputs/manuscript.tex")`
-- fix missing keys or unsupported `\nocite{*}` before final delivery
-- call `present_files(filepaths=["/mnt/user-data/outputs/manuscript.tex"])`
+- write LaTeX with exact BibTeX keys from `references.bib`
+- call `manuscript_export(tex_content=..., bibtex_content=..., filename_stem="manuscript")`
+- if `manuscript_export` reports missing keys, unsupported claims, blocked `\nocite{*}`, or compile errors, fix the inputs and retry before final delivery
+- use `citation_audit` and `present_files` only as fallback tools for narrower manual checks or existing files
 
 ### 3. Escalate to Subagent When Needed
 

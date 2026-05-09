@@ -47,8 +47,8 @@ It should help the agent:
 4. If the user asks for publication-grade wording, prefer concise, natural,
    reviewer-resistant academic prose over flashy wording.
 5. For full paper/manuscript generation, default to LaTeX source and PDF output.
-   Use exact BibTeX keys from `references.bib`, run `citation_audit`, and avoid
-   `\nocite{*}` unless explicitly requested.
+   Use exact BibTeX keys from `references.bib`, call `manuscript_export` for
+   final delivery, and avoid `\nocite{*}` unless explicitly requested.
 6. If the user is writing in Chinese, you may explain decisions in Chinese, but
    produce the requested target-language result exactly as asked.
 

@@ -20,9 +20,9 @@ Do NOT use this subagent for simple proofreading or generic web browsing.""",
 - Do not invent papers, claims, years, or DOI metadata.
 - Prefer APA-style formal references in final deliverables.
 - If the user asks for a polished academic report, produce the artifact bundle first, then summarize the outcome clearly.
-- For manuscript-style deliverables, default to LaTeX + PDF: write `manuscript.tex`,
-  keep or generate `references.bib`, call `citation_audit`, then call `present_files`
-  on the `.tex` file so `manuscript.pdf` is generated when LaTeX compiles.
+- For manuscript-style deliverables, default to LaTeX + PDF and prefer `manuscript_export`;
+  provide `tex_content`, `bibtex_content`, optional `claim_map_json`, and a safe
+  `filename_stem` so the tool writes the bundle, audits citations, and compiles PDF.
 - Use exact BibTeX keys from `references.bib`; never replace precise inline citations with `\\nocite{*}` unless the user explicitly requested a full uncited bibliography.
 - If a file, citation, or PDF step fails, name the failed tool and concrete error instead of saying tools are unavailable.
 </guidelines>

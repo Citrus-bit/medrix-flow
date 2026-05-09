@@ -118,6 +118,7 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 ### LaTeX / PDF 预览
 
 - `present_files` 在展示 `.tex` 文件时，会尝试自动生成预览 PDF
+- `manuscript_export` 是论文成稿的高层出口：一次调用写入 `.tex`、`references.bib`、`citation_audit.json`，审计通过后生成 `.pdf`
 - 当前实现优先调用本机 `tectonic`，不依赖 `pdflatex`、`xelatex` 或 `latexmk`
 - 论文/综述/实验论文类交付默认应输出 `manuscript.tex`、`references.bib`、`citation_audit.json` 和 `manuscript.pdf`
 - 若 `.tex` 同目录存在 `references.bib`，`present_files` 会先执行 citation audit；缺失 citation key 或未经允许的 `\nocite{*}` 会阻断 PDF 生成并展示审计文件
@@ -206,7 +207,7 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 | 科研任务编排 | `research_assistant` | 后台 staged research quest、创新性检查、证据 gate、实验计划、审稿循环与 final bundle 管理 |
 | 实验执行 | `experiment_lab` | Python-first 实验流水线、科研图自动路由、结果 bundle 导出 |
 | 沙箱 | bash, ls, read_file, write_file, str_replace | 线程隔离的文件系统操作 |
-| 内置 | present_files, ask_clarification, citation_audit, view_image, task, visual_quality_check, visual_refinement_check | 文件展示、交互澄清、引用审计、图像理解、子代理委派、视觉质量门控、迭代精修检查 |
+| 内置 | present_files, ask_clarification, citation_audit, manuscript_export, view_image, task, visual_quality_check, visual_refinement_check | 文件展示、交互澄清、引用审计、一键论文 PDF 导出、图像理解、子代理委派、视觉质量门控、迭代精修检查 |
 | 社区 | Tavily, Jina AI, Firecrawl, DuckDuckGo | 网页搜索、网页抓取、图片搜索 |
 | MCP | 任意 MCP 兼容服务器 | 支持 stdio/SSE/HTTP 传输协议 |
 | Skills | 领域专属工作流 | 从 `skills/public` 和 `skills/custom` 发现，并按启用状态注入的技能包 |
