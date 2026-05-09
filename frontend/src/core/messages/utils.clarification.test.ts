@@ -1,6 +1,70 @@
-import { describe, expect, it } from "vitest";
+import type { Message } from "@langchain/langgraph-sdk";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { findClarificationResponse } from "./utils";
+import { findClarificationResponse, groupMessages } from "./utils";
+
+describe("groupMessages", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("silently ignores orphan tool messages from partial stream replay", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const messages = [
+      {
+        id: "tool-1",
+        type: "tool",
+        name: "citation_audit",
+        tool_call_id: "tc-1",
+        content: "PASS",
+      },
+    ] as unknown as Message[];
+
+    const groups = groupMessages(messages, (group) => group.type);
+
+    expect(groups).toEqual([]);
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("attaches tool messages by tool_call_id even after a terminal assistant message", () => {
+    const messages = [
+      {
+        id: "ai-1",
+        type: "ai",
+        content: "",
+        tool_calls: [
+          {
+            id: "tc-1",
+            name: "citation_audit",
+            args: {},
+          },
+        ],
+      },
+      {
+        id: "ai-2",
+        type: "ai",
+        content: "Working from the audit result.",
+      },
+      {
+        id: "tool-1",
+        type: "tool",
+        name: "citation_audit",
+        tool_call_id: "tc-1",
+        content: "PASS",
+      },
+    ] as unknown as Message[];
+
+    const groups = groupMessages(messages, (group) => ({
+      type: group.type,
+      count: group.messages.length,
+    }));
+
+    expect(groups).toEqual([
+      { type: "assistant:processing", count: 2 },
+      { type: "assistant", count: 1 },
+    ]);
+  });
+});
 
 describe("findClarificationResponse", () => {
   it("returns the first human response after a clarification message", () => {

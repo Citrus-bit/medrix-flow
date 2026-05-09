@@ -51,6 +51,29 @@ export function groupMessages<T>(
     return null;
   }
 
+  function findToolCallGroup(message: Message) {
+    if (message.type !== "tool" || !message.tool_call_id) {
+      return null;
+    }
+    for (let index = groups.length - 1; index >= 0; index -= 1) {
+      const group = groups[index];
+      if (!group || group.type === "human" || group.type === "assistant") {
+        continue;
+      }
+      const hasMatchingToolCall = group.messages.some(
+        (candidate) =>
+          candidate.type === "ai" &&
+          candidate.tool_calls?.some(
+            (toolCall) => toolCall.id === message.tool_call_id,
+          ),
+      );
+      if (hasMatchingToolCall) {
+        return group;
+      }
+    }
+    return null;
+  }
+
   for (const message of messages) {
     if (message.name === "todo_reminder") {
       continue;
@@ -72,14 +95,9 @@ export function groupMessages<T>(
           messages: [message],
         });
       } else {
-        const open = lastOpenGroup();
+        const open = findToolCallGroup(message) ?? lastOpenGroup();
         if (open) {
           open.messages.push(message);
-        } else {
-          console.error(
-            "Unexpected tool message outside a processing group",
-            message,
-          );
         }
       }
       continue;
