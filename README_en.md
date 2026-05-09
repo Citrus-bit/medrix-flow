@@ -17,15 +17,16 @@
 
 ---
 
-MedrixFlow is a full-stack AI agent orchestration platform for academic writing, literature reviews, experiment reports, and research delivery. The backend uses LangGraph for multi-agent collaboration and state management, while the frontend provides a thread-based chat and artifact workflow built on Next.js 16. Beyond general-purpose agent capabilities, MedrixFlow now includes structured academic retrieval, APA 7 reference export, CS/AI and bioinformatics experiment specialist agents, local evidence storage, and report-oriented artifact delivery designed to solve the usual gaps in academic workflows: weak scholarly grounding, poor references, and disconnected experiment outputs.
+MedrixFlow is a full-stack AI agent orchestration platform for academic writing, literature reviews, experiment reports, and research delivery. The backend uses LangGraph for multi-agent collaboration and state management, while the frontend provides a thread-based chat and artifact workflow built on Next.js 16. Beyond general-purpose agent capabilities, MedrixFlow now includes structured academic retrieval, APA 7 reference export, CS/AI and bioinformatics experiment specialist agents, local evidence storage, and report-oriented artifact delivery, with research, literature, and experiment intent routed automatically from normal chat. It is designed to solve the usual gaps in academic workflows: weak scholarly grounding, poor references, and disconnected experiment outputs.
 
 ## Key Features
 
 ### 1. Academic Research Pipeline: From Topic to APA 7 References
 
-MedrixFlow now includes a dedicated, traceable pipeline for formal academic reporting:
+MedrixFlow now includes backend-routed research capabilities for formal academic reporting:
 
 - **Built-in academic subagent**: `academic-researcher` handles topic decomposition, query expansion, candidate paper screening, evidence card generation, outline building, and reference export
+- **Chat-native research routing**: prompts about literature, papers, citations, APA/BibTeX, evidence maps, or related work are routed toward `academic_research`, with complex deliverables delegated to `academic-researcher` when appropriate
 - **Formal-source-first CS/AI stack**: the default `cs_ai` path uses `DBLP`, `OpenReview`, `ACL Anthology`, `Semantic Scholar`, `OpenAlex`, `Crossref`, and `arXiv`, with conference/journal versions preferred as the canonical reference
 - **Formal report exports**: a single research project can produce `report.md`, `references.md`, `references.bib`, `evidence_map.json`, `retrieval_audit.json`, and optionally `graph.json`
 - **Local evidence persistence**: research projects, paper metadata, evidence cards, outline mappings, and formatted references are stored locally in SQLite for incremental reuse
@@ -36,6 +37,7 @@ MedrixFlow does not stop at writing. It also closes the gap between experiments 
 
 - **Visible system agents**: `cs-ai-lab` focuses on regression, classification, clustering, dimensionality reduction, diagnostics, and paper-ready result summaries; `bioinformatics-lab` focuses on bulk expression workflows, differential analysis, enrichment, and single-cell starter analyses
 - **Python-first execution**: experiment workflows run through a unified local Python path to reduce runtime switching and keep outputs reproducible
+- **autoresearch-style iteration**: model training, ablation, and code-tuning tasks can use a baseline-first loop with a fixed evaluation harness, primary metric, trial log, and `keep` / `discard` / `crash` records without importing external training code
 - **Automatic scientific figure routing**: chart type is selected from task intent and data shape, including line plots, histograms, scatter plots, heatmaps, ROC/PR, volcano, violin, and dot plots
 - **Paper-ready export bundle**: experiments can export `experiment_plan.md`, `methods.md`, `results.md`, `metrics.json`, `figure_manifest.json`, `figures/`, `tables/`, and when needed `paper_ready_results.md`
 
@@ -80,7 +82,7 @@ MedrixFlow keeps the UX production-ready through the LangGraph SDK’s `useStrea
 - **SSE streaming rendering**: responses, thinking traces, and subagent progress stream in real time
 - **Automatic disconnection recovery**: `reconnectOnMount + streamResumable` allows recovery after refresh or network interruption while backend execution continues
 - **Frontend-first setup**: model and API key configuration is handled in the UI and hot-reloaded into the app
-- **Modes map to reasoning depth**: `flash / pro / ultra` expose higher-level behavior instead of low-level model toggles
+- **Modes map to reasoning depth**: `flash / thinking / pro / ultra` expose higher-level behavior, reasoning effort, and subagent capability instead of low-level model toggles
 
 ### 8. Visual Quality, Security Auditing, and Observability
 
@@ -99,6 +101,13 @@ The platform also keeps strong delivery quality and operational visibility:
 - Academic research and experiment tasks write outputs such as `report.md`, `references.md`, `references.bib`, figures, and result tables into the current thread’s `outputs`
 - The right-side file panel auto-discovers these artifacts and supports **manual refresh**, **latest-file highlighting**, preview, and download
 - When a task is better delivered as files than as chat prose, the agent prefers returning an artifact bundle that can be reused directly in writing workflows
+
+### Automatic Research Routing
+
+- The sidebar no longer exposes a separate "Research" entry; the primary workflow is normal chat, while `/workspace/research` remains available as an internal or direct Research Dashboard
+- Literature reviews, citations, APA/BibTeX, related work, and evidence mapping prefer `academic_research`, with complex deliverables delegated to `academic-researcher`
+- `research_assistant` is used only when the user clearly asks for a staged research-project lifecycle, stage advancement, novelty checks, experiment gates, reviewer loops, or final bundle release
+- Real data experiments, model evaluation, bioinformatics analysis, and scientific figures continue to route through `experiment_lab`
 
 ### Clarification and Confirmation
 
@@ -123,6 +132,7 @@ The platform also keeps strong delivery quality and operational visibility:
 - Skills are auto-discovered from `skills/public` and `skills/custom`
 - Skill enablement state and MCP configuration are stored together in `extensions_config.json`
 - Users can enable or disable skills from the settings page, or drop custom skills directly into `skills/custom`
+- Current public skills cover academic deep research, experiment analysis, data analysis, Nature-style figures, PPT/image/video/podcast generation, web design, skill/plugin helpers, and GitHub deep research workflows
 
 ## System Architecture
 
@@ -192,6 +202,7 @@ The platform also keeps strong delivery quality and operational visibility:
 | Category | Tools | Description |
 |----------|-------|-------------|
 | Academic Research | `academic_research` | Structured literature retrieval, metadata normalization, paper deduplication, evidence-card persistence, and APA reference export |
+| Research Orchestration | `research_assistant` | Backend staged research quests, novelty checks, evidence gates, experiment planning, reviewer loops, and final bundle management |
 | Experiment Execution | `experiment_lab` | Python-first experiment pipeline, scientific figure routing, and result bundle export |
 | Sandbox | bash, ls, read_file, write_file, str_replace | Thread-isolated filesystem operations |
 | Built-in | present_files, ask_clarification, view_image, task, visual_quality_check, visual_refinement_check | File presentation, interactive clarification, image understanding, subagent delegation, visual quality gate, iterative refinement check |
@@ -207,6 +218,9 @@ The platform also keeps strong delivery quality and operational visibility:
 | `POST /api/academic/projects/{project_id}/ingest` | Retrieve papers from multiple sources, normalize metadata, deduplicate, and build the evidence pool |
 | `POST /api/academic/projects/{project_id}/synthesize` | Generate the formal report, APA references, BibTeX, and evidence mapping files |
 | `GET /api/academic/projects/{project_id}/references?style=apa7` | Read the APA 7 reference set |
+| `POST /api/research/quests` | Create a staged research quest from backend flows or the direct Research Dashboard |
+| `POST /api/research/quests/{quest_id}/advance` | Advance intake, literature, novelty, evidence, experiment, manuscript, review, and final bundle stages |
+| `POST /api/research/quests/{quest_id}/gate` | Record human gate decisions for experiment execution, pre-review, and final release |
 | `POST /api/experiments/projects` | Create an experiment project bound to an expert agent, datasets, and an optional academic project |
 | `POST /api/experiments/projects/{project_id}/execute` | Run the experiment pipeline and generate metrics, figures, and result summaries |
 | `POST /api/experiments/projects/{project_id}/export` | Export the experiment bundle, optionally including `paper_ready_results.md` |
@@ -216,6 +230,7 @@ The platform also keeps strong delivery quality and operational visibility:
 - **Literature review / related work**: given a topic, MedrixFlow can use `academic-researcher` with `academic-deep-research` to expand queries, search multiple academic sources, deduplicate, and build a core paper pool with evidence mappings
 - **APA 7 references**: formal report workflows export all verified canonical references for the current project without an export cap, along with `references.md`, `references.bib`, and `retrieval_audit.json`
 - **Experiment-backed writing**: `cs-ai-lab` and `bioinformatics-lab` can turn structured datasets or expression analyses into figures, tables, methods, and results bundles, reducing the gap between prose and evidence
+- **Controlled iterative experiments**: inspired by the autoresearch-style pattern, model training and ablation work emphasizes baselines, fixed metrics, fixed evaluation budgets, and `keep` / `discard` / `crash` logs instead of unconstrained code changes
 - **Local evidence reuse**: academic and experiment projects can be incrementally reused in the same thread, so follow-up literature, references, and experiments do not have to start from scratch
 - **Artifact-first delivery**: the right-side artifact panel is now better suited for locating newly generated reports, figures, and references without repeatedly asking the agent to resend them
 
@@ -321,7 +336,7 @@ medrix-flow/
 │   │   ├── runtime/                # Runs, message persistence, feedback, and stream bridge
 │   │   ├── sandbox/                # Sandbox execution engine + security auditing
 │   │   ├── subagents/              # Subagent system (incl. academic-researcher, experiment specialists, visual-specialist)
-│   │   ├── tools/                  # Tool collection (incl. academic_research, experiment_lab, visual QA)
+│   │   ├── tools/                  # Tool collection (incl. academic_research, research_assistant, experiment_lab, visual QA)
 │   │   ├── mcp/                    # MCP protocol integration
 │   │   ├── models/                 # Model factory + Provider patches
 │   │   ├── skills/                 # Skill discovery & loading
@@ -336,10 +351,10 @@ medrix-flow/
 │
 ├── frontend/                       # Frontend application
 │   ├── src/
-│   │   ├── app/                    # Next.js App Router routes
+│   │   ├── app/                    # Next.js App Router routes (including the retained direct /workspace/research page)
 │   │   ├── components/
 │   │   │   ├── ui/                 #   Base UI components
-│   │   │   ├── workspace/          #   Workspace components (chat/settings/sidebar)
+│   │   │   ├── workspace/          #   Workspace components (chat/agents/settings/sidebar; sidebar main entries are chats and agents)
 │   │   │   └── ai-elements/        #   AI components (reasoning/code block/model selector)
 │   │   ├── core/                   # Core business logic
 │   │   │   ├── threads/            #   Thread management + streaming
@@ -351,7 +366,7 @@ medrix-flow/
 │   └── package.json
 │
 ├── skills/                         # Skill system
-│   ├── public/                     #   Public skill packs
+│   ├── public/                     #   Public skill packs (academic/experiment/data/figure/PPT/image/video/podcast/skill helpers)
 │   └── custom/                     #   Custom skills
 │
 ├── scripts/                        # Script utilities

@@ -17,15 +17,16 @@
 
 ---
 
-MedrixFlow 是一个面向学术写作、文献综述、实验报告和研究交付的全栈 AI 代理编排平台。后端基于 LangGraph 实现多代理协作与状态管理，前端基于 Next.js 16 提供 thread-based chat 与 artifact 工作流。除了通用代理能力外，MedrixFlow 现在内置了结构化学术检索、APA 7 参考文献导出、CS/AI 与生物信息实验专家 Agent、本地证据库与报告产物交付链路，重点解决“学术感不足、引用不规范、实验结果难沉淀”的问题。
+MedrixFlow 是一个面向学术写作、文献综述、实验报告和研究交付的全栈 AI 代理编排平台。后端基于 LangGraph 实现多代理协作与状态管理，前端基于 Next.js 16 提供 thread-based chat 与 artifact 工作流。除了通用代理能力外，MedrixFlow 现在内置了结构化学术检索、APA 7 参考文献导出、CS/AI 与生物信息实验专家 Agent、本地证据库与报告产物交付链路，并在普通聊天中按用户意图自动分流科研、文献和实验任务，重点解决“学术感不足、引用不规范、实验结果难沉淀”的问题。
 
 ## 技术亮点
 
 ### 1. 学术研究闭环：从主题到 APA 7 References
 
-围绕正式学术报告的核心链路，MedrixFlow 新增了一条可追溯的研究专线：
+围绕正式学术报告的核心链路，MedrixFlow 提供了一套后台自动分流的研究能力：
 
 - **内置学术子代理**：`academic-researcher` 专门负责主题拆解、扩展检索、候选论文筛选、证据卡沉淀、大纲构建与参考文献导出
+- **聊天内科研分流**：普通聊天中出现文献、论文、引用、APA/BibTeX、evidence map、related work 等意图时，优先走 `academic_research` 或复杂任务下的 `academic-researcher`
 - **CS/AI 正式文献优先**：`cs_ai` 默认走 `DBLP`、`OpenReview`、`ACL Anthology`、`Semantic Scholar`、`OpenAlex`、`Crossref`、`arXiv` 的组合栈，并优先选择 conference/journal 正式版作为 canonical reference
 - **正式报告导出**：单次研究任务可沉淀 `report.md`、`references.md`、`references.bib`、`evidence_map.json`、`retrieval_audit.json`，并按需导出 `graph.json`
 - **本地证据存储**：研究项目、论文元数据、证据卡、章节映射与引用格式化结果都落到本地 SQLite，便于后续增量补文献与复用
@@ -36,6 +37,7 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 
 - **可见 system agent**：`cs-ai-lab` 面向回归、分类、聚类、降维、诊断图与论文级结果摘要；`bioinformatics-lab` 面向 bulk 表达分析、差异分析、富集分析与单细胞起步流程
 - **Python-first 实验执行**：统一走本地 Python 实验链路，减少多运行时切换；支持结构化表格数据与生信常见输入
+- **autoresearch-style 迭代实验**：模型训练、消融和代码调参类任务可采用 baseline first、固定评估口径、primary metric、trial log 与 `keep` / `discard` / `crash` 记录，不引入外部训练代码
 - **科研图自动路由**：按任务意图与数据形状自动选择折线图、直方图、散点图、热力图、ROC/PR、volcano、violin、dot plot 等图型
 - **论文级 bundle 导出**：实验默认产出 `experiment_plan.md`、`methods.md`、`results.md`、`metrics.json`、`figure_manifest.json`、`figures/`、`tables/`，必要时附带 `paper_ready_results.md`
 
@@ -80,7 +82,7 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 - **SSE 流式渲染**：Agent 响应、Thinking 过程、子代理任务进度全部实时流式展示
 - **断连自动恢复**：`reconnectOnMount + streamResumable` 机制确保页面刷新或网络断连后自动重连，后端继续运行不中断
 - **前端配置即用**：模型与 API Key 配置全部可在 UI 中完成，保存后自动写入配置并热重载
-- **模式即推理深度**：前端默认暴露 `flash / pro / ultra` 模式，对应不同 reasoning effort，无需用户手调底层模型参数
+- **模式即推理深度**：前端默认暴露 `flash / thinking / pro / ultra` 模式，对应不同 reasoning effort 与子代理能力，无需用户手调底层模型参数
 
 ### 8. 视觉输出质量系统与安全可观测性
 
@@ -99,6 +101,13 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 - 学术研究和实验任务默认把 `report.md`、`references.md`、`references.bib`、科研图、结果表等产物写入当前线程的 `outputs`
 - 右侧文件区会自动发现这些产物，支持**手动刷新**、**最新文件高亮**、文件预览与下载
 - 当任务更适合“交付文件”而不是“塞满聊天消息”时，代理会优先返回 artifact bundle，方便你直接继续写作或二次整理
+
+### 科研自动分流
+
+- 侧边栏不再单独展示“科研”入口，主工作流回到普通聊天；`/workspace/research` 仍保留为内部或直连 Research Dashboard
+- 文献综述、论文引用、APA/BibTeX、related work、证据映射等任务优先走 `academic_research`，复杂交付可委派给 `academic-researcher`
+- 只有当用户明确需要科研项目生命周期、阶段推进、创新性检查、实验 gate、审稿循环或 final bundle 时，才使用 `research_assistant`
+- 真实数据实验、模型评估、生信分析和科研图产出继续走 `experiment_lab`
 
 ### 澄清与确认
 
@@ -123,6 +132,7 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 - Skills 从项目根目录的 `skills/public` 与 `skills/custom` 自动发现
 - 技能启用状态与 MCP 配置统一保存在 `extensions_config.json`
 - 用户可以通过设置页启用/停用 skill，也可以把自定义 skill 直接放进 `skills/custom`
+- 当前公共 skill 覆盖学术深研、实验分析、数据分析、Nature 风格图表、PPT/图片/视频/播客生成、网页设计、技能/插件创建与 GitHub 深研等工作流
 
 ## 系统架构
 
@@ -191,6 +201,7 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 | 类别 | 工具 | 说明 |
 |------|------|------|
 | 学术研究 | `academic_research` | 结构化文献检索、元数据规范化、论文去重、证据卡沉淀、APA 参考文献导出 |
+| 科研任务编排 | `research_assistant` | 后台 staged research quest、创新性检查、证据 gate、实验计划、审稿循环与 final bundle 管理 |
 | 实验执行 | `experiment_lab` | Python-first 实验流水线、科研图自动路由、结果 bundle 导出 |
 | 沙箱 | bash, ls, read_file, write_file, str_replace | 线程隔离的文件系统操作 |
 | 内置 | present_files, ask_clarification, view_image, task, visual_quality_check, visual_refinement_check | 文件展示、交互澄清、图像理解、子代理委派、视觉质量门控、迭代精修检查 |
@@ -206,6 +217,9 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 | `POST /api/academic/projects/{project_id}/ingest` | 多源抓取论文、归一化元数据、去重并沉淀证据池 |
 | `POST /api/academic/projects/{project_id}/synthesize` | 生成正式报告、APA 参考文献、BibTeX 与证据映射文件 |
 | `GET /api/academic/projects/{project_id}/references?style=apa7` | 读取 APA 7 参考文献结果 |
+| `POST /api/research/quests` | 后台或直连 Research Dashboard 创建 staged research quest |
+| `POST /api/research/quests/{quest_id}/advance` | 推进 intake、literature、novelty、evidence、experiment、manuscript、review、final bundle 等阶段 |
+| `POST /api/research/quests/{quest_id}/gate` | 记录实验执行、预审、最终发布等人工 gate 决策 |
 | `POST /api/experiments/projects` | 创建实验项目，绑定专家 Agent、数据集和可选学术项目 |
 | `POST /api/experiments/projects/{project_id}/execute` | 执行实验主流程并生成指标、图表和结果摘要 |
 | `POST /api/experiments/projects/{project_id}/export` | 导出实验 bundle，必要时生成 `paper_ready_results.md` |
@@ -215,6 +229,7 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 - **文献综述 / related work**：给定研究主题后，可走 `academic-researcher` + `academic-deep-research` 工作流，自动完成检索式扩展、多源抓取、去重、核心论文池构建与证据映射
 - **APA 7 References**：正式报告链路会导出当前项目中全部已核验 canonical references，不设导出上限，并自动生成 `references.md`、`references.bib` 与 `retrieval_audit.json`
 - **实验支撑写作**：`cs-ai-lab` 与 `bioinformatics-lab` 可直接把表格实验或生信分析结果转成 figures / tables / methods / results bundle，减少“论文只有文字没有实验”的断层
+- **可控迭代实验**：受 autoresearch-style 思路启发，模型训练和消融类实验默认强调 baseline、固定指标、固定评估预算和 `keep` / `discard` / `crash` 记录，而不是无约束地修改代码
 - **本地证据沉淀**：学术项目与实验项目都可在本地持续复用，便于同一 thread 反复补文献、补实验、补 references，而不是每次都从零开始
 - **文件交付友好**：右侧 artifact 面板更适合查找新报告、新图表和新参考文献文件，避免生成完毕后仍要反复让代理“再发一遍”
 
@@ -320,7 +335,7 @@ medrix-flow/
 │   │   ├── runtime/                # Runs、消息持久化、反馈与流桥接
 │   │   ├── sandbox/                # 沙箱执行引擎 + 安全审计
 │   │   ├── subagents/              # 子代理系统（含 academic-researcher、实验专家、visual-specialist）
-│   │   ├── tools/                  # 工具集（含 academic_research、experiment_lab、视觉质检）
+│   │   ├── tools/                  # 工具集（含 academic_research、research_assistant、experiment_lab、视觉质检）
 │   │   ├── mcp/                    # MCP 协议集成
 │   │   ├── models/                 # 模型工厂 + Provider 补丁
 │   │   ├── skills/                 # Skill 发现与加载
@@ -335,10 +350,10 @@ medrix-flow/
 │
 ├── frontend/                       # 前端应用
 │   ├── src/
-│   │   ├── app/                    # Next.js App Router 路由
+│   │   ├── app/                    # Next.js App Router 路由（含保留的 /workspace/research 直连页）
 │   │   ├── components/
 │   │   │   ├── ui/                 #   基础 UI 组件
-│   │   │   ├── workspace/          #   工作区组件（聊天/设置/侧边栏）
+│   │   │   ├── workspace/          #   工作区组件（聊天/智能体/设置/侧边栏；侧边栏主入口为对话和智能体）
 │   │   │   └── ai-elements/        #   AI 组件（推理/代码块/模型选择器）
 │   │   ├── core/                   # 核心业务逻辑
 │   │   │   ├── threads/            #   线程管理 + 流式传输
@@ -350,7 +365,7 @@ medrix-flow/
 │   └── package.json
 │
 ├── skills/                         # 技能系统
-│   ├── public/                     #   公共技能包
+│   ├── public/                     #   公共技能包（academic/experiment/data/figure/PPT/image/video/podcast/skill helpers）
 │   └── custom/                     #   自定义技能
 │
 ├── scripts/                        # 脚本工具
