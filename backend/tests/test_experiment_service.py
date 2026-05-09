@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -63,6 +64,62 @@ def test_experiment_service_classification_bundle(tmp_path):
     assert result.bundle.figure_count >= 2
     assert any(path.endswith("confusion_matrix.png") for path in result.bundle.export_files)
     assert any(path.endswith("metrics.json") for path in result.bundle.export_files)
+    asyncio.run(db.close())
+
+
+def test_experiment_service_preserves_empirical_method_contract(tmp_path):
+    paths = _make_paths(tmp_path)
+    paths.ensure_thread_dirs("thread-exp-empirical")
+    uploads = paths.sandbox_uploads_dir("thread-exp-empirical")
+    outputs = paths.sandbox_outputs_dir("thread-exp-empirical")
+
+    df = pd.DataFrame(
+        {
+            "outcome": [1.0, 1.2, 1.3, 2.0, 2.2, 2.4, 2.8, 3.0],
+            "treated": [0, 0, 0, 1, 1, 1, 1, 1],
+            "year": [2020, 2021, 2022, 2020, 2021, 2022, 2023, 2024],
+            "unit_id": ["a", "a", "a", "b", "b", "b", "b", "b"],
+            "x1": [2, 3, 3, 4, 5, 5, 6, 7],
+        }
+    )
+    csv_path = uploads / "policy.csv"
+    df.to_csv(csv_path, index=False)
+
+    service, db = _prepare_service(tmp_path)
+    with patch("medrix_flow.experiments.service.get_paths", return_value=paths):
+        result = asyncio.run(
+            service.run_experiment(
+                thread_id="thread-exp-empirical",
+                agent_name="cs-ai-lab",
+                topic="DID evaluation of a policy effect",
+                dataset_ids=["/mnt/user-data/uploads/policy.csv"],
+                output_dir=outputs,
+                analysis_type="regression",
+                target_column="outcome",
+                metadata={
+                    "skill": "empirical-research-methods",
+                    "empirical_method": "did",
+                    "estimand": "ATT",
+                    "outcome": "outcome",
+                    "treatment": "treated",
+                    "unit_id": "unit_id",
+                    "time": "year",
+                    "required_outputs": ["table1", "event_study", "robustness"],
+                },
+            )
+        )
+
+    assert result.run.status == "success"
+    assert any(path.endswith("empirical_method_contract.json") for path in result.bundle.export_files)
+    contract_path = next(
+        outputs / path.removeprefix("/mnt/user-data/outputs/")
+        for path in result.bundle.export_files
+        if path.endswith("empirical_method_contract.json")
+    )
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    assert contract["skill"] == "empirical-research-methods"
+    assert contract["empirical_method"] == "did"
+    assert contract["causal_claim_gate"]
     asyncio.run(db.close())
 
 

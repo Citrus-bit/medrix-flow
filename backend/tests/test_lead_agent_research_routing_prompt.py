@@ -20,3 +20,5 @@ def test_apply_prompt_template_includes_research_routing_guidance(monkeypatch):
     assert "research_assistant" in rendered
     assert "academic-researcher" in rendered
     assert "experiment_lab" in rendered
+    assert "empirical-research-methods" in rendered
+    assert "DID" in rendered

@@ -108,6 +108,7 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 - 文献综述、论文引用、APA/BibTeX、related work、证据映射等任务优先走 `academic_research`，复杂交付可委派给 `academic-researcher`
 - 只有当用户明确需要科研项目生命周期、阶段推进、创新性检查、实验 gate、审稿循环或 final bundle 时，才使用 `research_assistant`
 - 真实数据实验、模型评估、生信分析和科研图产出继续走 `experiment_lab`
+- 实证社科/计量/公共政策/公共卫生数据研究会加载 `empirical-research-methods`，把 DID、IV、RDD、PSM/IPW、合成控制、DML、target-trial、TMLE、Table 1、稳健性和复现包要求转成 `experiment_lab` metadata 与 research quest gate
 
 ### 澄清与确认
 
@@ -135,7 +136,7 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 - Skills 从项目根目录的 `skills/public` 与 `skills/custom` 自动发现
 - 技能启用状态与 MCP 配置统一保存在 `extensions_config.json`
 - 用户可以通过设置页启用/停用 skill，也可以把自定义 skill 直接放进 `skills/custom`
-- 当前公共 skill 覆盖学术深研、实验分析、数据分析、Nature 风格图表、PPT/图片/视频/播客生成、网页设计、技能/插件创建与 GitHub 深研等工作流
+- 当前公共 skill 覆盖学术深研、实证研究方法、实验分析、数据分析、Nature 风格图表、PPT/图片/视频/播客生成、网页设计、技能/插件创建与 GitHub 深研等工作流
 
 ## 系统架构
 
@@ -205,7 +206,7 @@ MedrixFlow 不只停留在“会写报告”，还补上了实验与结果图产
 |------|------|------|
 | 学术研究 | `academic_research` | 结构化文献检索、元数据规范化、论文去重、证据卡沉淀、APA 参考文献导出 |
 | 科研任务编排 | `research_assistant` | 后台 staged research quest、创新性检查、证据 gate、实验计划、审稿循环与 final bundle 管理 |
-| 实验执行 | `experiment_lab` | Python-first 实验流水线、科研图自动路由、结果 bundle 导出 |
+| 实验执行 | `experiment_lab` | Python-first 实验流水线、实证方法 contract、科研图自动路由、结果 bundle 导出 |
 | 沙箱 | bash, ls, read_file, write_file, str_replace | 线程隔离的文件系统操作 |
 | 内置 | present_files, ask_clarification, citation_audit, manuscript_export, view_image, task, visual_quality_check, visual_refinement_check | 文件展示、交互澄清、引用审计、一键论文 PDF 导出、图像理解、子代理委派、视觉质量门控、迭代精修检查 |
 | 社区 | Tavily, Jina AI, Firecrawl, DuckDuckGo | 网页搜索、网页抓取、图片搜索 |

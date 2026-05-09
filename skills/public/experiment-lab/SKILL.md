@@ -11,6 +11,8 @@ This skill governs MedrixFlow's experiment workflow. It does not replace executi
 
 - CS/AI experiments on local structured data
 - Regression, classification, clustering, PCA/UMAP, and simple ablation tasks
+- Empirical social-science or public-health data analysis when paired with
+  `/mnt/skills/public/empirical-research-methods/SKILL.md`
 - Bioinformatics workflows on local expression data, metadata tables, `h5ad`, or 10x matrix bundles
 - QC, differential expression, enrichment attempts, marker-gene summaries
 - Requests for manuscript-grade figures or experiment bundles for a report
@@ -25,6 +27,11 @@ This skill governs MedrixFlow's experiment workflow. It does not replace executi
   - no metadata/group labels for requested differential analysis
 - Keep literature evidence separate from experimental evidence. Use `academic_research` only for related work or method framing.
 - Default to Python-first execution. Do not ask the user to choose Python or R unless they explicitly request R output.
+- For empirical methods such as DID, IV, RDD, PSM/IPW, synthetic control, DML,
+  causal forest, target-trial emulation, TMLE, survival, Table 1, event study,
+  robustness, heterogeneity, or mechanism analysis, first load
+  `/mnt/skills/public/empirical-research-methods/SKILL.md` and follow its
+  identification gates.
 
 ## Iterative Experiment Loop
 
@@ -48,6 +55,25 @@ For code-tuning, model-training, ablation, or autonomous experiment requests, us
 - Unsupervised tasks:
   - clustering -> cluster projection + silhouette
   - dimensionality reduction -> PCA/UMAP embedding
+
+## Empirical Research Routing
+
+For empirical social-science and public-health datasets, the `empirical-research-methods`
+skill defines the method contract. Use it to decide whether the requested work is
+descriptive, predictive, or causal, then pass method details into `experiment_lab`
+metadata:
+
+- `empirical_method`: `did`, `staggered_did`, `iv`, `rdd`, `psm`, `synthetic_control`,
+  `dml`, `causal_forest`, `target_trial`, `tmle`, `survival`, or `regression`
+- `estimand`: ATE, ATT, LATE, CATE, event-time effect, risk difference, hazard ratio, or predictive metric
+- `outcome`, `treatment`, `unit_id`, `time`, `treatment_time`, `instrument`,
+  `running_variable`, `cutoff`, `covariates`, `fixed_effects`, `cluster`
+- `required_outputs`: Table 1, main results, identification graphic, robustness,
+  heterogeneity, mechanism, and reproducibility ledger
+
+If the current backend cannot execute the requested causal estimator, run only
+the closest safe descriptive/regression workflow, record the requested method as
+not executed, and avoid causal claims.
 
 ## Bioinformatics Routing
 
@@ -92,6 +118,8 @@ Use `experiment_lab` when the user needs execution, metrics, or figure generatio
 - `target_column` for supervised CS/AI work
 - `metadata_path`, `sample_id_column`, and `group_column` for bulk expression tasks when available
 - `linked_academic_project_id` when the experiment should feed a formal report
+- `metadata` with empirical method, estimand, variables, identification assumptions,
+  and required outputs for empirical research tasks
 
 ## Final Response Pattern
 

@@ -26,6 +26,11 @@ Operating rules:
 - Default to Python-first local execution for structured experiments and figures.
 - Read and follow the `experiment-lab` skill whenever the task is about experiments,
   baselines, metrics, diagnostics, or paper-ready result bundles.
+- For empirical social-science, applied economics, public policy, education,
+  finance, management, epidemiology, or public-health data studies, read and
+  follow `/mnt/skills/public/empirical-research-methods/SKILL.md` before
+  execution. Pass empirical method metadata into `experiment_lab` and do not
+  make causal claims unless its identification gate passes.
 - Prefer the `experiment_lab` tool for end-to-end experiment execution and export.
 - If the user is writing a paper, thesis, or technical report and needs related-work
   grounding, you may also use `academic_research` for baseline literature, but never

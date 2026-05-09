@@ -25,6 +25,39 @@ from .types import (
     ReviewerReportRecord,
 )
 
+_EMPIRICAL_METHOD_HINTS = {
+    "difference-in-differences": "did",
+    "staggered did": "staggered_did",
+    "event study": "event_study",
+    "event-study": "event_study",
+    "instrumental variable": "iv",
+    "regression discontinuity": "rdd",
+    "synthetic control": "synthetic_control",
+    "target trial": "target_trial",
+    "causal forest": "causal_forest",
+    "propensity score": "psm",
+    "double machine learning": "dml",
+    "survival": "survival",
+    "tmle": "tmle",
+    "did": "did",
+    "iv": "iv",
+    "rdd": "rdd",
+    "psm": "psm",
+    "ipw": "ipw",
+    "dml": "dml",
+}
+
+_EMPIRICAL_DOMAIN_HINTS = {
+    "applied economics",
+    "econometric",
+    "empirical",
+    "finance",
+    "management",
+    "policy",
+    "public health",
+    "sociology",
+}
+
 
 class ResearchQuestService:
     def __init__(self, repository: ResearchRepository) -> None:
@@ -49,10 +82,10 @@ class ResearchQuestService:
             topic=topic.strip(),
             scope=scope.strip() if scope else None,
             objective=objective.strip() if objective else None,
-            domain=domain or detect_domain(topic, scope),
+            domain=domain or self._detect_research_domain(topic, scope, objective, metadata),
             stage="intake",
             status="active",
-            metadata=metadata or {},
+            metadata=self._initial_metadata(topic=topic, scope=scope, objective=objective, metadata=metadata),
             created_at=timestamp,
             updated_at=timestamp,
         )
@@ -65,6 +98,93 @@ class ResearchQuestService:
             outputs={"stage": created.stage, "human_gates": list(GATED_TRANSITIONS.values())},
         )
         return created
+
+    def _initial_metadata(
+        self,
+        *,
+        topic: str,
+        scope: str | None,
+        objective: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        merged = dict(metadata or {})
+        if self._is_empirical_research(topic, scope, objective, metadata):
+            methods = self._infer_empirical_methods(topic, scope, objective, metadata)
+            merged.setdefault("skill_guidance", []).append("empirical-research-methods")
+            merged.setdefault("methodology_skill_path", "/mnt/skills/public/empirical-research-methods/SKILL.md")
+            merged.setdefault("empirical_methods", methods)
+            merged.setdefault(
+                "experiment_metadata_contract",
+                {
+                    "required": [
+                        "empirical_method",
+                        "estimand",
+                        "outcome",
+                        "treatment_or_exposure",
+                        "sample_restrictions",
+                        "identification_assumptions",
+                    ],
+                    "conditional": [
+                        "unit_id",
+                        "time",
+                        "treatment_time",
+                        "instrument",
+                        "running_variable",
+                        "cutoff",
+                        "covariates",
+                        "fixed_effects",
+                        "cluster",
+                    ],
+                },
+            )
+        return merged
+
+    def _detect_research_domain(
+        self,
+        topic: str,
+        scope: str | None,
+        objective: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> str:
+        if self._is_empirical_research(topic, scope, objective, metadata):
+            return "empirical_social_science"
+        return detect_domain(topic, scope)
+
+    def _is_empirical_research(
+        self,
+        topic: str,
+        scope: str | None,
+        objective: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> bool:
+        haystack = " ".join(
+            [
+                topic.lower(),
+                (scope or "").lower(),
+                (objective or "").lower(),
+                " ".join(str(value).lower() for value in (metadata or {}).values()),
+            ]
+        )
+        return any(hint in haystack for hint in _EMPIRICAL_DOMAIN_HINTS) or bool(
+            self._infer_empirical_methods(topic, scope, objective, metadata)
+        )
+
+    def _infer_empirical_methods(
+        self,
+        topic: str,
+        scope: str | None,
+        objective: str | None,
+        metadata: dict[str, Any] | None,
+    ) -> list[str]:
+        haystack = " ".join(
+            [
+                topic.lower(),
+                (scope or "").lower(),
+                (objective or "").lower(),
+                " ".join(str(value).lower() for value in (metadata or {}).values()),
+            ]
+        )
+        return sorted({method for hint, method in _EMPIRICAL_METHOD_HINTS.items() if hint in haystack})
 
     async def list_quests(self, thread_id: str | None = None) -> list[ResearchQuest]:
         return await self._repository.list_quests(thread_id)
@@ -373,13 +493,24 @@ class ResearchQuestService:
     async def _stage_experiment_planned(self, quest: ResearchQuest, inputs: dict[str, Any]) -> dict[str, Any]:
         branch_payloads = self._normalize_dict_list(inputs.get("branches"))
         if not branch_payloads:
+            metadata = {"budget_policy": "human approval required before execution"}
+            if quest.domain == "empirical_social_science":
+                metadata.update(
+                    {
+                        "skill_guidance": "empirical-research-methods",
+                        "methodology_skill_path": "/mnt/skills/public/empirical-research-methods/SKILL.md",
+                        "empirical_methods": quest.metadata.get("empirical_methods", []),
+                        "identification_gate": "required before causal claims",
+                        "experiment_lab_metadata_required": quest.metadata.get("experiment_metadata_contract", {}),
+                    }
+                )
             branch_payloads = [
                 {
                     "name": "Baseline protocol",
                     "branch_type": "baseline",
                     "priority": 1.0,
                     "seed": 42,
-                    "metadata": {"budget_policy": "human approval required before execution"},
+                    "metadata": metadata,
                 }
             ]
         created = 0

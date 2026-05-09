@@ -67,6 +67,25 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 _DATA_SUFFIXES = {".csv", ".tsv", ".txt", ".xls", ".xlsx", ".parquet"}
 _TENX_FEATURE_SUFFIXES = {"features.tsv", "features.tsv.gz", "genes.tsv", "genes.tsv.gz"}
+_EMPIRICAL_METADATA_KEYS = {
+    "cluster",
+    "covariates",
+    "cutoff",
+    "empirical_method",
+    "estimand",
+    "fixed_effects",
+    "identification_assumptions",
+    "instrument",
+    "outcome",
+    "required_outputs",
+    "running_variable",
+    "skill",
+    "time",
+    "treatment",
+    "treatment_or_exposure",
+    "treatment_time",
+    "unit_id",
+}
 
 
 def _artifact_type_for(path: Path) -> str:
@@ -193,6 +212,38 @@ class ExperimentService:
             group_column=group_column,
             publication_grade=publication_grade,
         )
+
+    @staticmethod
+    def _empirical_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+        if not metadata:
+            return {}
+        if metadata.get("skill") == "empirical-research-methods":
+            return dict(metadata)
+        if "empirical_method" in metadata:
+            return dict(metadata)
+        return {key: metadata[key] for key in _EMPIRICAL_METADATA_KEYS if key in metadata}
+
+    def _write_empirical_method_contract(
+        self,
+        *,
+        export_dir: Path,
+        project: ExperimentProject,
+        analysis_type: str,
+    ) -> Path | None:
+        empirical = self._empirical_metadata(project.metadata)
+        if not empirical:
+            return None
+
+        empirical.setdefault("skill", "empirical-research-methods")
+        empirical.setdefault("requested_analysis_type", analysis_type)
+        empirical.setdefault("executed_analysis_type_note", "Current experiment_lab execution may fall back to descriptive/regression workflows.")
+        empirical.setdefault(
+            "causal_claim_gate",
+            "Do not make causal manuscript claims unless the requested identification checks are executed and pass.",
+        )
+        contract_path = export_dir / "empirical_method_contract.json"
+        contract_path.write_text(json.dumps(empirical, ensure_ascii=False, indent=2), encoding="utf-8")
+        return contract_path
 
     async def get_project_summary(self, project_id: str) -> ExperimentProjectSummary:
         project = await self._require_project(project_id)
@@ -324,6 +375,13 @@ class ExperimentService:
         await self._repository.replace_figures(run.run_id, figures)
 
         export_files: list[Path] = result["export_files"]
+        empirical_contract = self._write_empirical_method_contract(
+            export_dir=export_dir,
+            project=project,
+            analysis_type=result["analysis_type"],
+        )
+        if empirical_contract is not None:
+            export_files = [*export_files, empirical_contract]
         artifacts = [
             ExperimentArtifact(
                 artifact_id=f"artifact-{uuid4().hex[:12]}",
@@ -337,6 +395,8 @@ class ExperimentService:
                     "analysis_type": result["analysis_type"],
                     "figure_count": len([item for item in result["figures"] if item["output_files"]]),
                     "linked_academic_project_id": project.linked_academic_project_id,
+                    "empirical_method": project.metadata.get("empirical_method"),
+                    "methodology_skill": project.metadata.get("skill"),
                 },
                 created_at=now_iso(),
             )

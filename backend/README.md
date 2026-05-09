@@ -107,7 +107,7 @@ LLM-powered persistent context retention across conversations:
 | **Built-in** | `present_files`, `ask_clarification`, `citation_audit`, `manuscript_export`, `view_image`, `task` (subagent) |
 | **Community** | Tavily (web search), Jina AI (web fetch), Firecrawl (scraping), DuckDuckGo (image search) |
 | **MCP** | Any Model Context Protocol server (stdio, SSE, HTTP transports) |
-| **Skills** | Domain-specific workflows injected via system prompt |
+| **Skills** | Domain-specific workflows injected via system prompt, including `empirical-research-methods` for DID/IV/RDD/DML/Table 1/robustness empirical research routing |
 
 ### Gateway API
 

@@ -156,6 +156,43 @@ def test_research_quest_rejects_invalid_stage_jump():
     asyncio.run(scenario())
 
 
+def test_empirical_research_quest_attaches_method_skill_and_branch_contract():
+    async def scenario() -> None:
+        service, db = await _make_service()
+        quest = await service.create_quest(
+            thread_id="thread-empirical-1",
+            topic="DID evaluation of education policy effects on student outcomes",
+            objective="Run an empirical public policy analysis with event-study robustness.",
+        )
+
+        assert quest.domain == "empirical_social_science"
+        assert "empirical-research-methods" in quest.metadata["skill_guidance"]
+        assert quest.metadata["methodology_skill_path"] == "/mnt/skills/public/empirical-research-methods/SKILL.md"
+        assert {"did", "event_study"} <= set(quest.metadata["empirical_methods"])
+
+        await service.advance_quest(quest.quest_id)
+        await service.advance_quest(
+            quest.quest_id,
+            inputs={
+                "idea": "DID evaluation of education policy effects on student outcomes",
+                "closest_papers": [{"title": "Education policy and student outcomes"}],
+                "overlap_risk": "low",
+            },
+        )
+        await service.advance_quest(quest.quest_id)
+        planned = await service.advance_quest(quest.quest_id)
+
+        assert planned.quest.stage == "experiment_planned"
+        snapshot = await service.get_snapshot(quest.quest_id)
+        branch = snapshot.experiment_branches[0]
+        assert branch.metadata["skill_guidance"] == "empirical-research-methods"
+        assert branch.metadata["identification_gate"] == "required before causal claims"
+        assert branch.metadata["experiment_lab_metadata_required"]["required"]
+        await db.close()
+
+    asyncio.run(scenario())
+
+
 def test_high_overlap_blocks_experiment_planning_until_override():
     async def scenario() -> None:
         service, db = await _make_service()

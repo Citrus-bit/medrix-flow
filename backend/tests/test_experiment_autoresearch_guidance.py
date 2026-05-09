@@ -18,6 +18,21 @@ def test_experiment_lab_skill_documents_iterative_experiment_loop():
     assert "`keep`, `discard`, or `crash`" in text
 
 
+def test_empirical_research_methods_skill_is_available_and_routed():
+    root = Path(__file__).resolve().parents[2]
+    skill_text = (root / "skills/public/empirical-research-methods/SKILL.md").read_text(encoding="utf-8")
+    experiment_text = (root / "skills/public/experiment-lab/SKILL.md").read_text(encoding="utf-8")
+
+    assert "Awesome-Agent-Skills-for-Empirical-Research" in skill_text
+    assert "DID" in skill_text
+    assert "IV" in skill_text
+    assert "RDD" in skill_text
+    assert "experiment_lab" in skill_text
+    assert "manuscript_export" in skill_text
+    assert "empirical-research-methods" in experiment_text
+    assert "identification gates" in experiment_text
+
+
 def test_cs_ai_experimenter_mentions_autoresearch_style_loop():
     prompt = CS_AI_EXPERIMENTER_CONFIG.system_prompt
 
@@ -25,12 +40,14 @@ def test_cs_ai_experimenter_mentions_autoresearch_style_loop():
     assert "baseline" in prompt
     assert "primary metric" in prompt
     assert "keep/discard/crash" in prompt
+    assert "empirical-research-methods" in prompt
 
 
 def test_cs_ai_lab_mentions_autoresearch_style_loop():
     assert "autoresearch-style loop" in CS_AI_LAB.soul
     assert "fixed evaluation harness" in CS_AI_LAB.soul
     assert "keep/discard/crash" in CS_AI_LAB.soul
+    assert "empirical-research-methods" in CS_AI_LAB.soul
 
 
 def test_experiment_lab_tool_mentions_iterative_trial_log():
