@@ -16,8 +16,8 @@ from medrix_flow.runtime.utils import now_iso
 from .quality import hydrate_quality_metadata, is_nlp_topic
 from .types import PaperAuthor, PaperRecord
 from .utils import (
-    extract_keywords,
     canonical_id_for,
+    extract_keywords,
     infer_conflict_flags,
     infer_method_tags,
     infer_population_tags,
@@ -150,7 +150,7 @@ class DBLPAdapter(HTTPAcademicAdapter):
             title = _strip_markup(info.get("title"))
             if not title:
                 continue
-            authors = _dblp_authors(((info.get("authors") or {}).get("author")))
+            authors = _dblp_authors((info.get("authors") or {}).get("author"))
             year_text = str(info.get("year") or "")
             year = int(year_text) if year_text.isdigit() else None
             venue = info.get("venue") or info.get("booktitle") or info.get("journal")

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
@@ -13,7 +12,6 @@ from medrix_flow.runtime.utils import now_iso
 
 from .adapters import AcademicSourceAdapter, build_default_adapters
 from .formatters import format_apa7_reference, format_bibtex_entry
-from .queries import build_query_expansions
 from .quality import (
     canonical_reason,
     hydrate_quality_metadata,
@@ -22,6 +20,7 @@ from .quality import (
     venue_breakdown,
     version_priority_score,
 )
+from .queries import build_query_expansions
 from .ranking import score_papers, select_core_papers
 from .repository import AcademicRepository
 from .types import (
@@ -34,7 +33,6 @@ from .types import (
     ReferenceEntry,
     ReportExportRecord,
     ResearchProject,
-    SearchQueryRecord,
     SynthesisResult,
 )
 from .utils import (

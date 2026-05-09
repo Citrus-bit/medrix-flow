@@ -37,7 +37,7 @@ from medrix_flow.agents.lead_agent.prompt import apply_prompt_template
 from medrix_flow.agents.thread_state import ThreadState
 from medrix_flow.config.agents_config import AGENT_NAME_PATTERN
 from medrix_flow.config.app_config import get_app_config, reload_app_config
-from medrix_flow.config.extensions_config import ExtensionsConfig, SkillStateConfig, get_extensions_config, reload_extensions_config
+from medrix_flow.config.extensions_config import ExtensionsConfig, get_extensions_config, reload_extensions_config
 from medrix_flow.config.paths import get_paths
 from medrix_flow.models import create_chat_model
 from medrix_flow.skills.service import SkillService

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from .types import PaperRecord
 from .quality import preprint_penalty, published_version_bonus, venue_tier_score
+from .types import PaperRecord
 from .utils import (
     citation_score,
     completeness_score,
