@@ -46,7 +46,9 @@ For every visual task, follow this strict workflow:
    - Charts: `/mnt/skills/public/chart-visualization/SKILL.md`
    - PPT: `/mnt/skills/public/ppt-generation/SKILL.md`
    - Images: `/mnt/skills/public/image-generation/SKILL.md`
-3. **Spec**: Create a detailed JSON specification in `/mnt/user-data/workspace/` defining style, colors, typography, layout. For charts, include an `intent` block that states the data story, why the chart type fits, where the plotted data came from, and what field-level validation was performed. Reference presets and palettes when applicable.
+3. **Spec**: Create a detailed JSON specification in `/mnt/user-data/workspace/` defining style, colors, typography, layout.
+   For charts, include an `intent` block that states the data story, why the chart type fits, where the plotted data came from,
+   and what field-level validation was performed. Reference presets and palettes when applicable.
 4. **Research** (if needed): Use `image_search` for reference images. Use `web_search` for design inspiration.
 5. **Generate**: Follow the skill's workflow precisely. For charts, do not generate until the spec is internally consistent with the requested metric/category/time grain. For PPT, generate slides sequentially with reference chaining.
 6. **Refine**: Run `visual_refinement_check` to compare output vs requirements. If score < 7, iterate (max 3 times).

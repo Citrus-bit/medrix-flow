@@ -91,6 +91,7 @@ _SUPERSCRIPT_CLASS = "".join(map(re.escape, _SUPERSCRIPT_CHARS))
 _UNICODE_MATH_TOKEN_RE = re.compile(
     rf"(?<![$\\])([A-Za-z0-9]+)([{_SUBSCRIPT_CLASS}{_SUPERSCRIPT_CLASS}]+)"
 )
+_ADJACENT_INLINE_MATH_RATIO_RE = re.compile(r"\$([^$]+)\$/\$([^$]+)\$")
 
 
 def _translate_script_chars(chars: str, mapping: dict[str, str]) -> str:
@@ -122,7 +123,12 @@ def _replace_unicode_math_tokens(source: str) -> str:
             idx += 1
         return f"${''.join(pieces)}$"
 
-    return _UNICODE_MATH_TOKEN_RE.sub(repl, source)
+    source = _UNICODE_MATH_TOKEN_RE.sub(repl, source)
+    previous = None
+    while previous != source:
+        previous = source
+        source = _ADJACENT_INLINE_MATH_RATIO_RE.sub(r"$\1/\2$", source)
+    return source
 
 
 def _sanitize_latex_source(source: str) -> str:

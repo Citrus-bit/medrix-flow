@@ -62,7 +62,8 @@ Memory Section Guidelines:
   * context: Background facts (job title, projects, locations, languages)
   * behavior: Working patterns, communication habits, problem-solving approaches
   * goal: Stated objectives, learning targets, project ambitions
-  * visual_preference: Design style preferences (color palettes, typography, layout styles, brand guidelines, preferred chart types, presentation aesthetics). Extract when user expresses opinions on visual output, requests specific styles, or provides brand/design constraints.
+  * visual_preference: Design style preferences (color palettes, typography, layout styles, brand guidelines, preferred chart types, presentation aesthetics).
+    Extract when user expresses opinions on visual output, requests specific styles, or provides brand/design constraints.
 - Confidence levels:
   * 0.9-1.0: Explicitly stated facts ("I work on X", "My role is Y")
   * 0.7-0.8: Strongly implied from actions/discussions

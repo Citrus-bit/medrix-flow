@@ -4,12 +4,11 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from dotenv import load_dotenv, set_key
 from pydantic import BaseModel, Field
-from typing_extensions import Literal
 
 from medrix_flow.config.app_config import AppConfig, reload_app_config
 from medrix_flow.setup.security import (

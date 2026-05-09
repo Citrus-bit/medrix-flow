@@ -10,12 +10,12 @@ from medrix_flow.agents.middlewares.loop_detection_middleware import LoopDetecti
 from medrix_flow.agents.middlewares.memory_middleware import MemoryMiddleware
 from medrix_flow.agents.middlewares.sandbox_audit_middleware import SandboxAuditMiddleware
 from medrix_flow.agents.middlewares.subagent_limit_middleware import SubagentLimitMiddleware
-from medrix_flow.agents.middlewares.visual_quality_middleware import VisualQualityMiddleware
 from medrix_flow.agents.middlewares.title_middleware import TitleMiddleware
 from medrix_flow.agents.middlewares.todo_middleware import TodoMiddleware
 from medrix_flow.agents.middlewares.token_usage_middleware import TokenUsageMiddleware
 from medrix_flow.agents.middlewares.tool_error_handling_middleware import build_lead_runtime_middlewares
 from medrix_flow.agents.middlewares.view_image_middleware import ViewImageMiddleware
+from medrix_flow.agents.middlewares.visual_quality_middleware import VisualQualityMiddleware
 from medrix_flow.agents.thread_state import ThreadState
 from medrix_flow.config.agents_config import load_agent_config
 from medrix_flow.config.app_config import get_app_config

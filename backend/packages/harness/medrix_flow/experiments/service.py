@@ -19,7 +19,7 @@ from scipy.stats import ttest_ind
 from sklearn.cluster import KMeans
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import PCA
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import Lasso, LinearRegression, LogisticRegression, Ridge
 from sklearn.metrics import (
@@ -515,8 +515,8 @@ class ExperimentService:
                 [
                     "# Methods",
                     "",
-                    f"- Domain: CS/AI",
-                    f"- Analysis type: regression",
+                    "- Domain: CS/AI",
+                    "- Analysis type: regression",
                     f"- Model: {method_key}",
                     f"- Target column: `{target_column}`",
                     f"- Train/test split: {len(X_train)}/{len(X_test)}",
@@ -545,7 +545,7 @@ class ExperimentService:
                     "",
                     f"- Topic: {project.topic}",
                     f"- Dataset count: {len(project.dataset_ids)}",
-                    f"- Resolved analysis: regression",
+                    "- Resolved analysis: regression",
                     f"- Resolved target: {target_column}",
                     f"- Publication grade: {publication_grade}",
                 ]
@@ -697,8 +697,8 @@ class ExperimentService:
                 [
                     "# Methods",
                     "",
-                    f"- Domain: CS/AI",
-                    f"- Analysis type: classification",
+                    "- Domain: CS/AI",
+                    "- Analysis type: classification",
                     f"- Model: {method_key}",
                     f"- Target column: `{target_column}`",
                     f"- Classes: {', '.join(encoder.classes_.tolist())}",
@@ -727,7 +727,7 @@ class ExperimentService:
                     "",
                     f"- Topic: {project.topic}",
                     f"- Dataset count: {len(project.dataset_ids)}",
-                    f"- Resolved analysis: classification",
+                    "- Resolved analysis: classification",
                     f"- Resolved target: {target_column}",
                     f"- Publication grade: {publication_grade}",
                 ]
