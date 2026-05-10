@@ -185,6 +185,171 @@ def test_checkpoint_diff_materialization_persists_only_new_messages():
     asyncio.run(scenario())
 
 
+def test_workflow_endpoint_normalizes_run_events():
+    async def scenario():
+        service, db = await _make_runtime_service(messages=[HumanMessage(content="before")])
+
+        await service.start_run(
+            "thread-1",
+            runs.RunCreateRequest(run_id="run-workflow-1", assistant_id="lead_agent"),
+        )
+        await service.record_external_event(
+            "thread-1",
+            "run-workflow-1",
+            event_type="human_message",
+            caller="user",
+            content={"type": "human", "content": "Write a paper"},
+        )
+        await service.record_external_event(
+            "thread-1",
+            "run-workflow-1",
+            event_type="ai_tool_calls",
+            caller="assistant",
+            content={
+                "type": "ai",
+                "tool_calls": [
+                    {
+                        "name": "manuscript_export",
+                        "args": {"tex_content": "secret-free", "api_key": "should-not-leak"},
+                        "id": "call-1",
+                    }
+                ],
+            },
+        )
+        await service.record_external_event(
+            "thread-1",
+            "run-workflow-1",
+            event_type="tool_message",
+            caller="manuscript_export",
+            content={
+                "type": "tool",
+                "name": "manuscript_export",
+                "content": "PASS",
+                "artifacts": ["/mnt/user-data/outputs/manuscript.pdf"],
+            },
+        )
+        await service.complete_run("thread-1", "run-workflow-1", status=RunStatus.success)
+
+        workflow = await service.build_workflow("thread-1", "run-workflow-1", limit=20)
+        kinds = [node["kind"] for node in workflow["nodes"]]
+        assert "user" in kinds
+        assert "tool" in kinds
+        assert "artifact" in kinds
+        assert workflow["events"][1]["content"]["tool_calls"][0]["args"]["api_key"] == "[redacted]"
+        assert workflow["run"]["status"] == "success"
+
+        delta = await service.build_workflow("thread-1", "run-workflow-1", limit=20, after_seq=2)
+        assert [event["seq"] for event in delta["events"]] == [3]
+
+        await db.close()
+
+    asyncio.run(scenario())
+
+
+def test_external_sideband_events_do_not_advance_checkpoint_materialization():
+    async def scenario():
+        service, db = await _make_runtime_service(messages=[HumanMessage(content="before")])
+
+        await service.start_run(
+            "thread-1",
+            runs.RunCreateRequest(run_id="run-sideband-1", assistant_id="lead_agent"),
+        )
+        await service.record_external_event(
+            "thread-1",
+            "run-sideband-1",
+            event_type="human_message",
+            caller="user",
+            content={"type": "human", "content": "Visible request"},
+        )
+
+        record = await service.require_run("thread-1", "run-sideband-1")
+        assert record.persisted_message_count == 0
+        assert record.messages_complete is False
+
+        service._checkpointer.messages = [
+            HumanMessage(content="before"),
+            AIMessage(content="checkpoint answer"),
+        ]
+        await service.complete_run("thread-1", "run-sideband-1", status=RunStatus.success)
+
+        page = await service.list_run_messages("thread-1", "run-sideband-1", limit=10)
+        assert [row["event_type"] for row in page["data"]] == ["human_message", "ai_message"]
+        assert page["data"][1]["content"]["content"] == "checkpoint answer"
+
+        await db.close()
+
+    asyncio.run(scenario())
+
+
+def test_workflow_redacts_hidden_reasoning_content():
+    async def scenario():
+        service, db = await _make_runtime_service()
+
+        await service.start_run(
+            "thread-1",
+            runs.RunCreateRequest(run_id="run-redact-1", assistant_id="lead_agent"),
+        )
+        await service.record_external_event(
+            "thread-1",
+            "run-redact-1",
+            event_type="ai_message",
+            caller="assistant",
+            content={
+                "type": "ai",
+                "content": "<think>private reasoning</think>visible answer",
+                "additional_kwargs": {"reasoning_content": "private chain"},
+            },
+        )
+
+        workflow = await service.build_workflow("thread-1", "run-redact-1", limit=20)
+        content = workflow["events"][0]["content"]
+        assert content["content"] == "[hidden]visible answer"
+        assert content["additional_kwargs"]["reasoning_content"] == "[hidden]"
+
+        await db.close()
+
+    asyncio.run(scenario())
+
+
+def test_streaming_gateway_run_persists_visible_events():
+    async def scenario():
+        service, db = await _make_runtime_service()
+
+        fake_client = MagicMock()
+        fake_client.stream.return_value = iter(
+            [
+                SimpleNamespace(type="messages-tuple", data={"type": "ai", "content": "", "id": "ai-1", "tool_calls": [{"name": "search", "args": {}, "id": "call-1"}]}),
+                SimpleNamespace(type="messages-tuple", data={"type": "tool", "content": "result", "name": "search", "tool_call_id": "call-1", "id": "tool-1"}),
+                SimpleNamespace(type="messages-tuple", data={"type": "ai", "content": "done", "id": "ai-2", "usage_metadata": {"input_tokens": 3, "output_tokens": 4, "total_tokens": 7}}),
+            ]
+        )
+
+        with (
+            patch("app.gateway.services.get_paths") as mock_get_paths,
+            patch("app.gateway.services.get_sync_checkpointer", return_value="sync-checkpointer"),
+            patch("app.gateway.services.MedrixFlowClient", return_value=fake_client),
+        ):
+            mock_get_paths.return_value.ensure_thread_dirs.return_value = None
+            record = await service.start_run(
+                "thread-stream-1",
+                runs.RunCreateRequest(
+                    assistant_id="lead_agent",
+                    input={"messages": [HumanMessage(content="hello")]},
+                ),
+            )
+            assert record.task is not None
+            await record.task
+
+        workflow = await service.build_workflow("thread-stream-1", record.run_id, limit=20)
+        assert workflow["run"]["status"] == "success"
+        assert [event["event_type"] for event in workflow["events"]] == ["ai_tool_calls", "tool_message", "ai_message"]
+        assert workflow["usage"]["total_tokens"] == 7
+
+        await db.close()
+
+    asyncio.run(scenario())
+
+
 def test_gateway_run_threads_reasoning_effort_into_embedded_client():
     async def scenario():
         service, db = await _make_runtime_service()

@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import type { PromptInputMessage } from "@/components/ai-elements/prompt-input";
 
 import { getAPIClient } from "../api";
-import { completeThreadRun, registerThreadRun } from "../api/runs";
+import { completeThreadRun, createRunEvent, registerThreadRun } from "../api/runs";
 import { getBackendBaseURL } from "../config";
 import { useI18n } from "../i18n/hooks";
 import type { FileInMessage } from "../messages/utils";
@@ -82,6 +82,8 @@ export function useThreadStream({
   const threadIdRef = useRef<string | null>(threadId ?? null);
   const currentRunIdRef = useRef<string | null>(null);
   const startedRef = useRef(false);
+  const recordedUserEventRef = useRef(false);
+  const pendingUserContentRef = useRef("");
 
   const listeners = useRef({
     onStart,
@@ -105,6 +107,7 @@ export function useThreadStream({
     } else if (normalizedThreadId !== threadIdRef.current) {
       setCurrentRunId(null);
       currentRunIdRef.current = null;
+      recordedUserEventRef.current = false;
     }
     threadIdRef.current = normalizedThreadId;
   }, [threadId]);
@@ -147,6 +150,15 @@ export function useThreadStream({
       }).catch(() => {
         // Best-effort only. Older backends should not break streaming.
       });
+      if (!recordedUserEventRef.current) {
+        recordedUserEventRef.current = true;
+        const content = pendingUserContentRef.current;
+        void createRunEvent(meta.thread_id, meta.run_id, {
+          event_type: "human_message",
+          caller: "user",
+          content: { type: "human", content },
+        }).catch(() => undefined);
+      }
       // Optimistically add the new thread to the sidebar list so it's visible
       // immediately, even before the backend's threads.search returns it.
       queryClient.setQueriesData(
@@ -177,6 +189,22 @@ export function useThreadStream({
           name: event.name,
           data: event.data,
         });
+        const runId = currentRunIdRef.current;
+        const currentThreadId = threadIdRef.current;
+        if (runId && currentThreadId) {
+          void createRunEvent(currentThreadId, runId, {
+            event_type: "tool_message",
+            caller: event.name || "tool",
+            content: {
+              type: "tool",
+              name: event.name,
+              content:
+                typeof event.data === "string"
+                  ? event.data
+                  : JSON.stringify(event.data ?? {}),
+            },
+          }).catch(() => undefined);
+        }
       }
     },
     onUpdateEvent(data) {
@@ -206,6 +234,17 @@ export function useThreadStream({
             },
           );
         }
+        if (update && "artifacts" in update && Array.isArray(update.artifacts)) {
+          const runId = currentRunIdRef.current;
+          const currentThreadId = threadIdRef.current;
+          if (runId && currentThreadId) {
+            void createRunEvent(currentThreadId, runId, {
+              event_type: "state_snapshot",
+              caller: "checkpoint",
+              content: { artifacts: update.artifacts },
+            }).catch(() => undefined);
+          }
+        }
       }
     },
     onCustomEvent(event: unknown) {
@@ -226,6 +265,23 @@ export function useThreadStream({
           ...(e.message ? { latestMessage: e.message } : {}),
           lastUpdatedAt: new Date().toISOString(),
         });
+        const runId = currentRunIdRef.current;
+        const currentThreadId = threadIdRef.current;
+        if (runId && currentThreadId) {
+          void createRunEvent(currentThreadId, runId, {
+            event_type: "subagent_event",
+            caller: "task",
+            content: {
+              type: "task",
+              task_id: e.task_id,
+              heartbeat: Boolean(e.heartbeat),
+              content:
+                typeof e.message?.content === "string"
+                  ? e.message.content
+                  : JSON.stringify(e.message?.content ?? ""),
+            },
+          }).catch(() => undefined);
+        }
       }
     },
     onError(error) {
@@ -365,8 +421,10 @@ export function useThreadStream({
       }
       sendInFlightRef.current = true;
       setIsSubmitting(true);
+      recordedUserEventRef.current = false;
 
       const text = message.text.trim();
+      pendingUserContentRef.current = text;
 
       // Capture current count before showing optimistic messages
       prevMsgCountRef.current = thread.messages.length;

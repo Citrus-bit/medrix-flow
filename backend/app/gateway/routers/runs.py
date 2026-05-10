@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from app.gateway.deps import get_run_service
+from app.gateway.workflow import WorkflowSnapshot
 from medrix_flow.runtime.runs import RunRecord, RunStatus
 
 router = APIRouter(prefix="/api/threads", tags=["runs"])
@@ -70,6 +71,12 @@ class RunCompletionRequest(BaseModel):
     status: Literal["success", "interrupted", "error"] = "success"
 
 
+class RunEventCreateRequest(BaseModel):
+    event_type: str = Field(..., min_length=1, max_length=80)
+    caller: str = Field(default="frontend", max_length=120)
+    content: dict[str, Any] = Field(default_factory=dict)
+
+
 def _record_to_response(record: RunRecord) -> RunResponse:
     return RunResponse(
         run_id=record.run_id,
@@ -103,6 +110,37 @@ async def get_run(thread_id: str, run_id: str, request: Request) -> RunResponse:
     service = get_run_service(request)
     record = await service.require_run(thread_id, run_id)
     return _record_to_response(record)
+
+
+@router.get("/{thread_id}/runs/{run_id}/workflow", response_model=WorkflowSnapshot)
+async def get_run_workflow(
+    thread_id: str,
+    run_id: str,
+    request: Request,
+    limit: int = Query(default=200, ge=1, le=500),
+    after_seq: int | None = Query(default=None),
+) -> WorkflowSnapshot:
+    service = get_run_service(request)
+    payload = await service.build_workflow(thread_id, run_id, limit=limit, after_seq=after_seq)
+    return WorkflowSnapshot(**payload)
+
+
+@router.post("/{thread_id}/runs/{run_id}/events", response_model=RunMessage)
+async def create_run_event(
+    thread_id: str,
+    run_id: str,
+    body: RunEventCreateRequest,
+    request: Request,
+) -> RunMessage:
+    service = get_run_service(request)
+    row = await service.record_external_event(
+        thread_id,
+        run_id,
+        event_type=body.event_type,
+        caller=body.caller,
+        content=body.content,
+    )
+    return RunMessage(**row)
 
 
 @router.post("/{thread_id}/runs/stream")

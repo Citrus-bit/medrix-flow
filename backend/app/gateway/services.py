@@ -24,6 +24,8 @@ from medrix_flow.runtime.runs.store.base import RunStore
 from medrix_flow.runtime.serialization import extract_text, message_caller, message_event_type, serialize_message
 from medrix_flow.runtime.stream_bridge import END_SENTINEL, MemoryStreamBridge
 
+from .workflow import normalize_stream_event
+
 logger = logging.getLogger(__name__)
 
 _ITERATION_END = object()
@@ -202,6 +204,48 @@ class GatewayRunService:
         has_more = len(rows) > limit
         return {"data": rows[:limit] if has_more else rows, "has_more": has_more}
 
+    async def build_workflow(
+        self,
+        thread_id: str,
+        run_id: str,
+        *,
+        limit: int = 200,
+        after_seq: int | None = None,
+    ) -> dict[str, Any]:
+        from .workflow import build_workflow_snapshot
+
+        record = await self.require_run(thread_id, run_id)
+        if not record.messages_complete and record.status in {RunStatus.success, RunStatus.error, RunStatus.interrupted}:
+            await self.materialize_run_messages(record, finalize=True, final_status=record.status)
+            record = await self.require_run(thread_id, run_id)
+        rows = await self._event_store.list_messages_by_run(
+            thread_id,
+            run_id,
+            limit=limit + 1,
+            after_seq=after_seq,
+        )
+        has_more = len(rows) > limit
+        snapshot = build_workflow_snapshot(record=record, event_rows=rows[:limit], has_more=has_more)
+        return snapshot.model_dump()
+
+    async def record_external_event(
+        self,
+        thread_id: str,
+        run_id: str,
+        *,
+        event_type: str,
+        caller: str,
+        content: dict[str, Any],
+    ) -> dict[str, Any]:
+        await self.require_run(thread_id, run_id)
+        return await self._event_store.put(
+            thread_id=thread_id,
+            run_id=run_id,
+            event_type=event_type,
+            caller=caller,
+            content=content,
+        )
+
     async def materialize_run_messages(
         self,
         record: RunRecord,
@@ -209,6 +253,17 @@ class GatewayRunService:
         finalize: bool,
         final_status: RunStatus | None,
     ) -> MaterializationResult:
+        if record.source == "gateway":
+            if finalize or not record.messages_complete:
+                await self._run_manager.mark_materialized(
+                    record.run_id,
+                    persisted_message_count=record.persisted_message_count,
+                    complete=finalize,
+                )
+            if finalize and final_status is not None:
+                await self._run_manager.set_status(record.run_id, final_status, error=record.error)
+            return MaterializationResult(persisted_count=record.persisted_message_count, complete=finalize)
+
         checkpoint_messages = await self._get_checkpoint_messages(record.thread_id)
         persisted_start = record.pre_message_count + record.persisted_message_count
         if persisted_start < 0:
@@ -288,6 +343,7 @@ class GatewayRunService:
                     record.run_id,
                     {"event": event.type, "data": event.data},
                 )
+                await self._persist_stream_event(record, event.type, event.data)
 
             final_status = RunStatus.interrupted if record.abort_event.is_set() else RunStatus.success
         except asyncio.CancelledError:
@@ -303,6 +359,27 @@ class GatewayRunService:
         finally:
             await self.materialize_run_messages(record, finalize=True, final_status=final_status)
             await self._stream_bridge.close(record.run_id)
+
+    async def _persist_stream_event(self, record: RunRecord, event_type: str, data: dict[str, Any]) -> None:
+        try:
+            normalized_type, caller, content = normalize_stream_event(event_type, data)
+            row = await self._event_store.put(
+                thread_id=record.thread_id,
+                run_id=record.run_id,
+                event_type=normalized_type,
+                caller=caller,
+                content=content,
+            )
+            record.persisted_message_count += 1
+            await self._run_manager.mark_materialized(
+                record.run_id,
+                persisted_message_count=record.persisted_message_count,
+                complete=False,
+            )
+            if row.get("created_at"):
+                await self._run_manager.set_status(record.run_id, record.status, error=record.error)
+        except Exception:
+            logger.warning("Best-effort stream event persistence failed for %s", record.run_id, exc_info=True)
 
     async def _get_checkpoint_message_count(self, thread_id: str) -> int:
         return len(await self._get_checkpoint_messages(thread_id))

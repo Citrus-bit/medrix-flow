@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { completeThreadRun, listThreadRuns, registerThreadRun } from "./runs";
+import { cancelThreadRun, completeThreadRun, listThreadRuns, registerThreadRun } from "./runs";
 
 const fetchMock = vi.fn();
 
@@ -79,6 +79,20 @@ describe("runs api", () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "success" }),
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
+  it("cancels an active run", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 202 }));
+
+    await cancelThreadRun("thread-1", "run-1");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/threads/thread-1/runs/run-1/cancel?action=interrupt",
+      expect.objectContaining({
+        method: "POST",
         signal: expect.any(AbortSignal),
       }),
     );

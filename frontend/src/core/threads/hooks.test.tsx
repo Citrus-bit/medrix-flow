@@ -8,6 +8,7 @@ import { useThreadStream } from "./hooks";
 const mocks = vi.hoisted(() => ({
   registerThreadRun: vi.fn(),
   completeThreadRun: vi.fn(),
+  createRunEvent: vi.fn(),
   updateSubtask: vi.fn(),
   toastError: vi.fn(),
 }));
@@ -39,6 +40,7 @@ vi.mock("@/core/api", () => ({
 vi.mock("@/core/api/runs", () => ({
   registerThreadRun: (...args: unknown[]) => mocks.registerThreadRun(...args),
   completeThreadRun: (...args: unknown[]) => mocks.completeThreadRun(...args),
+  createRunEvent: (...args: unknown[]) => mocks.createRunEvent(...args),
 }));
 
 vi.mock("@/core/i18n/hooks", () => ({
@@ -81,12 +83,14 @@ describe("useThreadStream", () => {
     capturedOptions = null;
     mocks.registerThreadRun.mockReset();
     mocks.completeThreadRun.mockReset();
+    mocks.createRunEvent.mockReset();
     mocks.updateSubtask.mockReset();
     mocks.toastError.mockReset();
   });
 
   it("captures run_id from useStream metadata and sideband-registers it", async () => {
     mocks.registerThreadRun.mockResolvedValue(undefined);
+    mocks.createRunEvent.mockResolvedValue(undefined);
 
     const { result } = renderHook(
       () =>
