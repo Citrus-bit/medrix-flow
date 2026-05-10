@@ -12,6 +12,7 @@ from app.gateway.routers import (
     artifacts,
     channels,
     experiments,
+    features,
     mcp,
     memory,
     models,
@@ -130,6 +131,10 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
                 "description": "Operations for querying available AI models and their configurations",
             },
             {
+                "name": "features",
+                "description": "Read-only inventory of configured agents, MCP tools, and skills",
+            },
+            {
                 "name": "mcp",
                 "description": "Manage Model Context Protocol (MCP) server configurations",
             },
@@ -186,6 +191,9 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Research quest API is mounted at /api/research
     app.include_router(research.router)
+
+    # Feature inventory API is mounted at /api/features
+    app.include_router(features.router)
 
     # MCP API is mounted at /api/mcp
     app.include_router(mcp.router)

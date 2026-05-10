@@ -147,6 +147,8 @@ export interface Translations {
     systemAgent: string;
     customAgent: string;
     readonly: string;
+    readonlyCreateTitle: string;
+    readonlyCreateDescription: string;
   };
 
   // Breadcrumb
@@ -252,94 +254,31 @@ export interface Translations {
     description: string;
     sections: {
       setup: string;
-      appearance: string;
-      memory: string;
-      tools: string;
-      skills: string;
+      features: string;
       notification: string;
-      about: string;
     };
-    memory: {
+    features: {
       title: string;
       description: string;
-      empty: string;
-      rawJson: string;
-      markdown: {
-        overview: string;
-        userContext: string;
-        work: string;
-        personal: string;
-        topOfMind: string;
-        historyBackground: string;
-        recentMonths: string;
-        earlierContext: string;
-        longTermBackground: string;
-        updatedAt: string;
-        facts: string;
-        empty: string;
-        table: {
-          category: string;
-          confidence: string;
-          confidenceLevel: {
-            veryHigh: string;
-            high: string;
-            normal: string;
-            unknown: string;
-          };
-          content: string;
-          source: string;
-          createdAt: string;
-          view: string;
-        };
-      };
-    };
-    appearance: {
-      themeTitle: string;
-      themeDescription: string;
-      system: string;
-      light: string;
-      dark: string;
-      systemDescription: string;
-      lightDescription: string;
-      darkDescription: string;
-      languageTitle: string;
-      languageDescription: string;
-    };
-    tools: {
-      title: string;
-      description: string;
-      addServer: string;
-      deleteServer: string;
-      deleteConfirm: string;
-      testConnection: string;
-      saveChanges: string;
-      serverName: string;
-      serverNamePlaceholder: string;
-      transportType: string;
-      command: string;
-      commandPlaceholder: string;
+      readonlyHint: string;
+      agentsTitle: string;
+      toolsTitle: string;
+      skillsTitle: string;
+      emptyAgents: string;
+      emptyTools: string;
+      emptySkills: string;
+      noDescription: string;
+      readonly: string;
+      customEditable: string;
+      enabled: string;
+      disabled: string;
+      transport: string;
+      endpoint: string;
       arguments: string;
-      argumentsPlaceholder: string;
-      serverUrl: string;
-      serverUrlPlaceholder: string;
-      envVars: string;
-      envVarsPlaceholder: string;
-      httpHeaders: string;
-      headersPlaceholder: string;
-      descriptionLabel: string;
-      descriptionPlaceholder: string;
-      emptyTitle: string;
-      emptyDescription: string;
-      noChanges: string;
-      saveSuccess: string;
-    };
-    skills: {
-      title: string;
-      description: string;
-      createSkill: string;
-      emptyTitle: string;
-      emptyDescription: string;
-      emptyButton: string;
+      envKeys: string;
+      headerKeys: string;
+      oauthEnabled: string;
+      notConfigured: string;
     };
     notification: {
       title: string;

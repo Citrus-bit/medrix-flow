@@ -12,6 +12,7 @@ from medrix_flow.agents.memory.prompt import (
     MEMORY_UPDATE_PROMPT,
     format_conversation_for_update,
 )
+from medrix_flow.agents.memory.storage import create_empty_memory, get_memory_storage
 from medrix_flow.config.memory_config import get_memory_config
 from medrix_flow.config.paths import get_paths
 from medrix_flow.models import create_chat_model
@@ -19,16 +20,20 @@ from medrix_flow.models import create_chat_model
 logger = logging.getLogger(__name__)
 
 
-def _get_memory_file_path(agent_name: str | None = None) -> Path:
+def _get_memory_file_path(agent_name: str | None = None, thread_id: str | None = None) -> Path:
     """Get the path to the memory file.
 
     Args:
         agent_name: If provided, returns the per-agent memory file path.
                     If None, returns the global memory file path.
+        thread_id: If provided, returns the per-thread memory file path.
 
     Returns:
         Path to the memory file.
     """
+    if thread_id is not None:
+        return get_paths().thread_memory_file(thread_id)
+
     if agent_name is not None:
         return get_paths().agent_memory_file(agent_name)
 
@@ -42,26 +47,7 @@ def _get_memory_file_path(agent_name: str | None = None) -> Path:
 
 def _create_empty_memory() -> dict[str, Any]:
     """Create an empty memory structure."""
-    return {
-        "version": "1.0",
-        "lastUpdated": datetime.utcnow().isoformat() + "Z",
-        "user": {
-            "workContext": {"summary": "", "updatedAt": ""},
-            "personalContext": {"summary": "", "updatedAt": ""},
-            "topOfMind": {"summary": "", "updatedAt": ""},
-        },
-        "history": {
-            "recentMonths": {"summary": "", "updatedAt": ""},
-            "earlierContext": {"summary": "", "updatedAt": ""},
-            "longTermBackground": {"summary": "", "updatedAt": ""},
-        },
-        "facts": [],
-    }
-
-
-# Per-agent memory cache: keyed by agent_name (None = global)
-# Value: (memory_data, file_mtime)
-_memory_cache: dict[str | None, tuple[dict[str, Any], float | None]] = {}
+    return create_empty_memory()
 
 
 def get_memory_data(agent_name: str | None = None) -> dict[str, Any]:
@@ -76,23 +62,12 @@ def get_memory_data(agent_name: str | None = None) -> dict[str, Any]:
     Returns:
         The memory data dictionary.
     """
-    file_path = _get_memory_file_path(agent_name)
+    return get_memory_storage().load(agent_name=agent_name)
 
-    # Get current file modification time
-    try:
-        current_mtime = file_path.stat().st_mtime if file_path.exists() else None
-    except OSError:
-        current_mtime = None
 
-    cached = _memory_cache.get(agent_name)
-
-    # Invalidate cache if file has been modified or doesn't exist
-    if cached is None or cached[1] != current_mtime:
-        memory_data = _load_memory_from_file(agent_name)
-        _memory_cache[agent_name] = (memory_data, current_mtime)
-        return memory_data
-
-    return cached[0]
+def get_thread_memory(thread_id: str) -> dict[str, Any]:
+    """Get memory data isolated to a single conversation thread."""
+    return get_memory_storage().load(thread_id=thread_id)
 
 
 def reload_memory_data(agent_name: str | None = None) -> dict[str, Any]:
@@ -104,16 +79,12 @@ def reload_memory_data(agent_name: str | None = None) -> dict[str, Any]:
     Returns:
         The reloaded memory data dictionary.
     """
-    file_path = _get_memory_file_path(agent_name)
-    memory_data = _load_memory_from_file(agent_name)
+    return get_memory_storage().reload(agent_name=agent_name)
 
-    try:
-        mtime = file_path.stat().st_mtime if file_path.exists() else None
-    except OSError:
-        mtime = None
 
-    _memory_cache[agent_name] = (memory_data, mtime)
-    return memory_data
+def reload_thread_memory(thread_id: str) -> dict[str, Any]:
+    """Reload memory data for a single conversation thread."""
+    return get_memory_storage().reload(thread_id=thread_id)
 
 
 def _extract_text(content: Any) -> str:
@@ -232,36 +203,12 @@ def _save_memory_to_file(memory_data: dict[str, Any], agent_name: str | None = N
     Returns:
         True if successful, False otherwise.
     """
-    file_path = _get_memory_file_path(agent_name)
+    return get_memory_storage().save(memory_data, agent_name=agent_name)
 
-    try:
-        # Ensure directory exists
-        file_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Update lastUpdated timestamp
-        memory_data["lastUpdated"] = datetime.utcnow().isoformat() + "Z"
-
-        # Write atomically using temp file
-        temp_path = file_path.with_suffix(".tmp")
-        with open(temp_path, "w", encoding="utf-8") as f:
-            json.dump(memory_data, f, indent=2, ensure_ascii=False)
-
-        # Rename temp file to actual file (atomic on most systems)
-        temp_path.replace(file_path)
-
-        # Update cache and file modification time
-        try:
-            mtime = file_path.stat().st_mtime
-        except OSError:
-            mtime = None
-
-        _memory_cache[agent_name] = (memory_data, mtime)
-
-        logger.info("Memory saved to %s", file_path)
-        return True
-    except OSError as e:
-        logger.error("Failed to save memory file: %s", e)
-        return False
+def _save_thread_memory(memory_data: dict[str, Any], thread_id: str) -> bool:
+    """Save memory data isolated to a single conversation thread."""
+    return get_memory_storage().save(memory_data, thread_id=thread_id)
 
 
 class MemoryUpdater:
@@ -280,6 +227,38 @@ class MemoryUpdater:
         config = get_memory_config()
         model_name = self._model_name or config.model_name
         return create_chat_model(name=model_name, thinking_enabled=False)
+
+    def _update_memory_data(
+        self,
+        current_memory: dict[str, Any],
+        messages: list[Any],
+        *,
+        source_thread_id: str | None,
+    ) -> dict[str, Any] | None:
+        conversation_text = format_conversation_for_update(messages)
+        if not conversation_text.strip():
+            return None
+
+        prompt = MEMORY_UPDATE_PROMPT.format(
+            current_memory=json.dumps(current_memory, indent=2),
+            conversation=conversation_text,
+        )
+
+        model = self._get_model()
+        response = model.invoke(prompt)
+        response_text = _extract_text(response.content).strip()
+
+        if response_text.startswith("```"):
+            lines = response_text.split("\n")
+            response_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
+
+        update_data = json.loads(response_text)
+        if not isinstance(update_data, dict):
+            logger.warning("Memory update response must be a JSON object, got %s", type(update_data).__name__)
+            return None
+
+        updated_memory = self._apply_updates(current_memory, update_data, source_thread_id)
+        return _strip_upload_mentions_from_memory(updated_memory)
 
     def update_memory(self, messages: list[Any], thread_id: str | None = None, agent_name: str | None = None) -> bool:
         """Update memory based on conversation messages.
@@ -300,44 +279,14 @@ class MemoryUpdater:
             return False
 
         try:
-            # Get current memory
             current_memory = get_memory_data(agent_name)
-
-            # Format conversation for prompt
-            conversation_text = format_conversation_for_update(messages)
-
-            if not conversation_text.strip():
-                return False
-
-            # Build prompt
-            prompt = MEMORY_UPDATE_PROMPT.format(
-                current_memory=json.dumps(current_memory, indent=2),
-                conversation=conversation_text,
+            updated_memory = self._update_memory_data(
+                current_memory,
+                messages,
+                source_thread_id=thread_id,
             )
-
-            # Call LLM
-            model = self._get_model()
-            response = model.invoke(prompt)
-            response_text = _extract_text(response.content).strip()
-
-            # Parse response
-            # Remove markdown code blocks if present
-            if response_text.startswith("```"):
-                lines = response_text.split("\n")
-                response_text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
-
-            update_data = json.loads(response_text)
-
-            # Apply updates
-            updated_memory = self._apply_updates(current_memory, update_data, thread_id)
-
-            # Strip file-upload mentions from all summaries before saving.
-            # Uploaded files are session-scoped and won't exist in future sessions,
-            # so recording upload events in long-term memory causes the agent to
-            # try (and fail) to locate those files in subsequent conversations.
-            updated_memory = _strip_upload_mentions_from_memory(updated_memory)
-
-            # Save
+            if updated_memory is None:
+                return False
             return _save_memory_to_file(updated_memory, agent_name)
 
         except json.JSONDecodeError as e:
@@ -345,6 +294,32 @@ class MemoryUpdater:
             return False
         except Exception as e:
             logger.exception("Memory update failed: %s", e)
+            return False
+
+    def update_thread_memory(self, messages: list[Any], thread_id: str) -> bool:
+        """Update memory for a single conversation thread only."""
+        config = get_memory_config()
+        if not config.enabled:
+            return False
+
+        if not messages:
+            return False
+
+        try:
+            current_memory = get_thread_memory(thread_id)
+            updated_memory = self._update_memory_data(
+                current_memory,
+                messages,
+                source_thread_id=thread_id,
+            )
+            if updated_memory is None:
+                return False
+            return _save_thread_memory(updated_memory, thread_id)
+        except json.JSONDecodeError as e:
+            logger.warning("Failed to parse LLM response for thread memory update %s: %s", thread_id, e)
+            return False
+        except Exception as e:
+            logger.exception("Thread memory update failed for %s: %s", thread_id, e)
             return False
 
     def _apply_updates(
@@ -447,3 +422,14 @@ def update_memory_from_conversation(messages: list[Any], thread_id: str | None =
     """
     updater = MemoryUpdater()
     return updater.update_memory(messages, thread_id, agent_name)
+
+
+def update_thread_memory(messages: list[Any], thread_id: str, agent_name: str | None = None) -> bool:
+    """Update memory isolated to one conversation thread.
+
+    The agent name is accepted for call-site compatibility but does not affect
+    storage isolation.
+    """
+    _ = agent_name
+    updater = MemoryUpdater()
+    return updater.update_thread_memory(messages, thread_id)

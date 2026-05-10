@@ -342,6 +342,30 @@ class TestMemoryFilePath:
         assert path_global != path_b
         assert path_a != path_b
 
+    def test_thread_memory_path(self, tmp_path):
+        """Providing thread_id should return per-thread memory file."""
+        import medrix_flow.agents.memory.updater as updater_mod
+        from medrix_flow.config.memory_config import MemoryConfig
+
+        with (
+            patch("medrix_flow.agents.memory.updater.get_paths", return_value=_make_paths(tmp_path)),
+            patch("medrix_flow.agents.memory.updater.get_memory_config", return_value=MemoryConfig(storage_path="")),
+        ):
+            path = updater_mod._get_memory_file_path(thread_id="thread-a")
+
+        assert path == tmp_path / "threads" / "thread-a" / "memory.json"
+
+    def test_thread_memory_path_rejects_invalid_thread_id(self, tmp_path):
+        import medrix_flow.agents.memory.updater as updater_mod
+        from medrix_flow.config.memory_config import MemoryConfig
+
+        with (
+            patch("medrix_flow.agents.memory.updater.get_paths", return_value=_make_paths(tmp_path)),
+            patch("medrix_flow.agents.memory.updater.get_memory_config", return_value=MemoryConfig(storage_path="")),
+            pytest.raises(ValueError),
+        ):
+            updater_mod._get_memory_file_path(thread_id="../escape")
+
 
 # ===========================================================================
 # 8. Gateway API – Agents endpoints

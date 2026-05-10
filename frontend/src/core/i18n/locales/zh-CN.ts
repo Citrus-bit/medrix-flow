@@ -56,13 +56,13 @@ export const zhCN: Translations = {
 
   // Welcome
   welcome: {
-    greeting: "你好，欢迎回来！",
+    greeting: "Anaxa Research Workspace",
     description:
-      "欢迎使用 🧬 MedrixFlow，一个完全开源的超级智能体。通过内置和自定义的 Skills，\nMedrixFlow 可以帮你搜索网络、分析数据，还能为你生成幻灯片、\n图片、视频、播客及网页等，几乎可以做任何事情。",
+      "面向可审计科研流程：整合文献检索、证据映射、实验编排、LaTeX/PDF 成稿与质量审查，帮助你把研究问题推进为可复核的学术产物。",
 
     createYourOwnSkill: "创建你自己的 Agent SKill",
     createYourOwnSkillDescription:
-      "创建你的 Agent Skill 来释放 MedrixFlow 的潜力。通过自定义技能，MedrixFlow\n可以帮你搜索网络、分析数据，还能为你生成幻灯片、\n网页等作品，几乎可以做任何事情。",
+      "创建你的 Agent Skill 来扩展 Anaxa 的科研工作流。通过自定义技能，Anaxa\n可以帮你检索文献、分析数据，并生成幻灯片、\n网页等可交付成果。",
   },
 
   // Clipboard
@@ -194,10 +194,13 @@ export const zhCN: Translations = {
       "新智能体的名称是 {name}，现在开始为它生成 **SOUL**。",
     agentCreated: "智能体已创建！",
     startChatting: "开始对话",
-    backToGallery: "返回 Gallery",
+    backToGallery: "返回工作区",
     systemAgent: "系统内置",
     customAgent: "自定义",
     readonly: "只读",
+    readonlyCreateTitle: "前端智能体配置已改为只读",
+    readonlyCreateDescription:
+      "当前可用智能体会在“设置和更多 -> 功能”中统一展示。新增或修改智能体请通过后端配置文件或脚本化管理完成。",
   },
 
   // Breadcrumb
@@ -208,9 +211,9 @@ export const zhCN: Translations = {
 
   // Workspace
   workspace: {
-    visitGithub: "在 GitHub 上查看 MedrixFlow",
+    visitGithub: "在 GitHub 上查看 Anaxa",
     settingsAndMore: "设置和更多",
-    about: "关于 MedrixFlow",
+    about: "关于 Anaxa",
   },
 
   // Conversation
@@ -234,7 +237,7 @@ export const zhCN: Translations = {
 
   // Page titles (document title)
   pages: {
-    appName: "MedrixFlow",
+    appName: "Anaxa",
     chats: "对话",
     newChat: "新对话",
     untitled: "未命名",
@@ -259,7 +262,7 @@ export const zhCN: Translations = {
     writeFile: "写入文件",
     clickToViewContent: "点击查看文件内容",
     writeTodos: "更新 To-do 列表",
-    skillInstallTooltip: "安装技能并使其可在 MedrixFlow 中使用",
+    skillInstallTooltip: "安装技能并使其可在 Anaxa 中使用",
   },
 
   uploads: {
@@ -290,7 +293,7 @@ export const zhCN: Translations = {
     noResults: "未找到结果。",
     actions: "操作",
     keyboardShortcuts: "键盘快捷键",
-    keyboardShortcutsDescription: "使用键盘快捷键更快地操作 MedrixFlow。",
+    keyboardShortcutsDescription: "使用键盘快捷键更快地操作 Anaxa。",
     openCommandPalette: "打开命令面板",
     toggleSidebar: "切换侧边栏",
   },
@@ -298,109 +301,44 @@ export const zhCN: Translations = {
   // Settings
   settings: {
     title: "设置",
-    description: "根据你的偏好调整 MedrixFlow 的界面和行为。",
+    description: "配置 Anaxa 的模型、能力清单与通知。",
     sections: {
       setup: "配置",
-      appearance: "外观",
-      memory: "记忆",
-      tools: "工具",
-      skills: "技能",
+      features: "功能",
       notification: "通知",
-      about: "关于",
     },
-    memory: {
-      title: "记忆",
-      description:
-        "MedrixFlow 会在后台不断从你的对话中自动学习。这些记忆能帮助 MedrixFlow 更好地理解你，并提供更个性化的体验。",
-      empty: "暂无可展示的记忆数据。",
-      rawJson: "原始 JSON",
-      markdown: {
-        overview: "概览",
-        userContext: "用户上下文",
-        work: "工作",
-        personal: "个人",
-        topOfMind: "近期关注（Top of mind）",
-        historyBackground: "历史背景",
-        recentMonths: "近几个月",
-        earlierContext: "更早上下文",
-        longTermBackground: "长期背景",
-        updatedAt: "更新于",
-        facts: "事实",
-        empty: "（空）",
-        table: {
-          category: "类别",
-          confidence: "置信度",
-          confidenceLevel: {
-            veryHigh: "极高",
-            high: "较高",
-            normal: "一般",
-            unknown: "未知",
-          },
-          content: "内容",
-          source: "来源",
-          createdAt: "创建时间",
-          view: "查看",
-        },
-      },
-    },
-    appearance: {
-      themeTitle: "主题",
-      themeDescription: "跟随系统或选择固定的界面模式。",
-      system: "系统",
-      light: "浅色",
-      dark: "深色",
-      systemDescription: "自动跟随系统主题。",
-      lightDescription: "更明亮的配色，适合日间使用。",
-      darkDescription: "更暗的配色，减少眩光方便专注。",
-      languageTitle: "语言",
-      languageDescription: "在不同语言之间切换。",
-    },
-    tools: {
-      title: "工具",
-      description: "管理 MCP 工具的配置和启用状态。",
-      addServer: "添加 MCP 服务器",
-      deleteServer: "删除",
-      deleteConfirm: "确定要删除这个 MCP 服务器吗？",
-      testConnection: "测试",
-      saveChanges: "保存",
-      serverName: "服务器名称",
-      serverNamePlaceholder: "my-mcp-server",
-      transportType: "传输协议",
-      command: "命令",
-      commandPlaceholder: "npx",
+    features: {
+      title: "功能",
+      description: "只读查看当前可用的智能体、MCP 工具和技能配置。",
+      readonlyHint: "这里用于审计当前能力边界，不提供前端修改入口。",
+      agentsTitle: "智能体",
+      toolsTitle: "工具",
+      skillsTitle: "技能",
+      emptyAgents: "暂无智能体配置。",
+      emptyTools: "暂无 MCP 工具配置。",
+      emptySkills: "暂无技能配置。",
+      noDescription: "暂无描述。",
+      readonly: "只读",
+      customEditable: "自定义",
+      enabled: "启用",
+      disabled: "停用",
+      transport: "协议",
+      endpoint: "端点",
       arguments: "参数",
-      argumentsPlaceholder: "每行一个参数",
-      serverUrl: "URL",
-      serverUrlPlaceholder: "https://mcp.example.com/sse",
-      envVars: "环境变量",
-      envVarsPlaceholder: "KEY=value（每行一个）",
-      httpHeaders: "HTTP 头",
-      headersPlaceholder: "Header-Name: value（每行一个）",
-      descriptionLabel: "描述",
-      descriptionPlaceholder: "这个 MCP 服务器的用途？",
-      emptyTitle: "还没有配置 MCP 服务器",
-      emptyDescription: "添加一个 MCP 服务器来扩展 Agent 的能力。",
-      noChanges: "没有未保存的更改",
-      saveSuccess: "MCP 配置保存成功。",
-    },
-    skills: {
-      title: "技能",
-      description: "管理 Agent Skill 配置和启用状态。",
-      createSkill: "新建技能",
-      emptyTitle: "还没有技能",
-      emptyDescription:
-        "将你的 Agent Skill 文件夹放在 MedrixFlow 根目录下的 `/skills/custom` 文件夹中。",
-      emptyButton: "创建你的第一个技能",
+      envKeys: "环境变量键",
+      headerKeys: "HTTP 头键",
+      oauthEnabled: "OAuth",
+      notConfigured: "未配置",
     },
     notification: {
       title: "通知",
       description:
-        "MedrixFlow 只会在窗口不活跃时发送完成通知，特别适合长时间任务：你可以先去做别的事，完成后会收到提醒。",
+        "Anaxa 只会在窗口不活跃时发送完成通知，特别适合长时间任务：你可以先去做别的事，完成后会收到提醒。",
       requestPermission: "请求通知权限",
       deniedHint:
         "通知权限已被拒绝。可在浏览器的网站设置中重新开启，以接收完成提醒。",
       testButton: "发送测试通知",
-      testTitle: "MedrixFlow",
+      testTitle: "Anaxa",
       testBody: "这是一条测试通知。",
       notSupported: "当前浏览器不支持通知功能。",
       disableNotification: "关闭通知",

@@ -35,21 +35,21 @@ def create_empty_memory() -> dict[str, Any]:
 
 class MemoryStorage(abc.ABC):
     @abc.abstractmethod
-    def load(self, agent_name: str | None = None) -> dict[str, Any]:
+    def load(self, agent_name: str | None = None, thread_id: str | None = None) -> dict[str, Any]:
         pass
 
     @abc.abstractmethod
-    def reload(self, agent_name: str | None = None) -> dict[str, Any]:
+    def reload(self, agent_name: str | None = None, thread_id: str | None = None) -> dict[str, Any]:
         pass
 
     @abc.abstractmethod
-    def save(self, memory_data: dict[str, Any], agent_name: str | None = None) -> bool:
+    def save(self, memory_data: dict[str, Any], agent_name: str | None = None, thread_id: str | None = None) -> bool:
         pass
 
 
 class FileMemoryStorage(MemoryStorage):
     def __init__(self):
-        self._memory_cache: dict[str | None, tuple[dict[str, Any], float | None]] = {}
+        self._memory_cache: dict[tuple[str, str | None], tuple[dict[str, Any], float | None]] = {}
 
     def _validate_agent_name(self, agent_name: str) -> None:
         if not agent_name:
@@ -57,7 +57,17 @@ class FileMemoryStorage(MemoryStorage):
         if not AGENT_NAME_PATTERN.match(agent_name):
             raise ValueError(f"Invalid agent name {agent_name!r}: names must match {AGENT_NAME_PATTERN.pattern}")
 
-    def _get_memory_file_path(self, agent_name: str | None = None) -> Path:
+    def _cache_key(self, agent_name: str | None = None, thread_id: str | None = None) -> tuple[str, str | None]:
+        if thread_id is not None:
+            return ("thread", thread_id)
+        if agent_name is not None:
+            return ("agent", agent_name)
+        return ("global", None)
+
+    def _get_memory_file_path(self, agent_name: str | None = None, thread_id: str | None = None) -> Path:
+        if thread_id is not None:
+            return get_paths().thread_memory_file(thread_id)
+
         if agent_name is not None:
             self._validate_agent_name(agent_name)
             return get_paths().agent_memory_file(agent_name)
@@ -68,8 +78,8 @@ class FileMemoryStorage(MemoryStorage):
             return p if p.is_absolute() else get_paths().base_dir / p
         return get_paths().memory_file
 
-    def _load_memory_from_file(self, agent_name: str | None = None) -> dict[str, Any]:
-        file_path = self._get_memory_file_path(agent_name)
+    def _load_memory_from_file(self, agent_name: str | None = None, thread_id: str | None = None) -> dict[str, Any]:
+        file_path = self._get_memory_file_path(agent_name, thread_id)
 
         if not file_path.exists():
             return create_empty_memory()
@@ -82,37 +92,40 @@ class FileMemoryStorage(MemoryStorage):
             logger.warning("Failed to load memory file: %s", e)
             return create_empty_memory()
 
-    def load(self, agent_name: str | None = None) -> dict[str, Any]:
-        file_path = self._get_memory_file_path(agent_name)
+    def load(self, agent_name: str | None = None, thread_id: str | None = None) -> dict[str, Any]:
+        file_path = self._get_memory_file_path(agent_name, thread_id)
+        cache_key = self._cache_key(agent_name, thread_id)
 
         try:
             current_mtime = file_path.stat().st_mtime if file_path.exists() else None
         except OSError:
             current_mtime = None
 
-        cached = self._memory_cache.get(agent_name)
+        cached = self._memory_cache.get(cache_key)
 
         if cached is None or cached[1] != current_mtime:
-            memory_data = self._load_memory_from_file(agent_name)
-            self._memory_cache[agent_name] = (memory_data, current_mtime)
+            memory_data = self._load_memory_from_file(agent_name, thread_id)
+            self._memory_cache[cache_key] = (memory_data, current_mtime)
             return memory_data
 
         return cached[0]
 
-    def reload(self, agent_name: str | None = None) -> dict[str, Any]:
-        file_path = self._get_memory_file_path(agent_name)
-        memory_data = self._load_memory_from_file(agent_name)
+    def reload(self, agent_name: str | None = None, thread_id: str | None = None) -> dict[str, Any]:
+        file_path = self._get_memory_file_path(agent_name, thread_id)
+        cache_key = self._cache_key(agent_name, thread_id)
+        memory_data = self._load_memory_from_file(agent_name, thread_id)
 
         try:
             mtime = file_path.stat().st_mtime if file_path.exists() else None
         except OSError:
             mtime = None
 
-        self._memory_cache[agent_name] = (memory_data, mtime)
+        self._memory_cache[cache_key] = (memory_data, mtime)
         return memory_data
 
-    def save(self, memory_data: dict[str, Any], agent_name: str | None = None) -> bool:
-        file_path = self._get_memory_file_path(agent_name)
+    def save(self, memory_data: dict[str, Any], agent_name: str | None = None, thread_id: str | None = None) -> bool:
+        file_path = self._get_memory_file_path(agent_name, thread_id)
+        cache_key = self._cache_key(agent_name, thread_id)
 
         try:
             file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -129,7 +142,7 @@ class FileMemoryStorage(MemoryStorage):
             except OSError:
                 mtime = None
 
-            self._memory_cache[agent_name] = (memory_data, mtime)
+            self._memory_cache[cache_key] = (memory_data, mtime)
             logger.info("Memory saved to %s", file_path)
             return True
         except OSError as e:

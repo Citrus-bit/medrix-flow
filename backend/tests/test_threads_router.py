@@ -107,3 +107,52 @@ def test_delete_thread_data_returns_generic_500_error(tmp_path):
     assert exc_info.value.detail == "Failed to delete local thread data."
     assert "/secret/path" not in exc_info.value.detail
     log_exception.assert_called_once_with("Failed to delete thread data for %s", "thread-cleanup")
+
+
+def test_get_thread_memory_route_returns_thread_scoped_data(tmp_path):
+    paths = Paths(tmp_path)
+    memory_file = paths.thread_memory_file("thread-a")
+    memory_file.parent.mkdir(parents=True, exist_ok=True)
+    memory_file.write_text(
+        """
+{
+  "version": "1.0",
+  "lastUpdated": "2026-05-10T00:00:00Z",
+  "user": {
+    "workContext": {"summary": "Thread A work", "updatedAt": "2026-05-10T00:00:00Z"},
+    "personalContext": {"summary": "", "updatedAt": ""},
+    "topOfMind": {"summary": "", "updatedAt": ""}
+  },
+  "history": {
+    "recentMonths": {"summary": "", "updatedAt": ""},
+    "earlierContext": {"summary": "", "updatedAt": ""},
+    "longTermBackground": {"summary": "", "updatedAt": ""}
+  },
+  "facts": []
+}
+""",
+        encoding="utf-8",
+    )
+
+    app = FastAPI()
+    app.include_router(threads.router)
+
+    with patch("medrix_flow.agents.memory.storage.get_paths", return_value=paths):
+        with TestClient(app) as client:
+            response = client.get("/api/threads/thread-a/memory")
+
+    assert response.status_code == 200
+    assert response.json()["user"]["workContext"]["summary"] == "Thread A work"
+
+
+def test_get_thread_memory_route_rejects_invalid_thread_id(tmp_path):
+    paths = Paths(tmp_path)
+    app = FastAPI()
+    app.include_router(threads.router)
+
+    with patch("medrix_flow.agents.memory.storage.get_paths", return_value=paths):
+        with TestClient(app) as client:
+            response = client.get("/api/threads/thread.with.dot/memory")
+
+    assert response.status_code == 422
+    assert "Invalid thread_id" in response.json()["detail"]

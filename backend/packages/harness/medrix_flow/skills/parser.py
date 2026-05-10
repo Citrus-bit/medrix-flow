@@ -1,6 +1,8 @@
 import re
 from pathlib import Path
 
+import yaml
+
 from .types import Skill
 
 
@@ -30,24 +32,19 @@ def parse_skill_file(skill_file: Path, category: str, relative_path: Path | None
 
         front_matter = front_matter_match.group(1)
 
-        # Parse YAML front matter (simple key-value parsing)
-        metadata = {}
-        for line in front_matter.split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            if ":" in line:
-                key, value = line.split(":", 1)
-                metadata[key.strip()] = value.strip()
+        metadata = yaml.safe_load(front_matter) or {}
+        if not isinstance(metadata, dict):
+            return None
 
         # Extract required fields
-        name = metadata.get("name")
-        description = metadata.get("description")
+        name = str(metadata.get("name", "")).strip()
+        description = str(metadata.get("description", "")).strip()
 
         if not name or not description:
             return None
 
-        license_text = metadata.get("license")
+        license_value = metadata.get("license")
+        license_text = str(license_value).strip() if license_value else None
 
         return Skill(
             name=name,

@@ -3,12 +3,8 @@ export const OPEN_SETTINGS_EVENT = "medrix:open-settings";
 export type OpenSettingsDetail = {
   section?:
     | "setup"
-    | "appearance"
-    | "memory"
-    | "tools"
-    | "skills"
-    | "notification"
-    | "about";
+    | "features"
+    | "notification";
 };
 
 export function dispatchOpenSettings(

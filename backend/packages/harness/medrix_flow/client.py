@@ -45,6 +45,16 @@ from medrix_flow.skills.service import SkillService
 logger = logging.getLogger(__name__)
 
 
+def _thread_memory_mtime(thread_id: str | None) -> float | None:
+    if not thread_id:
+        return None
+    try:
+        path = get_paths().thread_memory_file(thread_id)
+        return path.stat().st_mtime if path.exists() else None
+    except (OSError, ValueError):
+        return None
+
+
 @dataclass
 class StreamEvent:
     """A single event from the streaming agent response.
@@ -200,6 +210,8 @@ class MedrixFlowClient:
             cfg.get("reasoning_effort"),
             cfg.get("is_plan_mode"),
             cfg.get("subagent_enabled"),
+            cfg.get("thread_id"),
+            _thread_memory_mtime(cfg.get("thread_id")),
         )
 
         if self._agent is not None and self._agent_config_key == key:
@@ -210,6 +222,7 @@ class MedrixFlowClient:
         model_name = cfg.get("model_name")
         subagent_enabled = cfg.get("subagent_enabled", False)
         max_concurrent_subagents = cfg.get("max_concurrent_subagents", 3)
+        thread_id = cfg.get("thread_id")
 
         kwargs: dict[str, Any] = {
             "model": create_chat_model(
@@ -223,6 +236,7 @@ class MedrixFlowClient:
                 subagent_enabled=subagent_enabled,
                 max_concurrent_subagents=max_concurrent_subagents,
                 agent_name=self._agent_name,
+                thread_id=thread_id,
             ),
             "state_schema": ThreadState,
         }

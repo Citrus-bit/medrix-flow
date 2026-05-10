@@ -388,24 +388,29 @@ combined with a FastAPI gateway for REST API access [citation:FastAPI](https://f
 """
 
 
-def _get_memory_context(agent_name: str | None = None) -> str:
+def _get_memory_context(agent_name: str | None = None, thread_id: str | None = None) -> str:
     """Get memory context for injection into system prompt.
 
     Args:
-        agent_name: If provided, loads per-agent memory. If None, loads global memory.
+        agent_name: Reserved for compatibility with custom agents.
+        thread_id: If provided, loads memory scoped to this conversation thread.
 
     Returns:
         Formatted memory context string wrapped in XML tags, or empty string if disabled.
     """
+    _ = agent_name
+    if not thread_id:
+        return ""
+
     try:
-        from medrix_flow.agents.memory import format_memory_for_injection, get_memory_data
+        from medrix_flow.agents.memory import format_memory_for_injection, get_thread_memory
         from medrix_flow.config.memory_config import get_memory_config
 
         config = get_memory_config()
         if not config.enabled or not config.injection_enabled:
             return ""
 
-        memory_data = get_memory_data(agent_name)
+        memory_data = get_thread_memory(thread_id)
         memory_content = format_memory_for_injection(memory_data, max_tokens=config.max_injection_tokens)
 
         if not memory_content.strip():
@@ -512,9 +517,16 @@ def get_deferred_tools_prompt_section() -> str:
     return f"<available-deferred-tools>\n{names}\n</available-deferred-tools>"
 
 
-def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagents: int = 3, *, agent_name: str | None = None, available_skills: set[str] | None = None) -> str:
+def apply_prompt_template(
+    subagent_enabled: bool = False,
+    max_concurrent_subagents: int = 3,
+    *,
+    agent_name: str | None = None,
+    available_skills: set[str] | None = None,
+    thread_id: str | None = None,
+) -> str:
     # Get memory context
-    memory_context = _get_memory_context(agent_name)
+    memory_context = _get_memory_context(agent_name, thread_id)
 
     # Include subagent section only if enabled (from runtime parameter)
     n = max_concurrent_subagents

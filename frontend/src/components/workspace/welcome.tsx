@@ -17,42 +17,9 @@ import { useModels } from "@/core/models/hooks";
 import { dispatchOpenSettings } from "@/core/settings/events";
 import { cn } from "@/lib/utils";
 
-let waved = false;
+import { AnaxaLogoMark } from "./anaxa-logo";
 
-function MedrixHexIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 48 48"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <path
-        d="M24 4L42 14v20L24 44 6 34V14L24 4z"
-        fill="url(#hex-grad)"
-        opacity="0.1"
-      />
-      <path
-        d="M24 4L42 14v20L24 44 6 34V14L24 4z"
-        stroke="url(#hex-grad)"
-        strokeWidth="2"
-        fill="none"
-      />
-      <path
-        d="M24 16v16M18 24h12"
-        stroke="url(#hex-grad)"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-      />
-      <defs>
-        <linearGradient id="hex-grad" x1="6" y1="4" x2="42" y2="44">
-          <stop stopColor="#0891b2" />
-          <stop offset="1" stopColor="#14b8a6" />
-        </linearGradient>
-      </defs>
-    </svg>
-  );
-}
+let waved = false;
 
 export function Welcome({
   className,
@@ -77,7 +44,7 @@ export function Welcome({
       )}
     >
       <div className={cn("inline-block", !waved ? "animate-wave" : "")}>
-        <MedrixHexIcon className="size-14" />
+        <AnaxaLogoMark className="rounded-2xl shadow-sm" size={64} />
       </div>
       {searchParams.get("mode") === "skill" ? (
         <>
@@ -120,19 +87,19 @@ export function Welcome({
               <div className="flex size-10 items-center justify-center rounded-xl bg-[#0891b2]/10">
                 <SearchIcon className="size-5 text-[#0891b2]" />
               </div>
-              <span className="text-muted-foreground text-xs">Research</span>
+              <span className="text-muted-foreground text-xs">Literature</span>
             </div>
             <div className="flex flex-col items-center gap-1.5">
               <div className="flex size-10 items-center justify-center rounded-xl bg-[#14b8a6]/10">
                 <BrainIcon className="size-5 text-[#14b8a6]" />
               </div>
-              <span className="text-muted-foreground text-xs">Analyze</span>
+              <span className="text-muted-foreground text-xs">Evidence</span>
             </div>
             <div className="flex flex-col items-center gap-1.5">
               <div className="flex size-10 items-center justify-center rounded-xl bg-[#06b6d4]/10">
                 <ActivityIcon className="size-5 text-[#06b6d4]" />
               </div>
-              <span className="text-muted-foreground text-xs">Insights</span>
+              <span className="text-muted-foreground text-xs">Manuscript</span>
             </div>
           </div>
         </>

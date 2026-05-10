@@ -3,6 +3,8 @@ import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from app.gateway.routers.memory import MemoryResponse
+from medrix_flow.agents.memory.updater import get_thread_memory, reload_thread_memory
 from medrix_flow.config.paths import Paths, get_paths
 
 logger = logging.getLogger(__name__)
@@ -14,6 +16,12 @@ class ThreadDeleteResponse(BaseModel):
 
     success: bool
     message: str
+
+
+class ThreadMemoryReloadResponse(BaseModel):
+    """Response model for thread memory reload."""
+
+    memory: MemoryResponse
 
 
 def _delete_thread_data(thread_id: str, paths: Paths | None = None) -> ThreadDeleteResponse:
@@ -39,3 +47,23 @@ async def delete_thread_data(thread_id: str) -> ThreadDeleteResponse:
     thread state deletion remains handled by the LangGraph API.
     """
     return _delete_thread_data(thread_id)
+
+
+@router.get("/{thread_id}/memory", response_model=MemoryResponse)
+async def get_thread_memory_data(thread_id: str) -> MemoryResponse:
+    """Get memory data scoped to one conversation thread."""
+    try:
+        memory_data = get_thread_memory(thread_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return MemoryResponse(**memory_data)
+
+
+@router.post("/{thread_id}/memory/reload", response_model=ThreadMemoryReloadResponse)
+async def reload_thread_memory_data(thread_id: str) -> ThreadMemoryReloadResponse:
+    """Reload memory data scoped to one conversation thread."""
+    try:
+        memory_data = reload_thread_memory(thread_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return ThreadMemoryReloadResponse(memory=MemoryResponse(**memory_data))

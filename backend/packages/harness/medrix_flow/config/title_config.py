@@ -27,7 +27,16 @@ class TitleConfig(BaseModel):
         description="Model name to use for title generation (None = use default model)",
     )
     prompt_template: str = Field(
-        default=("Generate a concise title (max {max_words} words) for this conversation.\nUser: {user_msg}\nAssistant: {assistant_msg}\n\nReturn ONLY the title, no quotes, no explanation."),
+        default=(
+            "Summarize the completed exchange as a specific navigation label "
+            "(max {max_words} words).\n"
+            "Prefer the user's concrete topic, research object, method, or deliverable. "
+            "Avoid generic labels such as Research, Help, Summary, or Chat.\n"
+            "Do not mention roles, instructions, reasoning, or the word title.\n\n"
+            "User message:\n{user_msg}\n\n"
+            "Assistant summary:\n{assistant_msg}\n\n"
+            "Return only the final title, with no quotes or explanation."
+        ),
         description="Prompt template for title generation",
     )
 

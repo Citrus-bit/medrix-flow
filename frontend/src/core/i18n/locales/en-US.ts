@@ -56,13 +56,13 @@ export const enUS: Translations = {
 
   // Welcome
   welcome: {
-    greeting: "Hello, again!",
+    greeting: "Anaxa Research Workspace",
     description:
-      "Welcome to 🧬 MedrixFlow, an open source super agent. With built-in and custom skills, MedrixFlow helps you search on the web, analyze data, and generate artifacts like slides, web pages and do almost anything.",
+      "A workspace for auditable scholarly workflows: literature discovery, claim-level evidence maps, experiment orchestration, LaTeX/PDF manuscripts, and quality review in one traceable pipeline.",
 
     createYourOwnSkill: "Create Your Own Skill",
     createYourOwnSkillDescription:
-      "Create your own skill to release the power of MedrixFlow. With customized skills,\nMedrixFlow can help you search on the web, analyze data, and generate\n artifacts like slides, web pages and do almost anything.",
+      "Create your own skill to extend Anaxa's research workflow. With customized skills,\nAnaxa can help you retrieve literature, analyze data, and generate\n artifacts like slides and web pages.",
   },
 
   // Clipboard
@@ -205,10 +205,13 @@ export const enUS: Translations = {
       "The new custom agent name is {name}. Let's bootstrap it's **SOUL**.",
     agentCreated: "Agent created!",
     startChatting: "Start chatting",
-    backToGallery: "Back to Gallery",
+    backToGallery: "Back to workspace",
     systemAgent: "System",
     customAgent: "Custom",
     readonly: "Read-only",
+    readonlyCreateTitle: "Agent configuration is read-only in the frontend",
+    readonlyCreateDescription:
+      "Configured agents are now shown under Settings and more -> Features. Add or modify agents through backend configuration or scripted administration.",
   },
 
   // Breadcrumb
@@ -219,9 +222,9 @@ export const enUS: Translations = {
 
   // Workspace
   workspace: {
-    visitGithub: "MedrixFlow on GitHub",
+    visitGithub: "Anaxa on GitHub",
     settingsAndMore: "Settings and more",
-    about: "About MedrixFlow",
+    about: "About Anaxa",
   },
 
   // Conversation
@@ -245,7 +248,7 @@ export const enUS: Translations = {
 
   // Page titles (document title)
   pages: {
-    appName: "MedrixFlow",
+    appName: "Anaxa",
     chats: "Chats",
     newChat: "New chat",
     untitled: "Untitled",
@@ -271,7 +274,7 @@ export const enUS: Translations = {
     writeFile: "Write file",
     clickToViewContent: "Click to view file content",
     writeTodos: "Update to-do list",
-    skillInstallTooltip: "Install skill and make it available to MedrixFlow",
+    skillInstallTooltip: "Install skill and make it available to Anaxa",
   },
 
   // Subtasks
@@ -303,7 +306,7 @@ export const enUS: Translations = {
     noResults: "No results found.",
     actions: "Actions",
     keyboardShortcuts: "Keyboard Shortcuts",
-    keyboardShortcutsDescription: "Navigate MedrixFlow faster with keyboard shortcuts.",
+    keyboardShortcutsDescription: "Navigate Anaxa faster with keyboard shortcuts.",
     openCommandPalette: "Open Command Palette",
     toggleSidebar: "Toggle Sidebar",
   },
@@ -311,111 +314,44 @@ export const enUS: Translations = {
   // Settings
   settings: {
     title: "Settings",
-    description: "Adjust how MedrixFlow looks and behaves for you.",
+    description: "Configure Anaxa models, feature inventory, and notifications.",
     sections: {
       setup: "Setup",
-      appearance: "Appearance",
-      memory: "Memory",
-      tools: "Tools",
-      skills: "Skills",
+      features: "Features",
       notification: "Notification",
-      about: "About",
     },
-    memory: {
-      title: "Memory",
-      description:
-        "MedrixFlow automatically learns from your conversations in the background. These memories help MedrixFlow understand you better and deliver a more personalized experience.",
-      empty: "No memory data to display.",
-      rawJson: "Raw JSON",
-      markdown: {
-        overview: "Overview",
-        userContext: "User context",
-        work: "Work",
-        personal: "Personal",
-        topOfMind: "Top of mind",
-        historyBackground: "History",
-        recentMonths: "Recent months",
-        earlierContext: "Earlier context",
-        longTermBackground: "Long-term background",
-        updatedAt: "Updated at",
-        facts: "Facts",
-        empty: "(empty)",
-        table: {
-          category: "Category",
-          confidence: "Confidence",
-          confidenceLevel: {
-            veryHigh: "Very high",
-            high: "High",
-            normal: "Normal",
-            unknown: "Unknown",
-          },
-          content: "Content",
-          source: "Source",
-          createdAt: "CreatedAt",
-          view: "View",
-        },
-      },
-    },
-    appearance: {
-      themeTitle: "Theme",
-      themeDescription:
-        "Choose how the interface follows your device or stays fixed.",
-      system: "System",
-      light: "Light",
-      dark: "Dark",
-      systemDescription: "Match the operating system preference automatically.",
-      lightDescription: "Bright palette with higher contrast for daytime.",
-      darkDescription: "Dim palette that reduces glare for focus.",
-      languageTitle: "Language",
-      languageDescription: "Switch between languages.",
-    },
-    tools: {
-      title: "Tools",
-      description: "Manage the configuration and enabled status of MCP tools.",
-      addServer: "Add MCP Server",
-      deleteServer: "Delete",
-      deleteConfirm: "Are you sure you want to delete this MCP server?",
-      testConnection: "Test",
-      saveChanges: "Save",
-      serverName: "Server Name",
-      serverNamePlaceholder: "my-mcp-server",
-      transportType: "Transport",
-      command: "Command",
-      commandPlaceholder: "npx",
+    features: {
+      title: "Features",
+      description: "Read-only inventory of configured agents, MCP tools, and skills.",
+      readonlyHint: "This view audits the current capability surface. Frontend edits are disabled.",
+      agentsTitle: "Agents",
+      toolsTitle: "Tools",
+      skillsTitle: "Skills",
+      emptyAgents: "No agents configured.",
+      emptyTools: "No MCP tools configured.",
+      emptySkills: "No skills configured.",
+      noDescription: "No description.",
+      readonly: "Read-only",
+      customEditable: "Custom",
+      enabled: "Enabled",
+      disabled: "Disabled",
+      transport: "Transport",
+      endpoint: "Endpoint",
       arguments: "Arguments",
-      argumentsPlaceholder: "One argument per line",
-      serverUrl: "URL",
-      serverUrlPlaceholder: "https://mcp.example.com/sse",
-      envVars: "Environment Variables",
-      envVarsPlaceholder: "KEY=value (one per line)",
-      httpHeaders: "HTTP Headers",
-      headersPlaceholder: "Header-Name: value (one per line)",
-      descriptionLabel: "Description",
-      descriptionPlaceholder: "What does this MCP server do?",
-      emptyTitle: "No MCP servers configured",
-      emptyDescription: "Add an MCP server to extend the agent's capabilities.",
-      noChanges: "No unsaved changes",
-      saveSuccess: "MCP configuration saved successfully.",
-    },
-    skills: {
-      title: "Agent Skills",
-      description:
-        "Manage the configuration and enabled status of the agent skills.",
-      createSkill: "Create skill",
-      emptyTitle: "No agent skill yet",
-      emptyDescription:
-        "Put your agent skill folders under the `/skills/custom` folder under the root folder of MedrixFlow.",
-      emptyButton: "Create Your First Skill",
+      envKeys: "Environment keys",
+      headerKeys: "HTTP header keys",
+      oauthEnabled: "OAuth",
+      notConfigured: "Not configured",
     },
     notification: {
       title: "Notification",
       description:
-        "MedrixFlow only sends a completion notification when the window is not active. This is especially useful for long-running tasks so you can switch to other work and get notified when done.",
+        "Anaxa only sends a completion notification when the window is not active. This is especially useful for long-running tasks so you can switch to other work and get notified when done.",
       requestPermission: "Request notification permission",
       deniedHint:
         "Notification permission was denied. You can enable it in your browser's site settings to receive completion alerts.",
       testButton: "Send test notification",
-      testTitle: "MedrixFlow",
+      testTitle: "Anaxa",
       testBody: "This is a test notification.",
       notSupported: "Your browser does not support notifications.",
       disableNotification: "Disable notification",

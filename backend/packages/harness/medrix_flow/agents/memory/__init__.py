@@ -21,8 +21,11 @@ from medrix_flow.agents.memory.queue import (
 from medrix_flow.agents.memory.updater import (
     MemoryUpdater,
     get_memory_data,
+    get_thread_memory,
     reload_memory_data,
+    reload_thread_memory,
     update_memory_from_conversation,
+    update_thread_memory,
 )
 
 __all__ = [
@@ -39,6 +42,9 @@ __all__ = [
     # Updater
     "MemoryUpdater",
     "get_memory_data",
+    "get_thread_memory",
     "reload_memory_data",
+    "reload_thread_memory",
+    "update_thread_memory",
     "update_memory_from_conversation",
 ]

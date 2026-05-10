@@ -3,12 +3,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import {
   BellIcon,
-  InfoIcon,
-  BrainIcon,
   CogIcon,
-  PaletteIcon,
   SparklesIcon,
-  WrenchIcon,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -19,28 +15,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { AboutSettingsPage } from "@/components/workspace/settings/about-settings-page";
-import { AppearanceSettingsPage } from "@/components/workspace/settings/appearance-settings-page";
-import { MemorySettingsPage } from "@/components/workspace/settings/memory-settings-page";
+import { FeatureSettingsPage } from "@/components/workspace/settings/feature-settings-page";
 import { NotificationSettingsPage } from "@/components/workspace/settings/notification-settings-page";
 import { SetupSettingsPage } from "@/components/workspace/settings/setup-settings-page";
-import { SkillSettingsPage } from "@/components/workspace/settings/skill-settings-page";
-import { ToolSettingsPage } from "@/components/workspace/settings/tool-settings-page";
+import { featuresQueryOptions } from "@/core/features";
 import { useI18n } from "@/core/i18n/hooks";
-import { mcpConfigQueryOptions } from "@/core/mcp/hooks";
-import { memoryQueryOptions } from "@/core/memory/hooks";
 import { setupQueryOptions } from "@/core/setup/hooks";
-import { skillsQueryOptions } from "@/core/skills/hooks";
 import { cn } from "@/lib/utils";
 
 type SettingsSection =
   | "setup"
-  | "appearance"
-  | "memory"
-  | "tools"
-  | "skills"
-  | "notification"
-  | "about";
+  | "features"
+  | "notification";
 
 type SettingsDialogProps = React.ComponentProps<typeof Dialog> & {
   defaultSection?: SettingsSection;
@@ -61,9 +47,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
       if (!prefetchedRef.current) {
         prefetchedRef.current = true;
         void queryClient.prefetchQuery(setupQueryOptions);
-        void queryClient.prefetchQuery(mcpConfigQueryOptions);
-        void queryClient.prefetchQuery(skillsQueryOptions);
-        void queryClient.prefetchQuery(memoryQueryOptions);
+        void queryClient.prefetchQuery(featuresQueryOptions);
       }
     }
   }, [defaultSection, dialogProps.open, queryClient]);
@@ -75,33 +59,17 @@ export function SettingsDialog(props: SettingsDialogProps) {
         label: t.settings.sections.setup,
         icon: CogIcon,
       },
-      {
-        id: "appearance",
-        label: t.settings.sections.appearance,
-        icon: PaletteIcon,
-      },
+      { id: "features", label: t.settings.sections.features, icon: SparklesIcon },
       {
         id: "notification",
         label: t.settings.sections.notification,
         icon: BellIcon,
       },
-      {
-        id: "memory",
-        label: t.settings.sections.memory,
-        icon: BrainIcon,
-      },
-      { id: "tools", label: t.settings.sections.tools, icon: WrenchIcon },
-      { id: "skills", label: t.settings.sections.skills, icon: SparklesIcon },
-      { id: "about", label: t.settings.sections.about, icon: InfoIcon },
     ],
     [
       t.settings.sections.setup,
-      t.settings.sections.appearance,
-      t.settings.sections.memory,
-      t.settings.sections.tools,
-      t.settings.sections.skills,
+      t.settings.sections.features,
       t.settings.sections.notification,
-      t.settings.sections.about,
     ],
   );
   return (
@@ -147,16 +115,8 @@ export function SettingsDialog(props: SettingsDialogProps) {
           <ScrollArea className="h-full min-h-0 rounded-lg border">
             <div className="space-y-8 p-6">
               {activeSection === "setup" && <SetupSettingsPage />}
-              {activeSection === "appearance" && <AppearanceSettingsPage />}
-              {activeSection === "memory" && <MemorySettingsPage />}
-              {activeSection === "tools" && <ToolSettingsPage />}
-              {activeSection === "skills" && (
-                <SkillSettingsPage
-                  onClose={() => props.onOpenChange?.(false)}
-                />
-              )}
+              {activeSection === "features" && <FeatureSettingsPage />}
               {activeSection === "notification" && <NotificationSettingsPage />}
-              {activeSection === "about" && <AboutSettingsPage />}
             </div>
           </ScrollArea>
         </div>

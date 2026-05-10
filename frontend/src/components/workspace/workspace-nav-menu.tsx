@@ -2,7 +2,7 @@
 
 import {
   ChevronsUpDown,
-  InfoIcon,
+  LanguagesIcon,
   Settings2Icon,
   SettingsIcon,
 } from "lucide-react";
@@ -22,6 +22,8 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Tooltip } from "@/components/workspace/tooltip";
+import type { Locale } from "@/core/i18n";
 import { useI18n } from "@/core/i18n/hooks";
 import {
   OPEN_SETTINGS_EVENT,
@@ -52,15 +54,19 @@ function NavMenuButtonContent({
 }
 
 const SETUP_PROMPT_SESSION_KEY = "medrix_flow.setup-prompted";
+const nextLocale: Record<Locale, Locale> = {
+  "en-US": "zh-CN",
+  "zh-CN": "en-US",
+};
 
 export function WorkspaceNavMenu() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDefaultSection, setSettingsDefaultSection] = useState<
-    "setup" | "appearance" | "memory" | "tools" | "skills" | "notification" | "about"
-  >("appearance");
+    "setup" | "features" | "notification"
+  >("setup");
   const [mounted, setMounted] = useState(false);
   const { open: isSidebarOpen } = useSidebar();
-  const { t } = useI18n();
+  const { t, locale, changeLocale } = useI18n();
 
   useEffect(() => {
     setMounted(true);
@@ -101,6 +107,26 @@ export function WorkspaceNavMenu() {
       />
       <SidebarMenu className="w-full">
         <SidebarMenuItem>
+          <Tooltip
+            content={
+              locale === "zh-CN"
+                ? "Switch to English"
+                : "切换到中文"
+            }
+          >
+            <SidebarMenuButton
+              type="button"
+              onClick={() => changeLocale(nextLocale[locale])}
+              className="text-muted-foreground"
+            >
+              <LanguagesIcon className="size-4" />
+              {isSidebarOpen && (
+                <span>{locale === "zh-CN" ? "English" : "中文"}</span>
+              )}
+            </SidebarMenuButton>
+          </Tooltip>
+        </SidebarMenuItem>
+        <SidebarMenuItem>
           {mounted ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -119,7 +145,7 @@ export function WorkspaceNavMenu() {
                 <DropdownMenuGroup>
                   <DropdownMenuItem
                     onClick={() => {
-                      setSettingsDefaultSection("appearance");
+                      setSettingsDefaultSection("setup");
                       setSettingsOpen(true);
                     }}
                   >
@@ -138,16 +164,6 @@ export function WorkspaceNavMenu() {
                     </DropdownMenuItem>
                   </a>
                 </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => {
-                    setSettingsDefaultSection("about");
-                    setSettingsOpen(true);
-                  }}
-                >
-                  <InfoIcon />
-                  {t.workspace.about}
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (

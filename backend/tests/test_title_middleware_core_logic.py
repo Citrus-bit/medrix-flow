@@ -59,10 +59,11 @@ class TestTitleMiddlewareCoreLogic:
         }
         assert middleware._should_generate_title(titled_state) is False
 
-    def test_should_not_generate_title_after_second_user_turn(self):
+    def test_regenerates_title_after_later_turn_when_existing_title_is_invalid(self):
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         state = {
+            "title": '<think> The user: "Generate a concise title (max 6 words) fo',
             "messages": [
                 HumanMessage(content="第一问"),
                 AIMessage(content="第一答"),
@@ -71,7 +72,7 @@ class TestTitleMiddlewareCoreLogic:
             ]
         }
 
-        assert middleware._should_generate_title(state) is False
+        assert middleware._should_generate_title(state) is True
 
     def test_generate_title_trims_quotes_and_respects_max_chars(self, monkeypatch):
         _set_test_title_config(max_chars=12)
@@ -198,3 +199,62 @@ class TestTitleMiddlewareCoreLogic:
         }
         result = middleware._generate_title_result(state)
         assert result["title"] == "空标题测试"
+
+    def test_parse_title_strips_reasoning_blocks(self):
+        _set_test_title_config(max_chars=80)
+        middleware = TitleMiddleware()
+
+        title = middleware._parse_title(
+            "<think>The model should infer a concise topic title.</think>\n"
+            "Title: VCFM Literature Review",
+        )
+
+        assert title == "VCFM Literature Review"
+
+    def test_prompt_echo_title_falls_back_to_user_topic(self, monkeypatch):
+        _set_test_title_config(max_chars=50)
+        middleware = TitleMiddleware()
+        fake_model = MagicMock()
+        fake_model.invoke = MagicMock(
+            return_value=MagicMock(
+                content='<think> The user: "Generate a concise title (max 6 words) fo',
+            ),
+        )
+        monkeypatch.setattr(
+            "medrix_flow.agents.middlewares.title_middleware.create_chat_model",
+            lambda **kwargs: fake_model,
+        )
+
+        state = {
+            "messages": [
+                HumanMessage(content="GNN和MLP在Virtual Cell Foundation Model中的局限与突破方向"),
+                AIMessage(content="我会从文献覆盖、证据链和评估框架入手。"),
+            ]
+        }
+
+        result = middleware._generate_title_result(state)
+
+        assert result["title"].startswith("GNN和MLP在Virtual Cell Foundation Model")
+
+    def test_existing_title_with_closed_think_block_is_normalized_without_model(self, monkeypatch):
+        _set_test_title_config(max_chars=80)
+        middleware = TitleMiddleware()
+        fake_model = MagicMock()
+        fake_model.invoke = MagicMock()
+        monkeypatch.setattr(
+            "medrix_flow.agents.middlewares.title_middleware.create_chat_model",
+            lambda **kwargs: fake_model,
+        )
+
+        state = {
+            "title": "<think>reasoning trace</think>\nTitle: Claim-Level Evidence Audit",
+            "messages": [
+                HumanMessage(content="请检查论文引用质量"),
+                AIMessage(content="我会做质量审查。"),
+            ],
+        }
+
+        result = middleware._generate_title_result(state)
+
+        assert result == {"title": "Claim-Level Evidence Audit"}
+        fake_model.invoke.assert_not_called()

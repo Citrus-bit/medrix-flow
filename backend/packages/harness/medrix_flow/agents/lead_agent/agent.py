@@ -40,6 +40,19 @@ def _resolve_model_name(requested_model_name: str | None = None) -> str:
     return default_model_name
 
 
+def _thread_memory_mtime(thread_id: str | None) -> float | None:
+    """Return the thread memory mtime used to refresh prompt-injected memory."""
+    if not thread_id:
+        return None
+    try:
+        from medrix_flow.config.paths import get_paths
+
+        path = get_paths().thread_memory_file(thread_id)
+        return path.stat().st_mtime if path.exists() else None
+    except (OSError, ValueError):
+        return None
+
+
 def _create_summarization_middleware() -> SummarizationMiddleware | None:
     """Create and configure the summarization middleware from config."""
     config = get_summarization_config()
@@ -297,6 +310,8 @@ def make_lead_agent(config: RunnableConfig):
     max_concurrent_subagents = cfg.get("max_concurrent_subagents", 3)
     is_bootstrap = cfg.get("is_bootstrap", False)
     agent_name = cfg.get("agent_name")
+    thread_id = cfg.get("thread_id")
+    thread_memory_mtime = _thread_memory_mtime(thread_id)
 
     agent_config = load_agent_config(agent_name) if not is_bootstrap else None
     # Custom agent model or fallback to global/default model resolution
@@ -337,6 +352,7 @@ def make_lead_agent(config: RunnableConfig):
             "reasoning_effort": reasoning_effort,
             "is_plan_mode": is_plan_mode,
             "subagent_enabled": subagent_enabled,
+            "thread_memory_mtime": thread_memory_mtime,
         }
     )
 
@@ -346,7 +362,12 @@ def make_lead_agent(config: RunnableConfig):
             model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled),
             tools=get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled) + [setup_agent],
             middleware=_build_middlewares(config, model_name=model_name),
-            system_prompt=apply_prompt_template(subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents, available_skills=set(["bootstrap"])),
+            system_prompt=apply_prompt_template(
+                subagent_enabled=subagent_enabled,
+                max_concurrent_subagents=max_concurrent_subagents,
+                available_skills=set(["bootstrap"]),
+                thread_id=thread_id,
+            ),
             state_schema=ThreadState,
         )
 
@@ -355,6 +376,11 @@ def make_lead_agent(config: RunnableConfig):
         model=create_chat_model(name=model_name, thinking_enabled=thinking_enabled, reasoning_effort=reasoning_effort),
         tools=get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled),
         middleware=_build_middlewares(config, model_name=model_name, agent_name=agent_name),
-        system_prompt=apply_prompt_template(subagent_enabled=subagent_enabled, max_concurrent_subagents=max_concurrent_subagents, agent_name=agent_name),
+        system_prompt=apply_prompt_template(
+            subagent_enabled=subagent_enabled,
+            max_concurrent_subagents=max_concurrent_subagents,
+            agent_name=agent_name,
+            thread_id=thread_id,
+        ),
         state_schema=ThreadState,
     )

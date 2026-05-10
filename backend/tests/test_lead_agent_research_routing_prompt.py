@@ -4,7 +4,7 @@ from medrix_flow.agents.lead_agent import prompt as prompt_module
 
 
 def test_apply_prompt_template_includes_research_routing_guidance(monkeypatch):
-    monkeypatch.setattr(prompt_module, "_get_memory_context", lambda agent_name=None: "")
+    monkeypatch.setattr(prompt_module, "_get_memory_context", lambda agent_name=None, thread_id=None: "")
     monkeypatch.setattr(prompt_module, "get_agent_soul", lambda agent_name: "")
     monkeypatch.setattr(prompt_module, "get_skills_prompt_section", lambda available_skills=None: "")
     monkeypatch.setattr(prompt_module, "get_deferred_tools_prompt_section", lambda: "")

@@ -111,10 +111,9 @@ class MemoryUpdateQueue:
             for context in contexts_to_process:
                 try:
                     print(f"Updating memory for thread {context.thread_id}")
-                    success = updater.update_memory(
+                    success = updater.update_thread_memory(
                         messages=context.messages,
                         thread_id=context.thread_id,
-                        agent_name=context.agent_name,
                     )
                     if success:
                         print(f"Memory updated successfully for thread {context.thread_id}")

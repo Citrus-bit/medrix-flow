@@ -109,6 +109,41 @@ def test_make_lead_agent_disables_thinking_when_model_does_not_support_it(monkey
     assert result["model"] is not None
 
 
+def test_make_lead_agent_passes_thread_id_to_prompt(monkeypatch):
+    app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
+
+    import medrix_flow.tools as tools_module
+
+    monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: app_config)
+    monkeypatch.setattr(tools_module, "get_available_tools", lambda **kwargs: [])
+    monkeypatch.setattr(lead_agent_module, "_build_middlewares", lambda config, model_name, agent_name=None: [])
+    monkeypatch.setattr(lead_agent_module, "_thread_memory_mtime", lambda thread_id: 123.0)
+    monkeypatch.setattr(lead_agent_module, "create_chat_model", lambda **kwargs: object())
+    monkeypatch.setattr(lead_agent_module, "create_agent", lambda **kwargs: kwargs)
+
+    captured: dict[str, object] = {}
+
+    def _fake_apply_prompt_template(**kwargs):
+        captured.update(kwargs)
+        return "prompt"
+
+    monkeypatch.setattr(lead_agent_module, "apply_prompt_template", _fake_apply_prompt_template)
+
+    lead_agent_module.make_lead_agent(
+        {
+            "configurable": {
+                "thread_id": "thread-a",
+                "model_name": "safe-model",
+                "thinking_enabled": False,
+                "is_plan_mode": False,
+                "subagent_enabled": False,
+            }
+        }
+    )
+
+    assert captured["thread_id"] == "thread-a"
+
+
 def test_build_middlewares_uses_resolved_model_name_for_vision(monkeypatch):
     app_config = _make_app_config(
         [

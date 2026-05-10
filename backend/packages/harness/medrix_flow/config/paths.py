@@ -74,6 +74,10 @@ class Paths:
         """Path to the persisted memory file: `{base_dir}/memory.json`."""
         return self.base_dir / "memory.json"
 
+    def thread_memory_file(self, thread_id: str) -> Path:
+        """Per-thread memory file: `{base_dir}/threads/{thread_id}/memory.json`."""
+        return self.thread_dir(thread_id) / "memory.json"
+
     @property
     def runtime_db_file(self) -> Path:
         """Path to the lightweight runtime persistence database."""

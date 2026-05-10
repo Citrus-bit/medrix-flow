@@ -30,6 +30,15 @@ def _memory_config(**overrides: object) -> MemoryConfig:
     return config
 
 
+def _make_message(role: str, content: str):
+    msg = MagicMock()
+    msg.type = role
+    msg.content = content
+    if role == "ai":
+        msg.tool_calls = []
+    return msg
+
+
 def test_apply_updates_skips_existing_duplicate_and_preserves_removals() -> None:
     updater = MemoryUpdater()
     current_memory = _make_memory(
@@ -286,3 +295,103 @@ class TestUpdateMemoryStructuredResponse:
             result = updater.update_memory([msg, ai_msg])
 
         assert result is True
+
+
+def test_update_thread_memory_uses_thread_scoped_storage() -> None:
+    updater = MemoryUpdater()
+    valid_json = (
+        '{"user": {}, "history": {}, '
+        '"newFacts": [{"content": "Thread A preference", "category": "preference", "confidence": 0.9}], '
+        '"factsToRemove": []}'
+    )
+    model = MagicMock()
+    response = MagicMock()
+    response.content = valid_json
+    model.invoke.return_value = response
+    storage = MagicMock()
+    storage.load.return_value = _make_memory()
+    storage.save.return_value = True
+
+    with (
+        patch.object(updater, "_get_model", return_value=model),
+        patch("medrix_flow.agents.memory.updater.get_memory_config", return_value=_memory_config(enabled=True)),
+        patch("medrix_flow.agents.memory.updater.get_memory_storage", return_value=storage),
+    ):
+        result = updater.update_thread_memory(
+            [_make_message("human", "Remember this only here"), _make_message("ai", "Noted")],
+            thread_id="thread-a",
+        )
+
+    assert result is True
+    storage.load.assert_called_once_with(thread_id="thread-a")
+    saved_memory = storage.save.call_args.args[0]
+    assert storage.save.call_args.kwargs == {"thread_id": "thread-a"}
+    assert saved_memory["facts"][0]["content"] == "Thread A preference"
+    assert saved_memory["facts"][0]["source"] == "thread-a"
+
+
+def test_update_thread_memory_invalid_json_does_not_save() -> None:
+    updater = MemoryUpdater()
+    model = MagicMock()
+    response = MagicMock()
+    response.content = "not json"
+    model.invoke.return_value = response
+    storage = MagicMock()
+    storage.load.return_value = _make_memory(
+        facts=[
+            {
+                "id": "fact_keep",
+                "content": "Keep existing memory",
+                "category": "context",
+                "confidence": 0.9,
+                "createdAt": "2026-03-18T00:00:00Z",
+                "source": "thread-a",
+            }
+        ]
+    )
+
+    with (
+        patch.object(updater, "_get_model", return_value=model),
+        patch("medrix_flow.agents.memory.updater.get_memory_config", return_value=_memory_config(enabled=True)),
+        patch("medrix_flow.agents.memory.updater.get_memory_storage", return_value=storage),
+    ):
+        result = updater.update_thread_memory(
+            [_make_message("human", "Hello"), _make_message("ai", "Hi")],
+            thread_id="thread-a",
+        )
+
+    assert result is False
+    storage.save.assert_not_called()
+
+
+def test_update_thread_memory_strips_upload_mentions() -> None:
+    updater = MemoryUpdater()
+    valid_json = (
+        '{"user": {"topOfMind": {"summary": "User uploaded files at /mnt/user-data/uploads/a.pdf. Real goal remains active.", "shouldUpdate": true}}, '
+        '"history": {}, '
+        '"newFacts": [{"content": "User uploaded files at /mnt/user-data/uploads/a.pdf.", "category": "context", "confidence": 0.95}, '
+        '{"content": "User wants PDF export", "category": "preference", "confidence": 0.95}], '
+        '"factsToRemove": []}'
+    )
+    model = MagicMock()
+    response = MagicMock()
+    response.content = valid_json
+    model.invoke.return_value = response
+    storage = MagicMock()
+    storage.load.return_value = _make_memory()
+    storage.save.return_value = True
+
+    with (
+        patch.object(updater, "_get_model", return_value=model),
+        patch("medrix_flow.agents.memory.updater.get_memory_config", return_value=_memory_config(enabled=True)),
+        patch("medrix_flow.agents.memory.updater.get_memory_storage", return_value=storage),
+    ):
+        result = updater.update_thread_memory(
+            [_make_message("human", "<uploaded_files>...</uploaded_files>\nPlease write"), _make_message("ai", "Done")],
+            thread_id="thread-a",
+        )
+
+    assert result is True
+    saved_memory = storage.save.call_args.args[0]
+    assert "/mnt/user-data/uploads" not in saved_memory["user"]["topOfMind"]["summary"]
+    assert [fact["content"] for fact in saved_memory["facts"]] == ["User wants PDF export"]
