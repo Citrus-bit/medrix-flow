@@ -43,7 +43,6 @@ import {
   SheetDescription,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArtifactFileList } from "@/components/workspace/artifacts/artifact-file-list";
@@ -51,6 +50,7 @@ import { useArtifacts } from "@/components/workspace/artifacts/context";
 import { Tooltip } from "@/components/workspace/tooltip";
 import {
   cancelThreadRun,
+  type WorkflowEvent,
   type WorkflowNode,
   type WorkflowSnapshot,
 } from "@/core/api/runs";
@@ -112,6 +112,18 @@ function formatMaybeTokens(
 ) {
   if (!value || value <= 0) return unrecordedLabel;
   return formatTokenCount(value);
+}
+
+function isEmptySubagentHeartbeat(event: WorkflowEvent) {
+  if (event.event_type !== "subagent_event") return false;
+  if (event.content.heartbeat !== true) return false;
+  const content = event.content.content;
+  return (
+    content === undefined ||
+    content === null ||
+    content === "" ||
+    content === '""'
+  );
 }
 
 function getNodeIcon(kind: WorkflowNode["kind"]) {
@@ -676,6 +688,10 @@ export function ThreadDetailsTrigger({
       ? workflow.artifacts.length
       : artifacts.length;
   const threadUsage = useMemo(() => accumulateUsage(messages), [messages]);
+  const visibleEvents = useMemo(
+    () => workflow?.events.filter((event) => !isEmptySubagentHeartbeat(event)) ?? [],
+    [workflow?.events],
+  );
   const threadDuration = useMemo(() => {
     if (runs.length === 0) return "—";
     const timestamps = runs
@@ -687,7 +703,7 @@ export function ThreadDetailsTrigger({
       new Date(Math.max(...timestamps)).toISOString(),
     );
   }, [runs]);
-  const eventCount = workflow?.events.length ?? 0;
+  const eventCount = visibleEvents.length;
 
   const agentThread = useMemo(
     () =>
@@ -735,31 +751,34 @@ export function ThreadDetailsTrigger({
     }
   }, [copy.stopFailed, copy.stopRequested, currentRunId, refetch, run?.run_id, threadId]);
 
+  const sheetContentId = "thread-details-panel";
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <Tooltip content={copy.tooltip}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            className="text-muted-foreground hover:text-foreground relative"
-            data-testid="thread-details-trigger"
-          >
-            {(streaming || active) && (
-              <span className="bg-primary absolute top-1.5 left-1.5 size-2 rounded-full">
-                <span className="bg-primary absolute inset-0 animate-ping rounded-full opacity-50" />
-              </span>
-            )}
-            <ActivityIcon />
-            {copy.trigger}
-            {artifactCount > 0 && (
-              <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
-                {artifactCount}
-              </Badge>
-            )}
-          </Button>
-        </SheetTrigger>
+        <Button
+          variant="ghost"
+          className="text-muted-foreground hover:text-foreground relative"
+          data-testid="thread-details-trigger"
+          aria-controls={sheetContentId}
+          aria-expanded={open}
+          onClick={() => setOpen(true)}
+        >
+          {(streaming || active) && (
+            <span className="bg-primary absolute top-1.5 left-1.5 size-2 rounded-full">
+              <span className="bg-primary absolute inset-0 animate-ping rounded-full opacity-50" />
+            </span>
+          )}
+          <ActivityIcon />
+          {copy.trigger}
+          {artifactCount > 0 && (
+            <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">
+              {artifactCount}
+            </Badge>
+          )}
+        </Button>
       </Tooltip>
-      <SheetContent className="w-[92vw] gap-0 p-0 sm:max-w-xl">
+      <SheetContent id={sheetContentId} className="w-[92vw] gap-0 p-0 sm:max-w-xl">
         <SheetHeader className="border-b pr-12">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -840,9 +859,9 @@ export function ThreadDetailsTrigger({
                     onExportThread={handleExportThread}
                   />
                 </div>
-                {workflow?.events.length ? (
+                {visibleEvents.length ? (
                   <div className="space-y-2">
-                    {workflow.events.map((event) => (
+                    {visibleEvents.map((event) => (
                       <Collapsible key={event.seq} className="min-w-0 rounded-md border p-3">
                         <CollapsibleTrigger className="group flex w-full cursor-pointer items-start justify-between gap-3 text-left">
                           <div className="min-w-0 flex-1 overflow-hidden">

@@ -202,6 +202,109 @@ describe("useThreadStream", () => {
     });
   });
 
+  it("updates subtask heartbeat without persisting empty subagent events", async () => {
+    mocks.registerThreadRun.mockResolvedValue(undefined);
+    mocks.createRunEvent.mockResolvedValue(undefined);
+
+    renderHook(
+      () =>
+        useThreadStream({
+          threadId: "thread-1",
+          context: {
+            mode: "flash",
+            model_name: undefined,
+            reasoning_effort: undefined,
+          },
+        }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      (capturedOptions?.onCreated as (meta: { thread_id: string; run_id: string }) => void)({
+        thread_id: "thread-1",
+        run_id: "run-1",
+      });
+    });
+    mocks.createRunEvent.mockClear();
+
+    await act(async () => {
+      (
+        capturedOptions?.onCustomEvent as (event: {
+          type: string;
+          task_id: string;
+          heartbeat?: boolean;
+        }) => void
+      )({
+        type: "task_running",
+        task_id: "task-1",
+        heartbeat: true,
+      });
+    });
+
+    expect(mocks.updateSubtask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "task-1",
+        lastUpdatedAt: expect.any(String),
+      }),
+    );
+    expect(mocks.createRunEvent).not.toHaveBeenCalled();
+  });
+
+  it("persists real subagent messages as workflow events", async () => {
+    mocks.registerThreadRun.mockResolvedValue(undefined);
+    mocks.createRunEvent.mockResolvedValue(undefined);
+
+    renderHook(
+      () =>
+        useThreadStream({
+          threadId: "thread-1",
+          context: {
+            mode: "flash",
+            model_name: undefined,
+            reasoning_effort: undefined,
+          },
+        }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      (capturedOptions?.onCreated as (meta: { thread_id: string; run_id: string }) => void)({
+        thread_id: "thread-1",
+        run_id: "run-1",
+      });
+    });
+    mocks.createRunEvent.mockClear();
+
+    await act(async () => {
+      (
+        capturedOptions?.onCustomEvent as (event: {
+          type: string;
+          task_id: string;
+          message?: { id: string; content: string };
+          heartbeat?: boolean;
+        }) => void
+      )({
+        type: "task_running",
+        task_id: "task-1",
+        message: { id: "msg-1", content: "Collected references" },
+      });
+    });
+
+    expect(mocks.createRunEvent).toHaveBeenCalledWith(
+      "thread-1",
+      "run-1",
+      expect.objectContaining({
+        event_type: "subagent_event",
+        caller: "task",
+        content: expect.objectContaining({
+          task_id: "task-1",
+          heartbeat: false,
+          content: "Collected references",
+        }),
+      }),
+    );
+  });
+
   it("marks ordinary text requests as non-visual", async () => {
     mocks.submit.mockResolvedValue(undefined);
 

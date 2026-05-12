@@ -255,6 +255,21 @@ describe("ThreadDetailsTrigger", () => {
           content: { type: "tool", content: "Generated manuscript bundle." },
           created_at: "2026-05-09T00:00:05Z",
         },
+        {
+          seq: 2,
+          run_id: "run-1",
+          thread_id: "thread-1",
+          event_type: "subagent_event",
+          caller: "task",
+          summary: '""',
+          content: {
+            type: "task",
+            task_id: "task-1",
+            heartbeat: true,
+            content: '""',
+          },
+          created_at: "2026-05-09T00:00:06Z",
+        },
       ],
       artifacts: [
         {
@@ -318,6 +333,8 @@ describe("ThreadDetailsTrigger", () => {
     expect(within(menu).getByText("导出对话 JSON")).toBeInTheDocument();
     expect(within(menu).getByText("导出运行轨迹 JSON")).toBeInTheDocument();
     expect(screen.getByText("#1")).toBeInTheDocument();
+    expect(screen.queryByText("#2")).not.toBeInTheDocument();
+    expect(screen.queryByText("subagent_event")).not.toBeInTheDocument();
   });
 
   it("keeps scanned-only artifacts out of the workflow tab", async () => {
@@ -406,6 +423,57 @@ describe("ThreadDetailsTrigger", () => {
     expect(await screen.findByText("User Goal / Run")).toBeInTheDocument();
     expect(screen.getByText("No visual decision flow yet")).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent(/[详情流程产出统计日志暂无未记录当前整个导出]/);
+  });
+
+  it("opens reliably while a run is actively streaming", async () => {
+    mocks.cancelThreadRun.mockResolvedValue(undefined);
+    mocks.listThreadRuns.mockResolvedValue([
+      {
+        run_id: "run-active",
+        thread_id: "thread-1",
+        assistant_id: "lead_agent",
+        status: "running",
+        metadata: {},
+        kwargs: {},
+        multitask_strategy: "reject",
+        created_at: "2026-05-09T00:00:00Z",
+        updated_at: "2026-05-09T00:00:10Z",
+      },
+    ]);
+    mocks.getRunWorkflow.mockResolvedValue({
+      run: {
+        run_id: "run-active",
+        thread_id: "thread-1",
+        assistant_id: "lead_agent",
+        status: "running",
+        created_at: "2026-05-09T00:00:00Z",
+        updated_at: "2026-05-09T00:00:10Z",
+        last_event_at: "2026-05-09T00:00:10Z",
+      },
+      nodes: [],
+      edges: [],
+      events: [],
+      artifacts: [],
+      usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+      has_more: false,
+    });
+
+    render(
+      <ThreadDetailsTrigger
+        threadId="thread-1"
+        currentRunId="run-active"
+        streaming
+      />,
+      { wrapper },
+    );
+
+    const trigger = await screen.findByTestId("thread-details-trigger");
+    expect(trigger.querySelector(".animate-ping")).toBeInTheDocument();
+
+    fireEvent.click(trigger);
+
+    expect(await screen.findByText("Agent 工作流、工具调用、产出文件与运行日志")).toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
   });
 
   it("does not show an active badge for stale pending runs", async () => {

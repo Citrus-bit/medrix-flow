@@ -21,6 +21,7 @@ import { useI18n } from "@/core/i18n/hooks";
 import { hasToolCalls } from "@/core/messages/utils";
 import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
 import { streamdownPluginsWithWordAnimation } from "@/core/streamdown";
+import type { Subtask } from "@/core/tasks";
 import { useSubtask } from "@/core/tasks/context";
 import { explainLastToolCall } from "@/core/tools/utils";
 import { cn } from "@/lib/utils";
@@ -33,25 +34,33 @@ import { MarkdownContent } from "./markdown-content";
 export function SubtaskCard({
   className,
   taskId,
+  initialTask,
   isLoading,
 }: {
   className?: string;
   taskId: string;
+  initialTask?: Subtask;
   isLoading: boolean;
 }) {
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(true);
   const rehypePlugins = useRehypeSplitWordsIntoSpans(isLoading);
-  const task = useSubtask(taskId)!;
+  const task = useSubtask(taskId) ?? initialTask;
+  const status = task?.status;
   const icon = useMemo(() => {
-    if (task.status === "completed") {
+    if (status === "completed") {
       return <CheckCircleIcon className="size-3" />;
-    } else if (task.status === "failed") {
+    } else if (status === "failed") {
       return <XCircleIcon className="size-3 text-red-500" />;
-    } else if (task.status === "in_progress") {
+    } else if (status === "in_progress") {
       return <Loader2Icon className="size-3 animate-spin" />;
     }
-  }, [task.status]);
+  }, [status]);
+
+  if (!task) {
+    return null;
+  }
+
   return (
     <ChainOfThought
       className={cn("relative w-full gap-2 rounded-lg border py-0", className)}

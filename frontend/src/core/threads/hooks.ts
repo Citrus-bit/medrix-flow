@@ -310,15 +310,21 @@ export function useThreadStream({
       ) {
         const e = event as {
           type: "task_running";
-          task_id: string;
+          task_id?: string;
           message?: AIMessage;
           heartbeat?: boolean;
         };
+        if (!e.task_id) {
+          return;
+        }
         updateSubtask({
           id: e.task_id,
           ...(e.message ? { latestMessage: e.message } : {}),
           lastUpdatedAt: new Date().toISOString(),
         });
+        if (e.heartbeat && !e.message) {
+          return;
+        }
         const runId = currentRunIdRef.current;
         const currentThreadId = threadIdRef.current;
         if (runId && currentThreadId) {

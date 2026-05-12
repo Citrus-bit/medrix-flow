@@ -36,6 +36,40 @@ import { PlanApprovalCard } from "./plan-approval-card";
 import { MessageListSkeleton } from "./skeleton";
 import { SubtaskCard } from "./subtask-card";
 
+type TaskToolCall = {
+  id?: string;
+  name?: string;
+  args?: Record<string, unknown>;
+};
+
+function subtaskFromToolCall(
+  toolCall: TaskToolCall,
+  fallbackDescription: string,
+): Subtask | null {
+  if (toolCall.name !== "task" || !toolCall.id) {
+    return null;
+  }
+
+  const args = toolCall.args ?? {};
+  const description =
+    typeof args.description === "string" && args.description.trim()
+      ? args.description
+      : fallbackDescription;
+  const prompt = typeof args.prompt === "string" ? args.prompt : "";
+  const subagentType =
+    typeof args.subagent_type === "string" && args.subagent_type.trim()
+      ? args.subagent_type
+      : "general-purpose";
+
+  return {
+    id: toolCall.id,
+    subagent_type: subagentType,
+    description,
+    prompt,
+    status: "in_progress",
+  };
+}
+
 export function MessageList({
   className,
   threadId,
@@ -62,14 +96,9 @@ export function MessageList({
     for (const message of messages) {
       if (message.type === "ai") {
         for (const toolCall of message.tool_calls ?? []) {
-          if (toolCall.name === "task") {
-            updateSubtask({
-              id: toolCall.id!,
-              subagent_type: toolCall.args.subagent_type,
-              description: toolCall.args.description,
-              prompt: toolCall.args.prompt,
-              status: "in_progress",
-            });
+          const subtask = subtaskFromToolCall(toolCall, t.subtasks.subtask);
+          if (subtask) {
+            updateSubtask(subtask);
           }
         }
       }
@@ -90,7 +119,7 @@ export function MessageList({
         ...parsed,
       });
     }
-  }, [messages, updateSubtask]);
+  }, [messages, t.subtasks.subtask, updateSubtask]);
 
   if (thread.isThreadLoading && messages.length === 0) {
     return <MessageListSkeleton />;
@@ -156,18 +185,16 @@ export function MessageList({
               </div>
             );
           } else if (group.type === "assistant:subagent") {
-            const tasks = new Set<Subtask>();
+            const tasksById = new Map<string, Subtask>();
             for (const message of group.messages) {
               if (message.type === "ai") {
                 for (const toolCall of message.tool_calls ?? []) {
-                  if (toolCall.name === "task") {
-                    tasks.add({
-                      id: toolCall.id!,
-                      subagent_type: toolCall.args.subagent_type,
-                      description: toolCall.args.description,
-                      prompt: toolCall.args.prompt,
-                      status: "in_progress",
-                    });
+                  const subtask = subtaskFromToolCall(
+                    toolCall,
+                    t.subtasks.subtask,
+                  );
+                  if (subtask) {
+                    tasksById.set(subtask.id, subtask);
                   }
                 }
               }
@@ -190,17 +217,22 @@ export function MessageList({
                   key="subtask-count"
                   className="text-muted-foreground font-norma pt-2 text-sm"
                 >
-                  {t.subtasks.executing(tasks.size)}
+                  {t.subtasks.executing(tasksById.size)}
                 </div>,
               );
-              const taskIds = message.tool_calls
-                ?.filter((toolCall) => toolCall.name === "task")
-                .map((toolCall) => toolCall.id);
-              for (const taskId of taskIds ?? []) {
+              const subtasks =
+                message.tool_calls
+                  ?.map((toolCall) =>
+                    subtaskFromToolCall(toolCall, t.subtasks.subtask),
+                  )
+                  .filter((subtask): subtask is Subtask => Boolean(subtask)) ??
+                [];
+              for (const subtask of subtasks) {
                 results.push(
                   <SubtaskCard
-                    key={"task-group-" + taskId}
-                    taskId={taskId!}
+                    key={"task-group-" + subtask.id}
+                    taskId={subtask.id}
+                    initialTask={subtask}
                     isLoading={thread.isLoading}
                   />,
                 );

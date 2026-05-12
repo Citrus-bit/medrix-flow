@@ -141,6 +141,45 @@ def test_task_tool_emits_running_and_completed_events(monkeypatch):
     assert events[-1]["result"] == "all done"
 
 
+def test_task_tool_emits_lightweight_heartbeat_without_message(monkeypatch):
+    config = _make_subagent_config()
+    events = []
+
+    monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
+    monkeypatch.setattr(
+        task_tool_module,
+        "SubagentExecutor",
+        type("DummyExecutor", (), {"__init__": lambda self, **kwargs: None, "execute_async": lambda self, prompt, task_id=None: task_id}),
+    )
+    monkeypatch.setattr(task_tool_module, "get_subagent_config", lambda _: config)
+    monkeypatch.setattr(task_tool_module, "get_skills_prompt_section", lambda: "")
+    responses = iter(
+        [
+            _make_result(FakeSubagentStatus.RUNNING),
+            _make_result(FakeSubagentStatus.COMPLETED, result="done"),
+        ]
+    )
+    monkeypatch.setattr(task_tool_module, "get_background_task_result", lambda _: next(responses))
+    monkeypatch.setattr(task_tool_module, "get_stream_writer", lambda: events.append)
+    monkeypatch.setattr(task_tool_module.time, "sleep", lambda _: None)
+    monkeypatch.setattr("medrix_flow.tools.get_available_tools", lambda **kwargs: [])
+
+    output = task_tool_module.task_tool.func(
+        runtime=_make_runtime(),
+        description="执行任务",
+        prompt="do work",
+        subagent_type="general-purpose",
+        tool_call_id="tc-heartbeat",
+    )
+
+    assert output == "Task Succeeded. Result: done"
+    assert [e["type"] for e in events] == ["task_started", "task_running", "task_completed"]
+    heartbeat = events[1]
+    assert heartbeat["heartbeat"] is True
+    assert heartbeat["task_id"] == "tc-heartbeat"
+    assert "message" not in heartbeat
+
+
 def test_task_tool_returns_failed_message(monkeypatch):
     config = _make_subagent_config()
     events = []
