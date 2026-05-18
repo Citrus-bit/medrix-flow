@@ -2,40 +2,10 @@ import type { Message, Thread } from "@langchain/langgraph-sdk";
 
 import type { Todo } from "../todos";
 
-export type PlanStatus =
-  | "draft"
-  | "awaiting_approval"
-  | "needs_revision"
-  | "approved"
-  | "executing"
-  | "completed"
-  | "blocked";
-
-export interface PlanRevision extends Record<string, unknown> {
-  revision_number?: number;
-  source?: string;
-  note?: string;
-  status?: PlanStatus;
-  updated_at?: string;
-}
-
-export interface PlanState extends Record<string, unknown> {
-  summary?: string;
-  phases?: string[];
-  deliverables?: string[];
-  open_questions?: string[];
-  acceptance_criteria?: string[];
-  risk_points?: string[];
-  revision_count?: number;
-  status?: PlanStatus;
-  updated_at?: string;
-  revisions?: PlanRevision[];
-}
-
 export interface AgentThreadState extends Record<string, unknown> {
   title: string;
   messages: Message[];
-  plan?: PlanState | null;
+  plan?: Record<string, unknown> | null;
   artifacts: string[];
   todos?: Todo[];
 }

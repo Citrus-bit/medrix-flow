@@ -1,220 +1,10 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
-from langchain_core.messages import HumanMessage, ToolMessage
-from langgraph.graph import END
-from langgraph.prebuilt.tool_node import ToolCallRequest
-from langgraph.types import Command
-
 from medrix_flow.agents.lead_agent import prompt as prompt_module
-from medrix_flow.agents.middlewares.plan_middleware import PlanMiddleware
-from medrix_flow.agents.plan_state import build_plan_state
-from medrix_flow.tools.builtins.plan_tool import write_plan_tool
+from medrix_flow.tools.tools import get_available_tools
 
 
-def test_write_plan_stores_awaiting_approval_plan_and_stops() -> None:
-    runtime = SimpleNamespace(state={})
-
-    result = write_plan_tool.func(
-        runtime=runtime,
-        summary="Build a literature-backed experiment bundle",
-        phases=["Survey benchmarks", "Design ablations"],
-        deliverables=["experiment_contract.json", "manuscript.tex"],
-        open_questions=["Target venue?"],
-        acceptance_criteria=["Claims map to evidence"],
-        risk_points=["Dataset access may be restricted"],
-        status="approved",
-        revision_note="Initial plan",
-        tool_call_id="tc-plan",
-    )
-
-    assert isinstance(result, Command)
-    assert result.goto == END
-    plan = result.update["plan"]
-    assert plan["status"] == "awaiting_approval"
-    assert plan["revision_count"] == 1
-    assert plan["phases"] == ["Survey benchmarks", "Design ablations"]
-    assert isinstance(result.update["messages"][0], ToolMessage)
-
-
-def test_write_plan_increments_revision_count() -> None:
-    existing = build_plan_state(
-        existing=None,
-        summary="First draft",
-        phases=["Phase 1"],
-        deliverables=["draft.md"],
-    )
-    runtime = SimpleNamespace(state={"plan": existing})
-
-    result = write_plan_tool.func(
-        runtime=runtime,
-        summary="Revised draft",
-        phases=["Phase 1", "Phase 2"],
-        deliverables=["draft.md", "audit.json"],
-        tool_call_id="tc-plan",
-    )
-
-    plan = result.update["plan"]
-    assert plan["revision_count"] == 2
-    assert len(plan["revisions"]) == 2
-    assert plan["summary"] == "Revised draft"
-
-
-def test_plan_middleware_blocks_locked_tools_until_approved() -> None:
-    middleware = PlanMiddleware()
-    called = False
-
-    def handler(request: ToolCallRequest) -> ToolMessage:
-        nonlocal called
-        called = True
-        return ToolMessage("ok", tool_call_id="tc-tool")
-
-    request = ToolCallRequest(
-        tool_call={"name": "present_files", "id": "tc-tool", "args": {}},
-        tool=None,
-        state={},
-        runtime=SimpleNamespace(state={"plan": {"status": "awaiting_approval"}}),
-    )
-
-    result = middleware.wrap_tool_call(request, handler)
-
-    assert called is False
-    assert isinstance(result, ToolMessage)
-    assert result.status == "error"
-    assert "Plan approval is required" in str(result.content)
-    assert "Plan tab" not in str(result.content)
-    assert "Plan 页" not in str(result.content)
-    assert "右侧" not in str(result.content)
-    assert "主对话区" in str(result.content)
-
-
-def test_plan_middleware_blocks_file_writes_until_approved() -> None:
-    middleware = PlanMiddleware()
-    called = False
-
-    def handler(request: ToolCallRequest) -> ToolMessage:
-        nonlocal called
-        called = True
-        return ToolMessage("ok", tool_call_id="tc-tool")
-
-    request = ToolCallRequest(
-        tool_call={"name": "write_file", "id": "tc-tool", "args": {}},
-        tool=None,
-        state={},
-        runtime=SimpleNamespace(state={"plan": {"status": "awaiting_approval"}}),
-    )
-
-    result = middleware.wrap_tool_call(request, handler)
-
-    assert called is False
-    assert isinstance(result, ToolMessage)
-    assert result.status == "error"
-
-
-def test_plan_middleware_allows_execution_after_approval() -> None:
-    middleware = PlanMiddleware()
-    called = False
-
-    def handler(request: ToolCallRequest) -> ToolMessage:
-        nonlocal called
-        called = True
-        return ToolMessage("ok", tool_call_id="tc-tool")
-
-    request = ToolCallRequest(
-        tool_call={"name": "present_files", "id": "tc-tool", "args": {}},
-        tool=None,
-        state={},
-        runtime=SimpleNamespace(state={"plan": {"status": "approved"}}),
-    )
-
-    result = middleware.wrap_tool_call(request, handler)
-
-    assert called is True
-    assert isinstance(result, ToolMessage)
-    assert result.content == "ok"
-
-
-def test_plan_middleware_refreshes_plan_reminder_when_plan_changes() -> None:
-    middleware = PlanMiddleware()
-    state = {
-        "messages": [
-            HumanMessage(
-                name="plan_state",
-                content="<thread_plan>\nupdated_at: 2026-01-01T00:00:00+00:00\n</thread_plan>",
-            )
-        ],
-        "plan": {
-            "summary": "Updated plan",
-            "status": "awaiting_approval",
-            "updated_at": "2026-01-02T00:00:00+00:00",
-        },
-    }
-
-    result = middleware.before_model(state, runtime=SimpleNamespace())
-
-    assert result is not None
-    assert result["messages"][0].name == "plan_state"
-    assert "Updated plan" in result["messages"][0].content
-    assert "updated_at: 2026-01-02T00:00:00+00:00" in result["messages"][0].content
-
-
-def test_plan_middleware_approves_pending_plan_from_latest_user_message() -> None:
-    middleware = PlanMiddleware()
-    state = {
-        "messages": [
-            HumanMessage(content="我批准当前计划，请按计划执行。"),
-        ],
-        "plan": {
-            "summary": "Generate manuscript bundle",
-            "status": "awaiting_approval",
-            "revision_count": 1,
-            "updated_at": "2026-01-02T00:00:00+00:00",
-            "revisions": [
-                {
-                    "revision_number": 1,
-                    "source": "agent",
-                    "note": "Initial plan",
-                    "status": "awaiting_approval",
-                    "updated_at": "2026-01-02T00:00:00+00:00",
-                }
-            ],
-        },
-    }
-
-    result = middleware.before_model(state, runtime=SimpleNamespace())
-
-    assert result is not None
-    plan = result["plan"]
-    assert plan["status"] == "approved"
-    assert plan["revision_count"] == 2
-    assert plan["revisions"][-1]["source"] == "user"
-    assert "status: approved" in result["messages"][0].content
-
-
-def test_plan_middleware_does_not_approve_revision_feedback() -> None:
-    middleware = PlanMiddleware()
-    state = {
-        "messages": [
-            HumanMessage(content="请先修改第二阶段，不要执行。"),
-        ],
-        "plan": {
-            "summary": "Generate manuscript bundle",
-            "status": "awaiting_approval",
-            "revision_count": 1,
-            "updated_at": "2026-01-02T00:00:00+00:00",
-        },
-    }
-
-    result = middleware.before_model(state, runtime=SimpleNamespace())
-
-    assert result is not None
-    assert "plan" not in result
-    assert result["messages"][0].name == "plan_state"
-    assert "status: awaiting_approval" in result["messages"][0].content
-
-
-def test_plan_prompt_section_is_only_in_plan_mode(monkeypatch) -> None:
+def test_plan_mode_uses_guided_intake_prompt_not_visible_plan(monkeypatch) -> None:
     monkeypatch.setattr(prompt_module, "_get_memory_context", lambda agent_name=None, thread_id=None: "")
     monkeypatch.setattr(prompt_module, "get_agent_soul", lambda agent_name: "")
     monkeypatch.setattr(prompt_module, "get_skills_prompt_section", lambda available_skills=None: "")
@@ -224,8 +14,46 @@ def test_plan_prompt_section_is_only_in_plan_mode(monkeypatch) -> None:
     normal = prompt_module.apply_prompt_template()
     plan_mode = prompt_module.apply_prompt_template(plan_mode=True)
 
-    assert "<plan_mode_system>" not in normal
-    assert "<plan_mode_system>" in plan_mode
-    assert "write_plan" in plan_mode
-    assert " ".join(["Plan", "tab"]) not in plan_mode
-    assert "approval card in the main conversation" in plan_mode
+    assert "<guided_intake_system>" not in normal
+    assert "<guided_intake_system>" in plan_mode
+    assert "ask_clarification" in plan_mode
+    assert "write_plan" not in plan_mode
+    assert "approval card" not in plan_mode
+    assert "Plan tab" not in plan_mode
+
+
+def test_plan_mode_does_not_expose_write_plan_tool() -> None:
+    tool_names = {
+        tool.name
+        for tool in get_available_tools(
+            include_mcp=False,
+            plan_mode=True,
+        )
+    }
+
+    assert "ask_clarification" in tool_names
+    assert "write_plan" not in tool_names
+
+
+def test_prompt_includes_startup_intake_rules(monkeypatch) -> None:
+    monkeypatch.setattr(prompt_module, "_get_memory_context", lambda agent_name=None, thread_id=None: "")
+    monkeypatch.setattr(prompt_module, "get_agent_soul", lambda agent_name: "")
+    monkeypatch.setattr(prompt_module, "get_skills_prompt_section", lambda available_skills=None: "")
+    monkeypatch.setattr(prompt_module, "get_deferred_tools_prompt_section", lambda: "")
+    monkeypatch.setattr(prompt_module, "load_skills", lambda enabled_only=True: [])
+
+    rendered = prompt_module.apply_prompt_template()
+
+    assert "Startup Intake for Complex or High-Risk Tasks" in rendered
+    assert "Before starting complex or high-risk work" in rendered
+    assert "file/code changes" in rendered
+    assert "whether file edits/commands are allowed" in rendered
+    assert "Ask one high-impact question at a time" in rendered
+    assert "Do not force intake for simple, low-risk, fully specified requests" in rendered
+    assert "Subagents cannot interact with the user" in rendered
+
+
+def test_legacy_plan_modules_are_removed() -> None:
+    tool_names = {tool.name for tool in get_available_tools(include_mcp=False)}
+
+    assert "write_plan" not in tool_names

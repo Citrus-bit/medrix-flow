@@ -114,6 +114,87 @@ function formatMaybeTokens(
   return formatTokenCount(value);
 }
 
+function workflowStepName(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const raw = value.trim();
+  const lowered = raw.toLowerCase();
+  if (lowered.includes("academic_research")) return "academic_research";
+  if (lowered.includes("dataset_benchmark")) return "dataset_benchmark_discovery";
+  if (lowered.includes("experiment_lab")) return "experiment_lab";
+  if (lowered.includes("manuscript_export")) return "manuscript_export";
+  if (lowered.includes("task") || lowered.includes("subagent")) return "subagent";
+  if (["ai", "tool", "human"].includes(lowered)) return null;
+  return raw;
+}
+
+function workflowToolCallName(content: Record<string, unknown>) {
+  const toolCalls = content.tool_calls;
+  if (!Array.isArray(toolCalls)) return null;
+  for (const toolCall of toolCalls) {
+    if (typeof toolCall !== "object" || toolCall === null) continue;
+    const name = Reflect.get(toolCall, "name");
+    const label = workflowStepName(name);
+    if (label) return label;
+  }
+  return null;
+}
+
+function workflowEventStepLabel(event: WorkflowEvent) {
+  const content = event.content;
+  const candidates = [
+    workflowToolCallName(content),
+    content.tool_name,
+    content.name,
+    event.caller,
+    event.event_type,
+    content.type,
+  ];
+  for (const candidate of candidates) {
+    const label = workflowStepName(candidate);
+    if (label) return label;
+  }
+  return event.summary || event.event_type;
+}
+
+function getSlowStepSummary(workflow?: WorkflowSnapshot) {
+  const events = workflow?.events.filter((event) => !isEmptySubagentHeartbeat(event)) ?? [];
+  if (!workflow || events.length === 0) return [];
+  const runEnd =
+    workflow.run.status === "pending" || workflow.run.status === "running"
+      ? new Date().toISOString()
+      : (workflow.run.last_event_at ?? workflow.run.updated_at);
+  const totals = new Map<string, { durationMs: number; eventCount: number }>();
+
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index];
+    if (!event) continue;
+    const start = Date.parse(event.created_at);
+    const nextCreatedAt = events[index + 1]?.created_at ?? runEnd;
+    const end = nextCreatedAt ? Date.parse(nextCreatedAt) : Number.NaN;
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) continue;
+
+    const label = workflowEventStepLabel(event);
+    const current = totals.get(label) ?? { durationMs: 0, eventCount: 0 };
+    current.durationMs += end - start;
+    current.eventCount += 1;
+    totals.set(label, current);
+  }
+
+  return [...totals.entries()]
+    .map(([label, value]) => ({
+      label,
+      duration: formatDuration(
+        new Date(0).toISOString(),
+        new Date(value.durationMs).toISOString(),
+      ),
+      eventCount: value.eventCount,
+      durationMs: value.durationMs,
+    }))
+    .filter((item) => item.durationMs > 0)
+    .sort((left, right) => right.durationMs - left.durationMs)
+    .slice(0, 5);
+}
+
 function isEmptySubagentHeartbeat(event: WorkflowEvent) {
   if (event.event_type !== "subagent_event") return false;
   if (event.content.heartbeat !== true) return false;
@@ -509,6 +590,7 @@ function StatsSection({
   const run = workflow?.run;
   const lastEventAt = run?.last_event_at ?? run?.updated_at;
   const usage = workflow?.usage;
+  const slowSteps = useMemo(() => getSlowStepSummary(workflow), [workflow]);
   return (
     <div className="space-y-4">
       <section className="space-y-2">
@@ -555,6 +637,36 @@ function StatsSection({
             <SquareXIcon className="size-4" />
             {copy.stopCurrentTask}
           </Button>
+        )}
+      </section>
+      <section className="space-y-2">
+        <div className="text-sm font-medium">{copy.slowSteps}</div>
+        {slowSteps.length > 0 ? (
+          <div className="space-y-2">
+            {slowSteps.map((item) => (
+              <div
+                key={item.label}
+                className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-md bg-muted/50 p-2 text-xs"
+              >
+                <div className="min-w-0">
+                  <div className="text-muted-foreground text-[10px] uppercase">
+                    {copy.labels.step}
+                  </div>
+                  <div className="min-w-0 break-all font-mono">{item.label}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-mono">{item.duration}</div>
+                  <div className="text-muted-foreground">
+                    {copy.eventCount(item.eventCount)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-muted-foreground rounded-md bg-muted/50 p-2 text-xs">
+            {copy.noSlowSteps}
+          </div>
         )}
       </section>
       <section className="space-y-2">
@@ -679,7 +791,7 @@ export function ThreadDetailsTrigger({
   const { workflow, run, runs, active, isFetching, refetch } = useThreadWorkflow({
     threadId,
     currentRunId,
-    enabled: open || streaming,
+    enabled: open,
   });
 
   const messages = thread.messages;

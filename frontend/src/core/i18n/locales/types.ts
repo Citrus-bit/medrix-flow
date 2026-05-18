@@ -157,6 +157,7 @@ export interface Translations {
   conversation: {
     noMessages: string;
     startConversation: string;
+    modelProviderOverloaded: string;
   };
 
   // Run status
@@ -165,6 +166,7 @@ export interface Translations {
     reconnecting: string;
     error: string;
     interrupted: string;
+    modelRetrying: (attempt: number, seconds: number) => string;
     lastEvent: (time: string) => string;
   };
 
@@ -199,11 +201,15 @@ export interface Translations {
     noLogsTitle: string;
     noLogsDescription: string;
     unrecorded: string;
+    slowSteps: string;
+    noSlowSteps: string;
+    eventCount: (count: number) => string;
     labels: {
       status: string;
       caller: string;
       seq: string;
       event: string;
+      step: string;
       run: string;
       started: string;
       lastEvent: string;
@@ -236,35 +242,6 @@ export interface Translations {
       success: string;
       error: string;
       interrupted: string;
-      unknown: string;
-    };
-  };
-
-  // Plan approval card in conversation
-  planApproval: {
-    title: string;
-    phases: string;
-    deliverables: string;
-    openQuestions: string;
-    acceptanceCriteria: string;
-    risks: string;
-    noItems: string;
-    updated: string;
-    revisions: string;
-    approveAndExecute: string;
-    revisePlan: string;
-    approvalHint: string;
-    approvedToast: string;
-    approvalFailed: string;
-    executionMessage: string;
-    status: {
-      draft: string;
-      awaiting_approval: string;
-      needs_revision: string;
-      approved: string;
-      executing: string;
-      completed: string;
-      blocked: string;
       unknown: string;
     };
   };

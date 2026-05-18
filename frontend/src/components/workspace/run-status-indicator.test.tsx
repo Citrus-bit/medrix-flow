@@ -21,6 +21,8 @@ vi.mock("@/core/i18n/hooks", () => ({
         reconnecting: "Backend run is still active. Reconnecting stream...",
         error: "Run ended with an error",
         interrupted: "Run interrupted",
+        modelRetrying: (attempt: number, seconds: number) =>
+          `Model temporarily unavailable. Retry ${attempt} in about ${seconds}s`,
         lastEvent: (time: string) => `Last event ${time}`,
       },
     },
@@ -52,6 +54,25 @@ describe("RunStatusIndicator", () => {
     );
 
     expect(screen.getByText("Running")).toBeInTheDocument();
+  });
+
+  it("shows model retry status before generic streaming state", () => {
+    mocks.listThreadRuns.mockResolvedValue([]);
+
+    render(
+      <RunStatusIndicator
+        threadId="thread-1"
+        currentRunId="run-1"
+        streaming
+        modelRetryStatus={{ attempt: 2, delaySeconds: 4.2 }}
+      />,
+      { wrapper },
+    );
+
+    expect(
+      screen.getByText("Model temporarily unavailable. Retry 2 in about 5s"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Running")).not.toBeInTheDocument();
   });
 
   it("shows reconnecting state when backend run remains active", async () => {

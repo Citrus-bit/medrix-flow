@@ -103,6 +103,130 @@ This paragraph says bibliography keys are synchronized, which is an author proce
     assert any("Author/tool process notes" in violation for violation in result.violations)
 
 
+def test_latex_citation_audit_blocks_cited_reference_missing_author(tmp_path):
+    bibtex_path = tmp_path / "references.bib"
+    tex_path = tmp_path / "manuscript.tex"
+    bibtex_path.write_text(
+        """
+@article{smith2024,
+  title = {A paper},
+  journal = {Journal},
+  year = {2024}
+}
+""",
+        encoding="utf-8",
+    )
+    tex_path.write_text(r"\documentclass{article}\begin{document}\cite{smith2024}\end{document}", encoding="utf-8")
+
+    result = audit_latex_citations(
+        bibtex_path=bibtex_path,
+        tex_path=tex_path,
+        min_references=1,
+        min_cited_references=1,
+        min_recent_references=1,
+        recent_year_cutoff=2016,
+        required_cited_fields=("author", "title", "year"),
+    )
+
+    assert result.status == "fail"
+    assert result.invalid_references == ["smith2024 missing author"]
+    assert any("missing required fields" in violation for violation in result.violations)
+
+
+def test_latex_citation_audit_accepts_complete_reference_fields(tmp_path):
+    bibtex_path = tmp_path / "references.bib"
+    tex_path = tmp_path / "manuscript.tex"
+    bibtex_path.write_text(
+        """
+@article{smith2024,
+  title = {A paper},
+  author = {Smith, Jane},
+  journal = {Journal},
+  year = {2024},
+  url = {https://example.test/smith2024}
+}
+""",
+        encoding="utf-8",
+    )
+    tex_path.write_text(r"\documentclass{article}\begin{document}\cite{smith2024}\end{document}", encoding="utf-8")
+
+    result = audit_latex_citations(
+        bibtex_path=bibtex_path,
+        tex_path=tex_path,
+        min_references=1,
+        min_cited_references=1,
+        min_recent_references=1,
+        recent_year_cutoff=2016,
+        required_cited_fields=("author", "title", "year"),
+    )
+
+    assert result.status == "pass"
+    assert result.reference_count == 1
+    assert result.cited_reference_count == 1
+    assert result.recent_reference_count == 1
+    assert result.invalid_references == []
+
+
+def test_latex_citation_audit_blocks_current_unsupported_claim(tmp_path):
+    bibtex_path = tmp_path / "references.bib"
+    tex_path = tmp_path / "manuscript.tex"
+    claim_map_path = tmp_path / "claim_map.json"
+    bibtex_path.write_text("@article{smith2024,\n  title = {A paper}\n}\n", encoding="utf-8")
+    tex_path.write_text(
+        r"\documentclass{article}\begin{document}The method is \textbf{universally} superior. \cite{smith2024}\end{document}",
+        encoding="utf-8",
+    )
+    claim_map_path.write_text(
+        json.dumps({"claims": [{"claim": "The method is universally superior.", "support_status": "unsupported"}]}),
+        encoding="utf-8",
+    )
+
+    result = audit_latex_citations(bibtex_path=bibtex_path, tex_path=tex_path, claim_map_path=claim_map_path)
+
+    assert result.status == "fail"
+    assert result.unsupported_claims == ["The method is universally superior."]
+    assert result.stale_claims == []
+    assert any("Unsupported manuscript claims: 1" in violation for violation in result.violations)
+
+
+def test_latex_citation_audit_warns_on_stale_unsupported_claim(tmp_path):
+    bibtex_path = tmp_path / "references.bib"
+    tex_path = tmp_path / "manuscript.tex"
+    claim_map_path = tmp_path / "claim_map.json"
+    bibtex_path.write_text("@article{smith2024,\n  title = {A paper}\n}\n", encoding="utf-8")
+    tex_path.write_text(
+        r"\documentclass{article}\begin{document}A weaker supported claim. \cite{smith2024}\end{document}",
+        encoding="utf-8",
+    )
+    claim_map_path.write_text(
+        json.dumps({"claims": [{"claim": "The method is universally superior.", "support_status": "unsupported"}]}),
+        encoding="utf-8",
+    )
+
+    result = audit_latex_citations(bibtex_path=bibtex_path, tex_path=tex_path, claim_map_path=claim_map_path)
+
+    assert result.status == "pass"
+    assert result.unsupported_claims == []
+    assert result.stale_claims == ["The method is universally superior."]
+    assert result.metadata["claim_map_sync_status"] == "stale_entries"
+
+
+def test_latex_citation_audit_without_tex_keeps_legacy_unsupported_claim_block(tmp_path):
+    bibtex_path = tmp_path / "references.bib"
+    claim_map_path = tmp_path / "claim_map.json"
+    bibtex_path.write_text("@article{smith2024,\n  title = {A paper}\n}\n", encoding="utf-8")
+    claim_map_path.write_text(
+        json.dumps({"claims": [{"claim": "The method is universally superior.", "support_status": "unsupported"}]}),
+        encoding="utf-8",
+    )
+
+    result = audit_latex_citations(bibtex_path=bibtex_path, claim_map_path=claim_map_path)
+
+    assert result.status == "fail"
+    assert result.unsupported_claims == ["The method is universally superior."]
+    assert result.stale_claims == []
+
+
 def test_citation_audit_tool_writes_audit_artifact(tmp_path, monkeypatch):
     outputs_dir = tmp_path / "threads" / "thread-1" / "user-data" / "outputs"
     outputs_dir.mkdir(parents=True)

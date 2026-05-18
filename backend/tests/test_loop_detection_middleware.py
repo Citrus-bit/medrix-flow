@@ -6,6 +6,7 @@ from langchain_core.messages import AIMessage, SystemMessage
 
 from medrix_flow.agents.middlewares.loop_detection_middleware import (
     _HARD_STOP_MSG,
+    _WARNING_MSG,
     LoopDetectionMiddleware,
     _hash_tool_calls,
 )
@@ -83,6 +84,9 @@ class TestLoopDetection:
         assert len(msgs) == 1
         assert isinstance(msgs[0], SystemMessage)
         assert "LOOP DETECTED" in msgs[0].content
+        assert "final answer" not in msgs[0].content.lower()
+        assert "summarize what you accomplished" not in msgs[0].content.lower()
+        assert "different route" in msgs[0].content
 
     def test_warn_only_injected_once(self):
         """Warning for the same hash should only be injected once per thread."""
@@ -111,15 +115,26 @@ class TestLoopDetection:
         for _ in range(3):
             mw._apply(_make_state(tool_calls=call), runtime)
 
-        # Fourth call triggers hard stop
+        # Fourth call triggers recovery directive
         result = mw._apply(_make_state(tool_calls=call), runtime)
         assert result is not None
         msgs = result["messages"]
         assert len(msgs) == 1
-        # Hard stop strips tool_calls
-        assert isinstance(msgs[0], AIMessage)
-        assert msgs[0].tool_calls == []
+        assert isinstance(msgs[0], SystemMessage)
         assert _HARD_STOP_MSG in msgs[0].content
+        assert "final answer" not in msgs[0].content.lower()
+        assert "summarize what you accomplished" not in msgs[0].content.lower()
+        assert "Do not present this as completed work" in msgs[0].content
+        assert "alternate repair path" in msgs[0].content
+
+    def test_loop_messages_are_recovery_oriented_not_delivery_oriented(self):
+        combined = f"{_WARNING_MSG}\n{_HARD_STOP_MSG}".lower()
+        assert "produce your final answer" not in combined
+        assert "final answer" not in combined
+        assert "summarize what you accomplished" not in combined
+        assert "completed work" in combined
+        assert "different route" in combined
+        assert "next unfinished step" in combined
 
     def test_different_calls_dont_trigger(self):
         mw = LoopDetectionMiddleware(warn_threshold=2)

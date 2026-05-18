@@ -13,10 +13,12 @@ from langgraph.typing import ContextT
 
 from medrix_flow.agents.lead_agent.prompt import get_skills_prompt_section
 from medrix_flow.agents.thread_state import ThreadState
-from medrix_flow.subagents import SubagentExecutor, get_subagent_config
+from medrix_flow.subagents import MIN_SUBAGENT_MAX_TURNS, SubagentExecutor, get_subagent_config
 from medrix_flow.subagents.executor import SubagentStatus, cleanup_background_task, get_background_task_result, mark_background_task_timed_out
 
 logger = logging.getLogger(__name__)
+TASK_HEARTBEAT_INTERVAL_SECONDS = 15
+TASK_POLL_INTERVAL_SECONDS = 5
 
 
 @tool("task", parse_docstring=True)
@@ -63,7 +65,8 @@ def task_tool(
         description: A short (3-5 word) description of the task for logging/display. ALWAYS PROVIDE THIS PARAMETER FIRST.
         prompt: The task description for the subagent. Be specific and clear about what needs to be done. ALWAYS PROVIDE THIS PARAMETER SECOND.
         subagent_type: The type of subagent to use. ALWAYS PROVIDE THIS PARAMETER THIRD.
-        max_turns: Optional maximum number of agent turns. Defaults to subagent's configured max.
+        max_turns: Optional maximum number of agent turns. Values below the
+            safe minimum are raised to avoid premature recursion-limit failures.
     """
     # Get subagent configuration
     config = get_subagent_config(subagent_type)
@@ -78,7 +81,7 @@ def task_tool(
         overrides["system_prompt"] = config.system_prompt + "\n\n" + skills_section
 
     if max_turns is not None:
-        overrides["max_turns"] = max_turns
+        overrides["max_turns"] = max(MIN_SUBAGENT_MAX_TURNS, max_turns)
 
     if overrides:
         config = replace(config, **overrides)
@@ -130,8 +133,9 @@ def task_tool(
     poll_count = 0
     last_status = None
     last_message_count = 0  # Track how many AI messages we've already sent
+    last_heartbeat_poll = -TASK_HEARTBEAT_INTERVAL_SECONDS // TASK_POLL_INTERVAL_SECONDS
     # Safety timeout: execution timeout + 60s buffer, counted from execution start.
-    max_poll_count = (config.timeout_seconds + 60) // 5
+    max_poll_count = (config.timeout_seconds + 60) // TASK_POLL_INTERVAL_SECONDS
 
     logger.info(f"[trace={trace_id}] Started background task {task_id} (subagent={subagent_type}, timeout={config.timeout_seconds}s, polling_limit={max_poll_count} polls)")
 
@@ -170,7 +174,10 @@ def task_tool(
                 )
                 logger.info(f"[trace={trace_id}] Task {task_id} sent message #{i + 1}/{current_message_count}")
             last_message_count = current_message_count
-        elif result.status == SubagentStatus.RUNNING:
+        elif (
+            result.status == SubagentStatus.RUNNING
+            and poll_count - last_heartbeat_poll >= TASK_HEARTBEAT_INTERVAL_SECONDS // TASK_POLL_INTERVAL_SECONDS
+        ):
             # Emit a lightweight heartbeat so the UI can keep showing progress
             # even when the subagent has not produced a new AI message yet.
             writer(
@@ -182,6 +189,7 @@ def task_tool(
                     "heartbeat": True,
                 }
             )
+            last_heartbeat_poll = poll_count
 
         # Check if task completed, failed, or timed out
         if result.status == SubagentStatus.COMPLETED:
@@ -201,7 +209,7 @@ def task_tool(
             return f"Task timed out. Error: {result.error}"
 
         # Still running, wait before next poll
-        time.sleep(5)  # Poll every 5 seconds
+        time.sleep(TASK_POLL_INTERVAL_SECONDS)
         poll_count += 1
 
         # Polling safety timeout as a backstop in case the scheduler timeout

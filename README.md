@@ -56,6 +56,8 @@ intake
 
 每个阶段都会把输入、输出、工具调用、产物、失败原因和 gate 决策写入研究 ledger。对于风险较高的步骤，例如外部代码执行、长实验、自动修改实验代码和最终论文发布，系统默认要求人工确认，而不是直接放任模型继续推进。
 
+论文生成默认采用“两段式”交付：`research_assistant action="run_pipeline"` 会先在 `manuscript_draft` 阶段返回可编辑初稿和 fast draft `.tex`，并记录 `draft_ready_at`；随后创建可跟踪的后台 finalization run，继续完成审稿、修复、citation audit、质量审计、PDF 编译和最终 bundle。章节草稿会按 `research.manuscript_section_concurrency` 并发生成，且可通过 `fast_draft_model` / `finalization_model` 区分首版速度和最终质量模型。
+
 ## 关键能力
 
 ### 学术检索与引用体系

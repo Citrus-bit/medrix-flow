@@ -32,7 +32,7 @@ export default function ChatPage() {
 
   const { showNotification } = useNotification();
 
-  const [thread, sendMessage, isUploading, , currentRunId] = useThreadStream({
+  const [thread, sendMessage, isUploading, , currentRunId, modelRetryStatus] = useThreadStream({
     threadId: isNewThread ? undefined : threadId,
     context: settings.context,
     isMock,
@@ -107,6 +107,7 @@ export default function ChatPage() {
                 threadId={threadId}
                 thread={thread}
                 runId={currentRunId}
+                modelRetryStatus={modelRetryStatus}
               />
             </div>
             <div className="absolute right-0 bottom-0 left-0 z-30 flex justify-center px-4 pb-2">

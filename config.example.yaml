@@ -16,7 +16,7 @@
 # ============================================================================
 # Bump this number when the config schema changes.
 # Run `make config-upgrade` to merge new fields into your local config.yaml.
-config_version: 5
+config_version: 6
 
 # ============================================================================
 # Models Configuration
@@ -284,8 +284,15 @@ tool_search:
 
 research:
   manuscript_model: null
+  fast_draft_model: null
+  finalization_model: null
+  manuscript_section_concurrency: 3
   default_auto_gates: []
   default_max_stages: 5
+  # final_only: run synchronously through final_bundle and export a PDF or a
+  # concrete export failure. fast_draft_first: return a TeX draft first and
+  # continue finalization in the background.
+  default_delivery_mode: final_only
   # Research quality gates:
   # - auto_repair: automatically pass the final_quality_repair gate up to the
   #   repair budget, then return to a human final_release gate.

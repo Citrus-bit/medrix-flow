@@ -2,14 +2,22 @@
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 from urllib.request import urlretrieve
 
 _REMOTE_GRAPHICS_RE = re.compile(r"(\\includegraphics(?:\[[^\]]*\])?\{)(https?://[^}]+)(\})")
+_CJK_CHAR_RE = re.compile(r"[\u3400-\u9fff]")
+_DOCUMENTCLASS_RE = re.compile(r"\\documentclass(?:\[(?P<options>[^\]]*)\])?\{(?P<class>[^{}]+)\}")
+_CTEX_PACKAGE_RE = re.compile(r"\\usepackage(?:\[(?P<options>[^\]]*)\])?\{ctex\}")
+_CTEX_CLASSES = {"ctexart", "ctexrep", "ctexbook", "ctexbeamer"}
+_TOUNICODE_SPECIAL = r"\AtBeginDvi{\special{pdf:tounicode UTF8-UCS2}}"
 _SUBSCRIPT_CHARS = {
     "₀": "0",
     "₁": "1",
@@ -94,6 +102,36 @@ _UNICODE_MATH_TOKEN_RE = re.compile(
 _ADJACENT_INLINE_MATH_RATIO_RE = re.compile(r"\$([^$]+)\$/\$([^$]+)\$")
 
 
+@dataclass(frozen=True)
+class PdfTextAuditResult:
+    """Result for checking whether compiled PDF text is extractable."""
+
+    status: str
+    pdf_path: str
+    cid_marker_count: int
+    text_length: int
+    cid_marker_ratio: float
+    pages_checked: int
+    violations: list[str]
+    error: str | None = None
+
+    @property
+    def passed(self) -> bool:
+        return self.status == "pass"
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "pdf_path": self.pdf_path,
+            "cid_marker_count": self.cid_marker_count,
+            "text_length": self.text_length,
+            "cid_marker_ratio": self.cid_marker_ratio,
+            "pages_checked": self.pages_checked,
+            "violations": self.violations,
+            "error": self.error,
+        }
+
+
 def _translate_script_chars(chars: str, mapping: dict[str, str]) -> str:
     return "".join(mapping[ch] for ch in chars if ch in mapping)
 
@@ -133,6 +171,7 @@ def _replace_unicode_math_tokens(source: str) -> str:
 
 def _sanitize_latex_source(source: str) -> str:
     source = _replace_unicode_math_tokens(source)
+    source = _ensure_cjk_pdf_text_support(source)
     if "\\usepackage{subfig}" not in source and "\\subfloat" in source:
         source = source.replace("\\usepackage{graphicx}", "\\usepackage{graphicx}\n\\usepackage{subfig}", 1)
     if "\\usepackage{amsmath}" not in source and ("$" in source or "\\[" in source or "\\begin{equation" in source):
@@ -140,6 +179,59 @@ def _sanitize_latex_source(source: str) -> str:
     if "\\hypersetup{" not in source and "\\usepackage{hyperref}" in source:
         source = source.replace("\\usepackage{hyperref}", "\\usepackage{hyperref}\n\\hypersetup{hidelinks}", 1)
     return source
+
+
+def _ensure_cjk_pdf_text_support(source: str) -> str:
+    if not _CJK_CHAR_RE.search(source):
+        return source
+
+    source = _ensure_ctex_fontset(source)
+    if "pdf:tounicode UTF8-UCS2" in source:
+        return source
+
+    documentclass_match = _DOCUMENTCLASS_RE.search(source)
+    if documentclass_match is not None:
+        insert_at = documentclass_match.end()
+        return source[:insert_at] + "\n" + _TOUNICODE_SPECIAL + source[insert_at:]
+    return _TOUNICODE_SPECIAL + "\n" + source
+
+
+def _ensure_ctex_fontset(source: str) -> str:
+    documentclass_match = _DOCUMENTCLASS_RE.search(source)
+    if documentclass_match is not None and documentclass_match.group("class") in _CTEX_CLASSES:
+        options = documentclass_match.group("options") or ""
+        if "fontset=" not in options:
+            updated_options = _append_latex_option(options, "fontset=fandol")
+            source = (
+                source[: documentclass_match.start()]
+                + rf"\documentclass[{updated_options}]{{{documentclass_match.group('class')}}}"
+                + source[documentclass_match.end() :]
+            )
+        return source
+
+    package_match = _CTEX_PACKAGE_RE.search(source)
+    if package_match is not None:
+        options = package_match.group("options") or ""
+        if "fontset=" in options:
+            return source
+        updated_options = _append_latex_option(options, "fontset=fandol")
+        return source[: package_match.start()] + rf"\usepackage[{updated_options}]{{ctex}}" + source[package_match.end() :]
+
+    if "\\usepackage{xeCJK}" in source or "\\usepackage[AutoFakeBold]{xeCJK}" in source:
+        return source
+
+    documentclass_match = _DOCUMENTCLASS_RE.search(source)
+    if documentclass_match is not None:
+        insert_at = documentclass_match.end()
+        return source[:insert_at] + "\n" + r"\usepackage[UTF8,fontset=fandol]{ctex}" + source[insert_at:]
+    return source
+
+
+def _append_latex_option(options: str, option: str) -> str:
+    cleaned = options.strip()
+    if not cleaned:
+        return option
+    return f"{cleaned},{option}"
 
 
 def _download_remote_graphics(source: str, workdir: Path) -> str:
@@ -193,3 +285,57 @@ def compile_latex_to_pdf(tex_path: Path, output_dir: Path | None = None) -> Path
     if not pdf_path.exists():
         raise FileNotFoundError(f"PDF not produced: {pdf_path}")
     return pdf_path
+
+
+def audit_pdf_text_extractability(
+    pdf_path: Path,
+    *,
+    max_cid_markers: int = 20,
+    max_cid_marker_ratio: float = 0.01,
+) -> PdfTextAuditResult:
+    """Fail when extracted PDF text is dominated by PDF CID placeholders."""
+
+    text, pages_checked, error = _extract_pdf_text(pdf_path)
+    cid_marker_count = text.count("(cid:")
+    text_length = len(text)
+    cid_marker_ratio = cid_marker_count / max(text_length, 1)
+    violations: list[str] = []
+    if cid_marker_count > max_cid_markers and cid_marker_ratio > max_cid_marker_ratio:
+        violations.append(
+            f"PDF text extraction contains too many CID placeholders: "
+            f"{cid_marker_count} markers, ratio {cid_marker_ratio:.3f}."
+        )
+
+    return PdfTextAuditResult(
+        status="fail" if violations else "pass",
+        pdf_path=str(pdf_path),
+        cid_marker_count=cid_marker_count,
+        text_length=text_length,
+        cid_marker_ratio=cid_marker_ratio,
+        pages_checked=pages_checked,
+        violations=violations,
+        error=error,
+    )
+
+
+def write_pdf_text_audit(result: PdfTextAuditResult, output_path: Path) -> Path:
+    output_path.write_text(json.dumps(result.to_dict(), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return output_path
+
+
+def _extract_pdf_text(pdf_path: Path) -> tuple[str, int, str | None]:
+    if not pdf_path.exists():
+        return "", 0, f"{pdf_path} does not exist"
+    try:
+        import pdfplumber
+    except Exception as exc:
+        return "", 0, f"pdfplumber unavailable: {exc}"
+
+    try:
+        texts: list[str] = []
+        with pdfplumber.open(str(pdf_path)) as pdf:
+            for page in pdf.pages:
+                texts.append(page.extract_text() or "")
+            return "\n".join(texts), len(pdf.pages), None
+    except Exception as exc:
+        return "", 0, f"pdf text extraction failed: {exc}"

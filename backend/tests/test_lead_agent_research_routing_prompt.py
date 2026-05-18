@@ -23,11 +23,15 @@ def test_apply_prompt_template_includes_research_routing_guidance(monkeypatch):
     assert "research_assistant" in rendered
     assert "run_pipeline" in rendered
     assert "action=\"run_pipeline\"" in rendered
+    assert "delivery_mode=\"final_only\"" in rendered
+    assert "draft_ready" in rendered
     assert "experiment_execution" in rendered
     assert "pre_review" in rendered
     assert "final_release" in rendered
     assert "academic-researcher" in rendered
     assert "experiment_lab" in rendered
+    assert "math_modeling_competition" in rendered
+    assert "five meaningful" in rendered
 
 
 def test_apply_prompt_template_includes_empirical_guidance_when_skill_available(monkeypatch, tmp_path):
@@ -72,5 +76,13 @@ def test_apply_prompt_template_includes_final_delivery_contract(monkeypatch):
     assert "/mnt/user-data/outputs" in rendered
     assert "present_files" in rendered
     assert "manuscript_export" in rendered
+    assert "4500 body words" in rendered
+    assert "10 PDF pages" in rendered
+    assert "5 figures" in rendered
     assert "If no real artifact exists" in rendered
     assert "do not say it is done" in rendered
+    assert "If any todo remains unfinished" in rendered
+    assert "Do not replace unfinished delivery with a status summary" in rendered
+    assert "insufficient references" in rendered
+    assert "quality-audit" in rendered
+    assert "repair path and retry" in rendered

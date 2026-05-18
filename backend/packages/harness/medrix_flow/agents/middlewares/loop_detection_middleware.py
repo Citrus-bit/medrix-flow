@@ -1,15 +1,19 @@
 """Middleware to detect and break repetitive tool call loops.
 
 P0 safety: prevents the agent from calling the same tool with the same
-arguments indefinitely until the recursion limit kills the run.
+arguments indefinitely until the recursion limit kills the run, while still
+letting unfinished tasks recover through a different route.
 
 Detection strategy:
   1. After each model response, hash the tool calls (name + args).
   2. Track recent hashes in a sliding window.
-  3. If the same hash appears >= warn_threshold times, inject a
-     "you are repeating yourself — wrap up" system message (once per hash).
-  4. If it appears >= hard_limit times, strip all tool_calls from the
-     response so the agent is forced to produce a final text answer.
+  3. If the same hash appears >= warn_threshold times, inject a recovery
+     warning that tells the model to stop repeating that exact call and choose
+     a different route.
+  4. If it appears >= hard_limit times, inject a stronger recovery directive
+     that blocks the repeated call path and asks the model to inspect existing
+     artifacts/errors/todos before continuing with alternate parameters, a
+     different tool, or the next unfinished task.
 """
 
 import hashlib
@@ -63,13 +67,18 @@ def _hash_tool_calls(tool_calls: list[dict]) -> str:
 
 _WARNING_MSG = (
     "[LOOP DETECTED] You are repeating the same tool calls. "
-    "Stop calling tools and produce your final answer now. "
-    "If you cannot complete the task, summarize what you accomplished so far."
+    "Do not repeat the identical call. Inspect the existing results, errors, "
+    "artifacts, and unfinished todos, then continue via a different route: "
+    "change the parameters, use another tool, repair the failed input, or move "
+    "to the next unfinished step."
 )
 
 _HARD_STOP_MSG = (
-    "[FORCED STOP] Repeated tool calls exceeded the safety limit. "
-    "Producing final answer with results collected so far."
+    "[LOOP RECOVERY REQUIRED] The identical tool call exceeded the safety limit. "
+    "That repeated call path is blocked. Do not present this as completed work. "
+    "Read the available artifacts/audits/errors/todos, choose an alternate repair "
+    "path or the next unfinished step, and continue until the requested deliverables "
+    "are generated and verified or a real external blocker requires user input."
 )
 
 
@@ -193,14 +202,10 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         warning, hard_stop = self._track_and_check(state, runtime)
 
         if hard_stop:
-            # Strip tool_calls from the last AIMessage to force text output
-            messages = state.get("messages", [])
-            last_msg = messages[-1]
-            stripped_msg = last_msg.model_copy(update={
-                "tool_calls": [],
-                "content": (last_msg.content or "") + f"\n\n{_HARD_STOP_MSG}",
-            })
-            return {"messages": [stripped_msg]}
+            # Inject a recovery directive after the repeated AI tool call. This
+            # blocks the repeated call path from proceeding while keeping the run
+            # oriented toward repair/continuation instead of premature delivery.
+            return {"messages": [SystemMessage(content=_HARD_STOP_MSG)]}
 
         if warning:
             # Inject a system message warning the model

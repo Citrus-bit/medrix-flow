@@ -72,11 +72,13 @@ def _build_runtime_middlewares(
     lazy_init: bool = True,
 ) -> list[AgentMiddleware]:
     """Build shared base middlewares for agent execution."""
+    from medrix_flow.agents.middlewares.model_provider_error_middleware import ModelProviderErrorMiddleware
     from medrix_flow.agents.middlewares.thread_data_middleware import ThreadDataMiddleware
     from medrix_flow.sandbox.middleware import SandboxMiddleware
 
     middlewares: list[AgentMiddleware] = [
         ThreadDataMiddleware(lazy_init=lazy_init),
+        ModelProviderErrorMiddleware(),
         SandboxMiddleware(lazy_init=lazy_init),
     ]
 

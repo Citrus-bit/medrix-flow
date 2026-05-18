@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass, field
 
+MIN_SUBAGENT_MAX_TURNS = 12
+
 
 @dataclass
 class SubagentConfig:

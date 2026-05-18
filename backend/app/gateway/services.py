@@ -7,6 +7,7 @@ import json
 import logging
 from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException, Request
@@ -29,6 +30,7 @@ from .workflow import normalize_stream_event
 logger = logging.getLogger(__name__)
 
 _ITERATION_END = object()
+STALE_EXTERNAL_RUN_AFTER = timedelta(minutes=30)
 
 
 def format_sse(event: str, data: Any, *, event_id: str | None = None) -> str:
@@ -66,6 +68,28 @@ def _extract_last_human_text(raw_input: dict[str, Any] | None) -> str:
             if isinstance(content, str):
                 return content
     return ""
+
+
+def _parse_iso_datetime(value: str) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
+def _is_stale_external_run(record: RunRecord, *, now: datetime | None = None) -> bool:
+    if record.source != "external" or record.status not in {RunStatus.pending, RunStatus.running}:
+        return False
+    updated_at = _parse_iso_datetime(record.updated_at or record.created_at)
+    if updated_at is None:
+        return False
+    current = now or datetime.now(UTC)
+    return current - updated_at > STALE_EXTERNAL_RUN_AFTER
 
 
 @dataclass
@@ -163,10 +187,12 @@ class GatewayRunService:
         record = await self._run_manager.get(run_id)
         if record is None or record.thread_id != thread_id:
             raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+        record = await self._reconcile_stale_external_run(record)
         return record
 
     async def list_runs(self, thread_id: str) -> list[RunRecord]:
-        return await self._run_manager.list_by_thread(thread_id)
+        records = await self._run_manager.list_by_thread(thread_id)
+        return [await self._reconcile_stale_external_run(record) for record in records]
 
     async def get_feedback(self, thread_id: str, run_id: str) -> dict | None:
         await self.require_run(thread_id, run_id)
@@ -312,6 +338,17 @@ class GatewayRunService:
             if name == END_SENTINEL:
                 break
             yield format_sse(name, event.get("data", {}), event_id=record.run_id)
+
+    async def _reconcile_stale_external_run(self, record: RunRecord) -> RunRecord:
+        if not _is_stale_external_run(record):
+            return record
+        await self._run_manager.set_status(
+            record.run_id,
+            RunStatus.interrupted,
+            error="External run was marked interrupted after 30 minutes without updates.",
+        )
+        refreshed = await self._run_manager.get(record.run_id)
+        return refreshed or record
 
     async def _execute_gateway_run(self, record: RunRecord, body: Any) -> None:
         try:

@@ -74,7 +74,7 @@ export const zhCN: Translations = {
     reasoningMode: "思考",
     reasoningModeDescription: "思考后再行动，在时间与准确性之间取得平衡",
     proMode: "Pro",
-    proModeDescription: "思考、计划再执行，获得更精准的结果，可能需要更多时间",
+    proModeDescription: "先补充关键细节再执行，获得更精准的结果，可能需要更多时间",
     ultraMode: "Ultra",
     ultraModeDescription:
       "继承自 Pro 模式，可调用子代理分工协作，适合复杂多步骤任务，能力最强",
@@ -168,6 +168,8 @@ export const zhCN: Translations = {
   conversation: {
     noMessages: "还没有消息",
     startConversation: "开始新的对话以查看消息",
+    modelProviderOverloaded:
+      "模型服务暂时过载、并发受限或不可用，请稍后重试或切换模型。",
   },
 
   runStatus: {
@@ -175,6 +177,8 @@ export const zhCN: Translations = {
     reconnecting: "后台任务仍在运行，正在尝试恢复流式连接...",
     error: "任务已出错",
     interrupted: "任务已中断",
+    modelRetrying: (attempt: number, seconds: number) =>
+      `模型暂时不可用，正在第 ${attempt} 次重试，约 ${seconds} 秒后继续`,
     lastEvent: (time: string) => `最近事件 ${time}`,
   },
 
@@ -213,15 +217,19 @@ export const zhCN: Translations = {
     noLogsDescription:
       "运行开始后，工具调用、子任务、文件产出和状态事件会逐步记录。",
     unrecorded: "未记录",
+    slowSteps: "慢步骤来源",
+    noSlowSteps: "暂无慢步骤估算。",
+    eventCount: (count: number) => `${count} 个事件`,
     labels: {
       status: "状态",
       caller: "调用方",
       seq: "序号",
       event: "事件",
+      step: "步骤",
       run: "Run",
       started: "开始时间",
       lastEvent: "最近事件",
-      duration: "耗时",
+      duration: "估算耗时",
       events: "事件数",
       artifacts: "产出数",
       totalDuration: "总耗时",
@@ -250,35 +258,6 @@ export const zhCN: Translations = {
       success: "已完成",
       error: "错误",
       interrupted: "已中断",
-      unknown: "未知",
-    },
-  },
-
-  planApproval: {
-    title: "待确认计划",
-    phases: "阶段",
-    deliverables: "交付物",
-    openQuestions: "开放问题",
-    acceptanceCriteria: "验收标准",
-    risks: "风险点",
-    noItems: "暂无记录",
-    updated: "更新时间",
-    revisions: "修订次数",
-    approveAndExecute: "批准并执行",
-    revisePlan: "修改计划",
-    approvalHint:
-      "可点击“批准并执行”，也可以直接回复“我批准当前计划，请按计划执行。”",
-    approvedToast: "计划已批准，正在按计划执行。",
-    approvalFailed: "批准计划失败",
-    executionMessage: "我批准当前计划，请按计划执行。",
-    status: {
-      draft: "草稿",
-      awaiting_approval: "待批准",
-      needs_revision: "待修改",
-      approved: "已批准",
-      executing: "执行中",
-      completed: "已完成",
-      blocked: "已阻塞",
       unknown: "未知",
     },
   },

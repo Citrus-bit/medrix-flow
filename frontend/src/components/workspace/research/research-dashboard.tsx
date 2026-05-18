@@ -103,11 +103,73 @@ function uniqueArtifacts(snapshot: ResearchQuestSnapshot | null) {
   if (!snapshot) return [];
   return Array.from(
     new Set([
+      ...(Array.isArray(snapshot.quest.metadata.final_bundle_artifacts)
+        ? snapshot.quest.metadata.final_bundle_artifacts.filter((artifact): artifact is string => typeof artifact === "string")
+        : []),
+      ...(Array.isArray(snapshot.quest.metadata.draft_artifacts)
+        ? snapshot.quest.metadata.draft_artifacts.filter((artifact): artifact is string => typeof artifact === "string")
+        : []),
       ...snapshot.ledger.flatMap((entry) => entry.artifacts),
       ...snapshot.experiment_branches.flatMap((branch) => branch.artifact_paths),
       ...snapshot.manuscript_sections.flatMap((section) => section.artifact_paths),
     ]),
   ).filter(Boolean);
+}
+
+function researchDeliveryStatus(snapshot: ResearchQuestSnapshot) {
+  const draftReadyAt = typeof snapshot.quest.metadata.draft_ready_at === "string"
+    ? snapshot.quest.metadata.draft_ready_at
+    : null;
+  const finalBundleReadyAt = typeof snapshot.quest.metadata.final_bundle_ready_at === "string"
+    ? snapshot.quest.metadata.final_bundle_ready_at
+    : null;
+  const finalBundleExportMessage = typeof snapshot.quest.metadata.final_bundle_export_message === "string"
+    ? snapshot.quest.metadata.final_bundle_export_message
+    : null;
+  const finalBundleExportStatus = snapshot.quest.metadata.final_bundle_export_status;
+  const finalizationRunId = typeof snapshot.quest.metadata.finalization_run_id === "string"
+    ? snapshot.quest.metadata.finalization_run_id
+    : null;
+  if (finalBundleExportStatus === "passed") {
+    return {
+      label: "Final PDF ready",
+      detail: finalBundleReadyAt ? `Exported ${compactDate(finalBundleReadyAt)}` : "PDF export passed",
+      variant: "default" as const,
+    };
+  }
+  if (finalBundleExportStatus === "blocked" || finalBundleExportStatus === "error") {
+    return {
+      label: "Final bundle blocked",
+      detail: finalBundleExportMessage ?? "Final PDF export did not complete",
+      variant: "destructive" as const,
+    };
+  }
+  if (snapshot.quest.stage === "final_bundle" || snapshot.quest.status === "completed") {
+    return {
+      label: "Final bundle ready",
+      detail: draftReadyAt ? `Draft created ${compactDate(draftReadyAt)}` : "Final audits completed",
+      variant: "default" as const,
+    };
+  }
+  if (draftReadyAt && finalizationRunId) {
+    return {
+      label: "Finalizing",
+      detail: `Draft ready ${compactDate(draftReadyAt)} · run ${finalizationRunId}`,
+      variant: "secondary" as const,
+    };
+  }
+  if (draftReadyAt || snapshot.manuscript_sections.some((section) => section.status === "draft_ready")) {
+    return {
+      label: "Draft ready",
+      detail: draftReadyAt ? `Created ${compactDate(draftReadyAt)}` : "Editable manuscript sections available",
+      variant: "secondary" as const,
+    };
+  }
+  return {
+    label: "In progress",
+    detail: "Draft has not been generated yet",
+    variant: "outline" as const,
+  };
 }
 
 function nextStageLabel(stage: ResearchStage) {
@@ -163,6 +225,7 @@ export function ResearchQuestSnapshotView({
 
   const { quest } = snapshot;
   const currentStageIndex = stageIndex(quest.stage);
+  const deliveryStatus = researchDeliveryStatus(snapshot);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -173,10 +236,12 @@ export function ResearchQuestSnapshotView({
               <h1 className="truncate text-xl font-semibold">{quest.title}</h1>
               <Badge variant={statusVariant(quest.status)}>{quest.status}</Badge>
               <Badge variant="outline">{stageLabels[quest.stage]}</Badge>
+              <Badge variant={deliveryStatus.variant}>{deliveryStatus.label}</Badge>
             </div>
             <p className="text-muted-foreground mt-1 max-w-3xl text-sm">
               {quest.topic}
             </p>
+            <p className="text-muted-foreground mt-1 text-xs">{deliveryStatus.detail}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {pendingGate ? (
@@ -362,7 +427,7 @@ export function ResearchQuestSnapshotView({
                 <CardHeader>
                   <CardTitle className="text-base">Manuscript Workspace</CardTitle>
                   <CardDescription>
-                    Section drafts keep their claim links and artifact references.
+                    {deliveryStatus.label} · {deliveryStatus.detail}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">

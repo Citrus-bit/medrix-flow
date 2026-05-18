@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 
 from medrix_flow.research import PipelineRunResult, PipelineStageEvent, ResearchQuestOrchestrator, ResearchQuestService
 from medrix_flow.research.repository import ResearchRepository
@@ -81,6 +82,77 @@ def test_research_pipeline_happy_path_auto_approves_gates():
         }
         assert len([entry for entry in snapshot.ledger if entry.event_type == "quality_repair_required"]) == 2
         assert len([entry for entry in snapshot.ledger if entry.event_type == "quality_repair_attempted"]) == 2
+        await db.close()
+
+    asyncio.run(scenario())
+
+
+def test_research_pipeline_fast_draft_first_stops_after_manuscript_draft():
+    async def scenario() -> None:
+        orchestrator, service, _repo, db = await _make_pipeline()
+        quest = await service.create_quest(thread_id="thread-pipeline-fast-draft", topic="fast manuscript drafts")
+
+        async def content_generator(section_key, snapshot):
+            return f"Generated {section_key} for {snapshot.quest.topic}."
+
+        result = await orchestrator.run_pipeline(
+            quest.quest_id,
+            auto_gates=["experiment_execution"],
+            max_stages=8,
+            delivery_mode="fast_draft_first",
+            content_generator=content_generator,
+        )
+
+        assert result.status == "draft_ready"
+        assert result.final_stage == "manuscript_draft"
+        assert [event.stage for event in result.stages_executed][-1] == "manuscript_draft"
+        snapshot = await service.get_snapshot(quest.quest_id)
+        assert snapshot.quest.stage == "manuscript_draft"
+        assert snapshot.quest.metadata["draft_status"] == "draft_ready"
+        assert len(snapshot.manuscript_sections) == 5
+        assert {section.status for section in snapshot.manuscript_sections} == {"draft_ready"}
+        await db.close()
+
+    asyncio.run(scenario())
+
+
+def test_manuscript_sections_generate_concurrently():
+    async def scenario() -> None:
+        _orchestrator, service, _repo, db = await _make_pipeline()
+        quest = await service.create_quest(thread_id="thread-concurrent-draft", topic="concurrent drafts")
+        await service.advance_quest(quest.quest_id, target_stage="literature")
+        await service.advance_quest(quest.quest_id, target_stage="novelty_check")
+        await service.advance_quest(quest.quest_id, target_stage="evidence_verified")
+        await service.advance_quest(quest.quest_id, target_stage="experiment_planned")
+        await service.decide_gate(
+            quest.quest_id,
+            stage="experiment_running",
+            gate_type="experiment_execution",
+            status="approved",
+        )
+        await service.advance_quest(quest.quest_id, target_stage="experiment_running")
+        await service.advance_quest(quest.quest_id, target_stage="results_synthesized")
+        started: list[float] = []
+
+        async def content_generator(section_key, snapshot):
+            started.append(time.perf_counter())
+            await asyncio.sleep(0.05)
+            return f"Generated {section_key}."
+
+        before = time.perf_counter()
+        result = await service.advance_quest(
+            quest.quest_id,
+            target_stage="manuscript_draft",
+            inputs={"section_concurrency": 5},
+            content_generator=content_generator,
+        )
+        elapsed = time.perf_counter() - before
+
+        assert result.generated["section_generation_mode"] == "parallel"
+        assert result.generated["section_generation_concurrency"] == 5
+        assert len(started) == 5
+        assert max(started) - min(started) < 0.04
+        assert elapsed < 0.2
         await db.close()
 
     asyncio.run(scenario())

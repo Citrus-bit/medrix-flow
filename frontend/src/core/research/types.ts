@@ -13,6 +13,18 @@ export type ResearchStage =
 
 export type ResearchQuestStatus = "active" | "blocked" | "completed" | "error";
 export type GateStatus = "pending" | "approved" | "rejected";
+export type ResearchDeliveryMode = "fast_draft_first" | "final_only";
+export type ResearchFinalBundleExportStatus = "passed" | "blocked" | "error";
+export type ResearchQuestMetadata = Record<string, unknown> & {
+  delivery_mode?: ResearchDeliveryMode;
+  draft_ready_at?: string;
+  finalization_run_id?: string;
+  draft_artifacts?: string[];
+  final_bundle_artifacts?: string[];
+  final_bundle_ready_at?: string;
+  final_bundle_export_status?: ResearchFinalBundleExportStatus;
+  final_bundle_export_message?: string;
+};
 export type SupportStatus =
   | "supported"
   | "unsupported"
@@ -31,7 +43,7 @@ export type ResearchQuest = {
   status: ResearchQuestStatus;
   academic_project_id: string | null;
   experiment_project_ids: string[];
-  metadata: Record<string, unknown>;
+  metadata: ResearchQuestMetadata;
   created_at: string;
   updated_at: string;
 };

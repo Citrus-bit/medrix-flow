@@ -77,6 +77,7 @@ class ResearchQuestOrchestrator:
         max_stages: int = 11,
         quality_mode: str = "auto_repair",
         repair_budget: int = 2,
+        delivery_mode: str = "final_only",
         content_generator: ContentGenerator | None = None,
         reviewer_generator: ReviewerGenerator | None = None,
     ) -> PipelineRunResult:
@@ -88,6 +89,8 @@ class ResearchQuestOrchestrator:
         """
         if max_stages < 1:
             raise ValueError("max_stages must be at least 1.")
+        if delivery_mode not in {"fast_draft_first", "final_only"}:
+            raise ValueError("delivery_mode must be fast_draft_first or final_only.")
 
         allowed_gates = set(auto_gates or [])
         stages_executed: list[PipelineStageEvent] = []
@@ -127,8 +130,12 @@ class ResearchQuestOrchestrator:
                     )
 
                 entered_at = now_iso()
+                stage_inputs: dict[str, Any] = {}
+                if next_stage == "manuscript_draft" and snapshot.quest.metadata.get("manuscript_section_concurrency"):
+                    stage_inputs["section_concurrency"] = snapshot.quest.metadata["manuscript_section_concurrency"]
                 result = await self._service.advance_quest(
                     quest_id,
+                    inputs=stage_inputs,
                     content_generator=content_generator,
                     reviewer_generator=reviewer_generator,
                 )
@@ -181,6 +188,15 @@ class ResearchQuestOrchestrator:
                         artifacts=result.ledger_entry.artifacts if result.ledger_entry else [],
                     )
                 )
+
+                if delivery_mode == "fast_draft_first" and result.quest.stage == "manuscript_draft":
+                    return PipelineRunResult(
+                        quest_id=quest_id,
+                        status="draft_ready",
+                        stages_executed=stages_executed,
+                        final_stage=result.quest.stage,
+                        message="Research pipeline paused after fast manuscript draft.",
+                    )
 
                 if result.quest.stage == "final_bundle":
                     return PipelineRunResult(

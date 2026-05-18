@@ -76,7 +76,7 @@ export const enUS: Translations = {
       "Reasoning before action, balance between time and accuracy",
     proMode: "Pro",
     proModeDescription:
-      "Reasoning, planning and executing, get more accurate results, may take more time",
+      "Clarify key details before execution for more accurate results. May take more time",
     ultraMode: "Ultra",
     ultraModeDescription:
       "Pro mode with subagents to divide work; best for complex multi-step tasks",
@@ -178,6 +178,8 @@ export const enUS: Translations = {
   conversation: {
     noMessages: "No messages yet",
     startConversation: "Start a conversation to see messages here",
+    modelProviderOverloaded:
+      "Model provider is temporarily overloaded, concurrency-limited, or unavailable. Retry later or switch models.",
   },
 
   runStatus: {
@@ -185,6 +187,8 @@ export const enUS: Translations = {
     reconnecting: "Backend run is still active. Reconnecting stream...",
     error: "Run ended with an error",
     interrupted: "Run interrupted",
+    modelRetrying: (attempt: number, seconds: number) =>
+      `Model temporarily unavailable. Retry ${attempt} in about ${seconds}s`,
     lastEvent: (time: string) => `Last event ${time}`,
   },
 
@@ -223,15 +227,19 @@ export const enUS: Translations = {
     noLogsDescription:
       "Tool calls, subtasks, file outputs, and status events will be recorded after the run starts.",
     unrecorded: "Not recorded",
+    slowSteps: "Slow Step Sources",
+    noSlowSteps: "No slow-step estimate yet.",
+    eventCount: (count: number) => `${count} event${count === 1 ? "" : "s"}`,
     labels: {
       status: "Status",
       caller: "Caller",
       seq: "Seq",
       event: "Event",
+      step: "Step",
       run: "Run",
       started: "Started",
       lastEvent: "Last Event",
-      duration: "Duration",
+      duration: "Estimated Duration",
       events: "Events",
       artifacts: "Artifacts",
       totalDuration: "Total Duration",
@@ -260,35 +268,6 @@ export const enUS: Translations = {
       success: "Complete",
       error: "Error",
       interrupted: "Interrupted",
-      unknown: "Unknown",
-    },
-  },
-
-  planApproval: {
-    title: "Plan Awaiting Approval",
-    phases: "Phases",
-    deliverables: "Deliverables",
-    openQuestions: "Open Questions",
-    acceptanceCriteria: "Acceptance Criteria",
-    risks: "Risks",
-    noItems: "None recorded",
-    updated: "Updated",
-    revisions: "Revisions",
-    approveAndExecute: "Approve and execute",
-    revisePlan: "Revise plan",
-    approvalHint:
-      'Click "Approve and execute", or reply "I approve the current plan. Execute according to it."',
-    approvedToast: "Plan approved. Execution has started.",
-    approvalFailed: "Failed to approve plan",
-    executionMessage: "I approve the current plan. Execute according to it.",
-    status: {
-      draft: "Draft",
-      awaiting_approval: "Awaiting Approval",
-      needs_revision: "Needs Revision",
-      approved: "Approved",
-      executing: "Executing",
-      completed: "Completed",
-      blocked: "Blocked",
       unknown: "Unknown",
     },
   },

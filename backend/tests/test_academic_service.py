@@ -333,6 +333,177 @@ def test_academic_service_writes_requested_reference_style(tmp_path, monkeypatch
     asyncio.run(scenario())
 
 
+def test_academic_service_reuses_passed_coverage_bundle(tmp_path, monkeypatch):
+    async def scenario() -> None:
+        monkeypatch.setenv("MEDRIX_FLOW_HOME", str(tmp_path))
+        paths_module._paths = None
+
+        db = SQLiteRuntimeDB(":memory:")
+        await db.connect()
+        repo = AcademicRepository(db)
+        await repo.setup()
+
+        class CountingAdapter:
+            name = "openalex"
+
+            def __init__(self) -> None:
+                self.calls = 0
+
+            async def search(self, query: str, *, project_id: str, limit: int) -> list[PaperRecord]:
+                self.calls += 1
+                return [
+                    _paper(
+                        provider="openalex",
+                        provider_id="reuse-1",
+                        title="Reusable benchmark dataset with ablation evidence",
+                        year=2025,
+                        venue="Journal of Reusable Evidence",
+                        doi="10.8300/reuse-1",
+                        abstract=(
+                            "A benchmark dataset paper with metric reporting, baseline comparison, "
+                            "ablation analysis, and external validation."
+                        ),
+                    ).model_copy(update={"project_id": project_id, "paper_id": f"{project_id}:reuse-1"})
+                ]
+
+        adapter = CountingAdapter()
+        service = AcademicResearchService(repo, adapters=[adapter])
+
+        first = await service.run_research(
+            thread_id="thread-reuse",
+            topic="reusable benchmark evidence",
+            output_dir=tmp_path / "outputs-1",
+            min_reference_count=1,
+            target_reference_count=1,
+        )
+        calls_after_first = adapter.calls
+        second = await service.run_research(
+            thread_id="thread-reuse",
+            topic="reusable benchmark evidence",
+            output_dir=tmp_path / "outputs-2",
+            min_reference_count=1,
+            target_reference_count=1,
+        )
+
+        assert first.project.project_id == second.project.project_id
+        assert calls_after_first > 0
+        assert adapter.calls == calls_after_first
+        assert (second.project.metadata or {})["reference_coverage_audit"]["status"] == "pass"
+        assert any(Path(path).name == "references.bib" for path in second.export_files)
+
+        await db.close()
+
+    asyncio.run(scenario())
+
+
+def test_academic_service_reingests_when_reuse_signature_changes(tmp_path, monkeypatch):
+    async def scenario() -> None:
+        monkeypatch.setenv("MEDRIX_FLOW_HOME", str(tmp_path))
+        paths_module._paths = None
+
+        db = SQLiteRuntimeDB(":memory:")
+        await db.connect()
+        repo = AcademicRepository(db)
+        await repo.setup()
+
+        class CountingAdapter:
+            name = "openalex"
+
+            def __init__(self) -> None:
+                self.calls = 0
+
+            async def search(self, query: str, *, project_id: str, limit: int) -> list[PaperRecord]:
+                self.calls += 1
+                return [
+                    _paper(
+                        provider="openalex",
+                        provider_id="signature-1",
+                        title="Signature-sensitive benchmark dataset with ablation evidence",
+                        year=2025,
+                        venue="Journal of Reusable Evidence",
+                        doi="10.8300/signature-1",
+                        abstract=(
+                            "A benchmark dataset paper with metric reporting, baseline comparison, "
+                            "ablation analysis, and external validation."
+                        ),
+                    ).model_copy(update={"project_id": project_id, "paper_id": f"{project_id}:signature-1"})
+                ]
+
+        adapter = CountingAdapter()
+        service = AcademicResearchService(repo, adapters=[adapter])
+
+        first = await service.run_research(
+            thread_id="thread-signature",
+            topic="signature sensitive benchmark evidence",
+            output_dir=tmp_path / "outputs-1",
+            min_reference_count=1,
+            target_reference_count=1,
+            source_profile="default",
+        )
+        calls_after_first = adapter.calls
+        second = await service.run_research(
+            thread_id="thread-signature",
+            topic="signature sensitive benchmark evidence",
+            output_dir=tmp_path / "outputs-2",
+            min_reference_count=1,
+            target_reference_count=1,
+            source_profile="alternate-profile",
+        )
+        calls_after_source_change = adapter.calls
+        third = await service.run_research(
+            thread_id="thread-signature",
+            topic="signature sensitive benchmark evidence",
+            output_dir=tmp_path / "outputs-3",
+            min_reference_count=1,
+            target_reference_count=1,
+            source_profile="alternate-profile",
+            quality_mode="strict",
+        )
+        calls_after_quality_change = adapter.calls
+        fourth = await service.run_research(
+            thread_id="thread-signature",
+            topic="signature sensitive benchmark evidence",
+            output_dir=tmp_path / "outputs-4",
+            min_reference_count=1,
+            target_reference_count=1,
+            source_profile="alternate-profile",
+            quality_mode="strict",
+            preprint_policy="include_preprints",
+        )
+        calls_after_preprint_change = adapter.calls
+        fifth = await service.run_research(
+            thread_id="thread-signature",
+            topic="signature sensitive benchmark evidence",
+            output_dir=tmp_path / "outputs-5",
+            min_reference_count=1,
+            target_reference_count=1,
+            source_profile="alternate-profile",
+            quality_mode="strict",
+            preprint_policy="include_preprints",
+            core_paper_limit=40,
+        )
+
+        assert first.project.project_id == second.project.project_id
+        assert first.project.project_id == third.project.project_id
+        assert first.project.project_id == fourth.project.project_id
+        assert first.project.project_id == fifth.project.project_id
+        assert calls_after_first > 0
+        assert adapter.calls > calls_after_first
+        assert calls_after_source_change > calls_after_first
+        assert calls_after_quality_change > calls_after_source_change
+        assert calls_after_preprint_change > calls_after_quality_change
+        assert adapter.calls > calls_after_preprint_change
+        signature = (fifth.project.metadata or {})["ingest_request_signature"]
+        assert signature["source_profile"] == "alternate-profile"
+        assert signature["quality_mode"] == "strict"
+        assert signature["preprint_policy"] == "include_preprints"
+        assert signature["core_paper_limit"] == 40
+
+        await db.close()
+
+    asyncio.run(scenario())
+
+
 def test_academic_service_review_deliverable_applies_coverage_targets(tmp_path, monkeypatch):
     async def scenario() -> None:
         monkeypatch.setenv("MEDRIX_FLOW_HOME", str(tmp_path))

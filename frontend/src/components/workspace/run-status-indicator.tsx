@@ -6,6 +6,7 @@ import { AlertTriangleIcon, CircleStopIcon } from "lucide-react";
 import { listThreadRuns } from "@/core/api/runs";
 import { useI18n } from "@/core/i18n/hooks";
 import { isRunActive, resolveThreadRun } from "@/core/runs/status";
+import type { ModelRetryStatus } from "@/core/threads/hooks";
 import { cn } from "@/lib/utils";
 
 import { StreamingIndicator } from "./streaming-indicator";
@@ -22,11 +23,13 @@ export function RunStatusIndicator({
   threadId,
   currentRunId,
   streaming,
+  modelRetryStatus,
 }: {
   className?: string;
   threadId: string;
   currentRunId?: string | null;
   streaming: boolean;
+  modelRetryStatus?: ModelRetryStatus | null;
 }) {
   const { t } = useI18n();
   const { data: runs } = useQuery({
@@ -41,14 +44,20 @@ export function RunStatusIndicator({
   const run = resolveThreadRun(runs, currentRunId);
   const status = run?.status;
   const active = isRunActive(run);
+  const showRetry = streaming && Boolean(modelRetryStatus);
   const showError = Boolean(currentRunId) && !streaming && status === "error";
   const showInterrupted = Boolean(currentRunId) && !streaming && status === "interrupted";
 
-  if (!streaming && !active && !showError && !showInterrupted) {
+  if (!streaming && !active && !showError && !showInterrupted && !showRetry) {
     return null;
   }
 
-  const label = streaming
+  const label = showRetry && modelRetryStatus
+    ? t.runStatus.modelRetrying(
+        modelRetryStatus.attempt,
+        Math.ceil(modelRetryStatus.delaySeconds),
+      )
+    : streaming
     ? t.runStatus.running
     : active
       ? t.runStatus.reconnecting

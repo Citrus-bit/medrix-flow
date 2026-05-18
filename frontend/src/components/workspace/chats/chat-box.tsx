@@ -48,7 +48,7 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
     threadId,
     seededArtifacts: thread.values.artifacts ?? [],
     enabled: !isMock,
-    refetchInterval: thread.isLoading ? 1500 : 2500,
+    refetchInterval: thread.isLoading ? 5000 : 10_000,
   });
   const inventoryPaths = useMemo(
     () => artifactInventory.map((item) => item.filepath),

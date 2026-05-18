@@ -8,7 +8,6 @@ from medrix_flow.agents.lead_agent.prompt import apply_prompt_template
 from medrix_flow.agents.middlewares.clarification_middleware import ClarificationMiddleware
 from medrix_flow.agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware
 from medrix_flow.agents.middlewares.memory_middleware import MemoryMiddleware
-from medrix_flow.agents.middlewares.plan_middleware import PlanMiddleware
 from medrix_flow.agents.middlewares.sandbox_audit_middleware import SandboxAuditMiddleware
 from medrix_flow.agents.middlewares.subagent_limit_middleware import SubagentLimitMiddleware
 from medrix_flow.agents.middlewares.title_middleware import TitleMiddleware
@@ -245,9 +244,6 @@ def _build_middlewares(config: RunnableConfig, model_name: str | None, agent_nam
     todo_list_middleware = _create_todo_list_middleware(is_plan_mode)
     if todo_list_middleware is not None:
         middlewares.append(todo_list_middleware)
-
-    if is_plan_mode:
-        middlewares.append(PlanMiddleware())
 
     # Add TitleMiddleware
     middlewares.append(TitleMiddleware())

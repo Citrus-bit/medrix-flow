@@ -18,10 +18,6 @@ import { useUpdateSubtask } from "../tasks/context";
 import type { UploadedFileInfo } from "../uploads";
 import { uploadFiles } from "../uploads";
 
-import {
-  approvePendingPlan,
-  isExplicitPlanApprovalMessage,
-} from "./plan-approval";
 import type { AgentThread, AgentThreadState } from "./types";
 
 export type ToolEndEvent = {
@@ -36,6 +32,15 @@ export type ThreadStreamOptions = {
   onStart?: (threadId: string, runId?: string) => void;
   onFinish?: (state: AgentThreadState) => void;
   onToolEnd?: (event: ToolEndEvent) => void;
+};
+
+export type ModelRetryStatus = {
+  attempt: number;
+  delaySeconds: number;
+  errorClass?: string;
+  statusCode?: number | null;
+  providerCode?: string | null;
+  retryAt?: string;
 };
 
 function getStreamErrorMessage(error: unknown): string {
@@ -61,6 +66,48 @@ function getStreamErrorMessage(error: unknown): string {
   return "Request failed.";
 }
 
+function getStreamErrorSignature(error: unknown): string {
+  if (typeof error === "string") {
+    return error.trim().toLowerCase();
+  }
+  if (error instanceof Error) {
+    return `${error.name}:${error.message}`.toLowerCase();
+  }
+  if (typeof error === "object" && error !== null) {
+    const parts = [
+      Reflect.get(error, "name"),
+      Reflect.get(error, "message"),
+      Reflect.get(error, "status"),
+      Reflect.get(error, "statusCode"),
+      Reflect.get(error, "status_code"),
+      Reflect.get(error, "code"),
+      Reflect.get(error, "error"),
+      Reflect.get(error, "body"),
+    ]
+      .map((value) => {
+        if (typeof value === "string") return value;
+        try {
+          return JSON.stringify(value ?? "");
+        } catch {
+          return String(value ?? "");
+        }
+      })
+      .join(" ");
+    if (parts.trim()) {
+      return parts.toLowerCase();
+    }
+  }
+  return getStreamErrorMessage(error).toLowerCase();
+}
+
+const MODEL_PROVIDER_OVERLOAD_PATTERN =
+  /(system_cpu_overloaded|system cpu overloaded|service unavailable|temporarily unavailable|temporarily overloaded|concurrency limit exceeded|please retry later|model unavailable|model is unavailable|provider unavailable|rate limit|too many requests|\b503\b|\b529\b|\b504\b|internalservererror|internal server error|an internal error occurred|overloaded)/i;
+
+function isModelProviderOverloadedError(error: unknown): boolean {
+  const signature = getStreamErrorSignature(error);
+  return MODEL_PROVIDER_OVERLOAD_PATTERN.test(signature);
+}
+
 function isModelNotConfiguredError(error: unknown): boolean {
   const message = getStreamErrorMessage(error).toLowerCase();
   return (
@@ -69,11 +116,49 @@ function isModelNotConfiguredError(error: unknown): boolean {
   );
 }
 
+function getFriendlyStreamErrorMessage(
+  error: unknown,
+  overloadedMessage: string,
+): string {
+  if (isModelProviderOverloadedError(error)) {
+    return overloadedMessage;
+  }
+  return getStreamErrorMessage(error);
+}
+
 const VISUAL_OUTPUT_INTENT_PATTERN =
   /(\b(chart|charts|graph|graphs|plot|plots|dashboard|ppt|pptx|slides?|presentation|image|images|illustration|diagram|flowchart|wireframe|ui|ux|frontend|website|webpage|landing page|visuali[sz]e|visualization|infographic)\b|图表|作图|画图|绘图|可视化|仪表盘|看板|幻灯片|演示文稿|PPT|图片|图像|插图|流程图|架构图|界面|前端|网页|网站|海报)/i;
 
 function hasVisualOutputIntent(text: string): boolean {
   return VISUAL_OUTPUT_INTENT_PATTERN.test(text);
+}
+
+function compactValueSignature(value: unknown): string {
+  const text =
+    typeof value === "string"
+      ? value
+      : JSON.stringify(value ?? "", (_key, item) =>
+          typeof item === "bigint" ? item.toString() : item,
+        );
+  return text.length > 500 ? `${text.slice(0, 500)}:${text.length}` : text;
+}
+
+export function threadStateSignature(values: AgentThreadState | null | undefined): string {
+  if (!values) return "empty";
+  const messages = Array.isArray(values.messages) ? values.messages : [];
+  const artifacts = Array.isArray(values.artifacts) ? values.artifacts : [];
+  const lastMessage = messages.at(-1);
+  return JSON.stringify({
+    title: values.title ?? "",
+    updated_at: values.updated_at ?? "",
+    status: values.status ?? "",
+    message_count: messages.length,
+    last_message_id: lastMessage?.id ?? "",
+    last_message_type: lastMessage?.type ?? "",
+    last_message_content: compactValueSignature(lastMessage?.content),
+    artifact_count: artifacts.length,
+    last_artifact: artifacts.at(-1) ?? "",
+  });
 }
 
 function getToolEventInput(data: unknown): Record<string, unknown> {
@@ -99,6 +184,32 @@ function getToolEventRunId(event: unknown): string | undefined {
   return typeof runId === "string" && runId.length > 0 ? runId : undefined;
 }
 
+function getModelRetryStatus(event: unknown): ModelRetryStatus | null {
+  if (typeof event !== "object" || event === null) return null;
+  if (Reflect.get(event, "type") !== "model_retry") return null;
+  const attempt = Reflect.get(event, "attempt");
+  const delaySeconds = Reflect.get(event, "delay_seconds");
+  if (typeof attempt !== "number" || typeof delaySeconds !== "number") {
+    return null;
+  }
+  const errorClass = Reflect.get(event, "error_class");
+  const statusCode = Reflect.get(event, "status_code");
+  const providerCode = Reflect.get(event, "provider_code");
+  const retryAt = Reflect.get(event, "retry_at");
+  return {
+    attempt,
+    delaySeconds,
+    ...(typeof errorClass === "string" ? { errorClass } : {}),
+    ...(typeof statusCode === "number" || statusCode === null
+      ? { statusCode }
+      : {}),
+    ...(typeof providerCode === "string" || providerCode === null
+      ? { providerCode }
+      : {}),
+    ...(typeof retryAt === "string" ? { retryAt } : {}),
+  };
+}
+
 export function useThreadStream({
   threadId,
   context,
@@ -111,6 +222,8 @@ export function useThreadStream({
   // Track the thread ID that is currently streaming to handle thread changes during streaming
   const [onStreamThreadId, setOnStreamThreadId] = useState(() => threadId);
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
+  const [modelRetryStatus, setModelRetryStatus] =
+    useState<ModelRetryStatus | null>(null);
   // Ref to track current thread ID across async callbacks without causing re-renders,
   // and to allow access to the current thread id in onUpdateEvent
   const threadIdRef = useRef<string | null>(threadId ?? null);
@@ -118,6 +231,9 @@ export function useThreadStream({
   const startedRef = useRef(false);
   const recordedUserEventRef = useRef(false);
   const pendingUserContentRef = useRef("");
+  const completedRunRef = useRef<{ runId: string; status: "success" | "error" } | null>(
+    null,
+  );
 
   const listeners = useRef({
     onStart,
@@ -137,11 +253,15 @@ export function useThreadStream({
       startedRef.current = false;
       setOnStreamThreadId(normalizedThreadId);
       setCurrentRunId(null);
+      setModelRetryStatus(null);
       currentRunIdRef.current = null;
+      completedRunRef.current = null;
     } else if (normalizedThreadId !== threadIdRef.current) {
       setCurrentRunId(null);
+      setModelRetryStatus(null);
       currentRunIdRef.current = null;
       recordedUserEventRef.current = false;
+      completedRunRef.current = null;
     }
     threadIdRef.current = normalizedThreadId;
   }, [threadId]);
@@ -164,6 +284,35 @@ export function useThreadStream({
   const queryClient = useQueryClient();
   const updateSubtask = useUpdateSubtask();
 
+  const completeCurrentRun = useCallback((status: "success" | "error") => {
+    const runId = currentRunIdRef.current;
+    const currentThreadId = threadIdRef.current;
+    if (!runId || !currentThreadId) {
+      return;
+    }
+    if (
+      completedRunRef.current?.runId === runId &&
+      completedRunRef.current.status === status
+    ) {
+      return;
+    }
+    completedRunRef.current = { runId, status };
+    void completeThreadRun(currentThreadId, runId, status).catch(() => undefined);
+  }, []);
+
+  const showStreamErrorToast = useCallback(
+    (error: unknown) => {
+      if (isModelProviderOverloadedError(error)) {
+        toast.error(t.conversation.modelProviderOverloaded, {
+          id: "model-provider-overloaded",
+        });
+        return;
+      }
+      toast.error(getFriendlyStreamErrorMessage(error, t.conversation.modelProviderOverloaded));
+    },
+    [t.conversation.modelProviderOverloaded],
+  );
+
   const thread = useStream<AgentThreadState>({
     client: getAPIClient(isMock),
     assistantId: "lead_agent",
@@ -173,7 +322,9 @@ export function useThreadStream({
     onCreated(meta) {
       handleStreamStart(meta.thread_id, meta.run_id);
       setCurrentRunId(meta.run_id);
+      setModelRetryStatus(null);
       currentRunIdRef.current = meta.run_id;
+      completedRunRef.current = null;
       setOnStreamThreadId(meta.thread_id);
       void registerThreadRun(meta.thread_id, meta.run_id, {
         assistantId:
@@ -218,6 +369,9 @@ export function useThreadStream({
       );
     },
     onLangChainEvent(event) {
+      if (event.event === "on_chat_model_stream" || event.event === "on_chat_model_end") {
+        setModelRetryStatus(null);
+      }
       if (event.event === "on_tool_start") {
         const runId = currentRunIdRef.current;
         const currentThreadId = threadIdRef.current;
@@ -302,6 +456,28 @@ export function useThreadStream({
       }
     },
     onCustomEvent(event: unknown) {
+      const modelRetry = getModelRetryStatus(event);
+      if (modelRetry) {
+        setModelRetryStatus(modelRetry);
+        const runId = currentRunIdRef.current;
+        const currentThreadId = threadIdRef.current;
+        if (runId && currentThreadId) {
+          void createRunEvent(currentThreadId, runId, {
+            event_type: "model_retry",
+            caller: "model",
+            content: {
+              type: "model_retry",
+              attempt: modelRetry.attempt,
+              delay_seconds: modelRetry.delaySeconds,
+              error_class: modelRetry.errorClass,
+              status_code: modelRetry.statusCode,
+              provider_code: modelRetry.providerCode,
+              retry_at: modelRetry.retryAt,
+            },
+          }).catch(() => undefined);
+        }
+        return;
+      }
       if (
         typeof event === "object" &&
         event !== null &&
@@ -346,13 +522,8 @@ export function useThreadStream({
     },
     onError(error) {
       setOptimisticMessages([]);
-      const runId = currentRunIdRef.current;
-      const currentThreadId = threadIdRef.current;
-      if (runId && currentThreadId) {
-        void completeThreadRun(currentThreadId, runId, "error").catch(
-          () => undefined,
-        );
-      }
+      setModelRetryStatus(null);
+      completeCurrentRun("error");
       if (isModelNotConfiguredError(error)) {
         toast.error(t.setup.noModelsConfigured, {
           id: "model-not-configured",
@@ -365,16 +536,11 @@ export function useThreadStream({
         });
         return;
       }
-      toast.error(getStreamErrorMessage(error));
+      showStreamErrorToast(error);
     },
     onFinish(state) {
-      const runId = currentRunIdRef.current;
-      const currentThreadId = threadIdRef.current;
-      if (runId && currentThreadId) {
-        void completeThreadRun(currentThreadId, runId, "success").catch(
-          () => undefined,
-        );
-      }
+      setModelRetryStatus(null);
+      completeCurrentRun("success");
       listeners.current.onFinish?.(state.values);
       void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
     },
@@ -385,6 +551,7 @@ export function useThreadStream({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const sendInFlightRef = useRef(false);
   const prevMsgCountRef = useRef(thread.messages.length);
+  const polledSignatureRef = useRef<string | null>(null);
   const [polledValues, setPolledValues] = useState<AgentThreadState | null>(
     null,
   );
@@ -398,6 +565,7 @@ export function useThreadStream({
   useEffect(() => {
     if (!thread.isLoading) {
       setPolledValues(null);
+      polledSignatureRef.current = null;
       return;
     }
 
@@ -405,6 +573,7 @@ export function useThreadStream({
     let cancelled = false;
 
     const syncThreadState = async () => {
+      if (document.visibilityState !== "visible") return;
       const currentThreadId = threadIdRef.current;
       if (!currentThreadId) return;
       try {
@@ -412,6 +581,11 @@ export function useThreadStream({
           currentThreadId,
         );
         if (cancelled) return;
+        const nextSignature = threadStateSignature(state.values);
+        if (nextSignature === polledSignatureRef.current) {
+          return;
+        }
+        polledSignatureRef.current = nextSignature;
         setPolledValues(state.values);
         void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
       } catch {
@@ -535,24 +709,6 @@ export function useThreadStream({
       let uploadedFileInfo: UploadedFileInfo[] = [];
 
       try {
-        if (isExplicitPlanApprovalMessage(text)) {
-          const approvedPlan = await approvePendingPlan(
-            threadId,
-            snapshotThread.values?.plan,
-            text,
-          );
-          if (approvedPlan) {
-            setPolledValues({
-              ...(snapshotThread.values ?? {
-                title: "",
-                messages: [],
-                artifacts: [],
-              }),
-              plan: approvedPlan,
-            });
-          }
-        }
-
         // Upload files first if any
         if (message.files && message.files.length > 0) {
           setIsUploading(true);
@@ -699,6 +855,12 @@ export function useThreadStream({
         setOptimisticMessages([]);
         setIsUploading(false);
         setIsSubmitting(false);
+        if (isModelProviderOverloadedError(error)) {
+          completeCurrentRun("error");
+          showStreamErrorToast(error);
+          void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
+          return;
+        }
         throw error;
       } finally {
         sendInFlightRef.current = false;
@@ -706,12 +868,13 @@ export function useThreadStream({
     },
     [
       thread,
-      snapshotThread.values,
       _handleOnStart,
       t.uploads.uploadingFiles,
       t.common.thinking,
       context,
       queryClient,
+      completeCurrentRun,
+      showStreamErrorToast,
     ],
   );
 
@@ -724,7 +887,14 @@ export function useThreadStream({
         } as typeof thread)
       : snapshotThread;
 
-  return [mergedThread, sendMessage, isUploading, isSubmitting, currentRunId] as const;
+  return [
+    mergedThread,
+    sendMessage,
+    isUploading,
+    isSubmitting,
+    currentRunId,
+    modelRetryStatus,
+  ] as const;
 }
 
 export function useThreads(

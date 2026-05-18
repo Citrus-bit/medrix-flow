@@ -36,12 +36,15 @@ vi.mock("../run-status-indicator", () => ({
   RunStatusIndicator: () => null,
 }));
 
-function makeThread(messages: Message[]): BaseStream<AgentThreadState> {
+function makeThread(
+  messages: Message[],
+  values: Partial<AgentThreadState> = {},
+): BaseStream<AgentThreadState> {
   return {
     messages,
     isLoading: false,
     isThreadLoading: false,
-    values: {},
+    values,
   } as BaseStream<AgentThreadState>;
 }
 
@@ -131,5 +134,29 @@ describe("MessageList subtask rendering", () => {
     await waitFor(() => {
       expect(screen.getByText("Subtask completed")).toBeInTheDocument();
     });
+  });
+});
+
+describe("MessageList legacy plan state", () => {
+  it("does not render legacy plan UI for old pending plan state", () => {
+    render(
+      <MessageList
+        threadId="thread-1"
+        thread={makeThread([], {
+          title: "",
+          messages: [],
+          artifacts: [],
+          plan: {
+            summary: "Legacy plan summary",
+            status: "awaiting_approval",
+          },
+        })}
+        paddingBottom={0}
+      />,
+      { wrapper },
+    );
+
+    expect(screen.queryByText("Legacy plan summary")).not.toBeInTheDocument();
+    expect(screen.queryByText("Plan Awaiting Approval")).not.toBeInTheDocument();
   });
 });

@@ -5,15 +5,18 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-_BIBTEX_ENTRY_RE = re.compile(r"@\s*([A-Za-z]+)\s*[{(]\s*([^,\s{}()]+)\s*,", re.MULTILINE)
+_BIBTEX_ENTRY_RE = re.compile(r"@\s*([A-Za-z]+)\s*([{\(])\s*([^,\s{}()]+)\s*,", re.MULTILINE)
 _LATEX_CITE_RE = re.compile(
     r"\\(?P<command>(?:[A-Za-z]*cite[A-Za-z]*|nocite))\s*(?:\[[^\]]*\]\s*){0,2}\{(?P<keys>[^{}]+)\}",
     re.MULTILINE,
 )
 _UNESCAPED_COMMENT_RE = re.compile(r"(?<!\\)%.*")
+_LATEX_SIMPLE_COMMAND_ARG_RE = re.compile(r"\\[A-Za-z]+\*?(?:\[[^\]]*\]\s*)*\{([^{}]*)\}")
+_LATEX_REMAINING_COMMAND_RE = re.compile(r"\\[A-Za-z]+\*?(?:\[[^\]]*\]\s*)*")
 _IGNORED_BIBTEX_ENTRY_TYPES = {"comment", "preamble", "string"}
 _EXPERIMENTAL_CLAIM_TERMS = {
     "ablation",
@@ -47,6 +50,16 @@ _SIMULATION_DISCLOSURE_KEYS = {
 
 
 @dataclass(frozen=True)
+class BibTeXEntry:
+    """Parsed BibTeX entry fields needed by deterministic quality gates."""
+
+    entry_type: str
+    key: str
+    fields: dict[str, str]
+    raw: str
+
+
+@dataclass(frozen=True)
 class CitationAuditResult:
     """Structured result for a LaTeX/BibTeX citation audit."""
 
@@ -60,9 +73,16 @@ class CitationAuditResult:
     nocite_all: bool
     violations: list[str] = field(default_factory=list)
     unsupported_claims: list[str] = field(default_factory=list)
+    stale_claims: list[str] = field(default_factory=list)
     paragraph_count: int = 0
     uncited_paragraph_count: int = 0
     author_notes: list[str] = field(default_factory=list)
+    reference_count: int = 0
+    cited_reference_count: int = 0
+    recent_reference_count: int = 0
+    recent_year_cutoff: int | None = None
+    invalid_references: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def passed(self) -> bool:
@@ -80,25 +100,120 @@ class CitationAuditResult:
             "nocite_all": self.nocite_all,
             "violations": self.violations,
             "unsupported_claims": self.unsupported_claims,
+            "stale_claims": self.stale_claims,
             "paragraph_count": self.paragraph_count,
             "uncited_paragraph_count": self.uncited_paragraph_count,
             "author_notes": self.author_notes,
+            "reference_count": self.reference_count,
+            "cited_reference_count": self.cited_reference_count,
+            "recent_reference_count": self.recent_reference_count,
+            "recent_year_cutoff": self.recent_year_cutoff,
+            "invalid_references": self.invalid_references,
+            "metadata": self.metadata,
         }
+
+
+def parse_bibtex_entries(source: str) -> dict[str, BibTeXEntry]:
+    """Parse BibTeX entries and common fields without model inference."""
+
+    entries: dict[str, BibTeXEntry] = {}
+    for match in _BIBTEX_ENTRY_RE.finditer(source):
+        entry_type = match.group(1).lower()
+        if entry_type in _IGNORED_BIBTEX_ENTRY_TYPES:
+            continue
+        key = match.group(3).strip()
+        if not key or key in entries:
+            continue
+        raw = _extract_raw_bibtex_entry(source, match)
+        fields = _parse_bibtex_fields(raw[match.end() - match.start() : -1] if raw.endswith(("}", ")")) else raw)
+        entries[key] = BibTeXEntry(entry_type=entry_type, key=key, fields=fields, raw=raw)
+    return entries
 
 
 def extract_bibtex_keys(source: str) -> list[str]:
     """Extract citation keys from BibTeX source without model inference."""
 
-    keys: list[str] = []
-    seen: set[str] = set()
-    for match in _BIBTEX_ENTRY_RE.finditer(source):
-        entry_type = match.group(1).lower()
-        key = match.group(2).strip()
-        if not key or entry_type in _IGNORED_BIBTEX_ENTRY_TYPES or key in seen:
+    return list(parse_bibtex_entries(source).keys())
+
+
+def _extract_raw_bibtex_entry(source: str, match: re.Match[str]) -> str:
+    opener = match.group(2)
+    closer = "}" if opener == "{" else ")"
+    depth = 1
+    index = match.end()
+    while index < len(source):
+        char = source[index]
+        if char == opener:
+            depth += 1
+        elif char == closer:
+            depth -= 1
+            if depth == 0:
+                return source[match.start() : index + 1]
+        index += 1
+    return source[match.start() :]
+
+
+def _parse_bibtex_fields(body: str) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    index = 0
+    length = len(body)
+    while index < length:
+        while index < length and body[index] in " \t\r\n,":
+            index += 1
+        field_start = index
+        while index < length and re.match(r"[A-Za-z0-9_-]", body[index]):
+            index += 1
+        if field_start == index:
+            index += 1
             continue
-        keys.append(key)
-        seen.add(key)
-    return keys
+        field_name = body[field_start:index].strip().lower()
+        while index < length and body[index].isspace():
+            index += 1
+        if index >= length or body[index] != "=":
+            continue
+        index += 1
+        while index < length and body[index].isspace():
+            index += 1
+        value, index = _parse_bibtex_value(body, index)
+        fields[field_name] = _normalize_bibtex_value(value)
+    return fields
+
+
+def _parse_bibtex_value(body: str, index: int) -> tuple[str, int]:
+    if index >= len(body):
+        return "", index
+    if body[index] == "{":
+        depth = 1
+        index += 1
+        start = index
+        while index < len(body):
+            char = body[index]
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    return body[start:index], index + 1
+            index += 1
+        return body[start:], index
+    if body[index] == '"':
+        index += 1
+        start = index
+        while index < len(body):
+            if body[index] == '"' and (index == 0 or body[index - 1] != "\\"):
+                return body[start:index], index + 1
+            index += 1
+        return body[start:], index
+
+    start = index
+    while index < len(body) and body[index] != ",":
+        index += 1
+    return body[start:index], index
+
+
+def _normalize_bibtex_value(value: str) -> str:
+    value = value.strip().strip("{}").strip()
+    return re.sub(r"\s+", " ", value)
 
 
 def extract_latex_citations(source: str) -> tuple[list[str], bool]:
@@ -126,7 +241,37 @@ def extract_latex_citations(source: str) -> tuple[list[str], bool]:
     return cited, nocite_all
 
 
-def find_unsupported_claims(claims: Any) -> list[str]:
+def _latex_visible_text(source: str) -> str:
+    stripped = "\n".join(_UNESCAPED_COMMENT_RE.sub("", line) for line in source.splitlines())
+    text = _LATEX_CITE_RE.sub(" ", stripped)
+    text = re.sub(r"\\(?:begin|end)\{[^{}]*\}", " ", text)
+    text = re.sub(r"\\([%&_$#{}])", r"\1", text)
+    for _ in range(8):
+        next_text = _LATEX_SIMPLE_COMMAND_ARG_RE.sub(r" \1 ", text)
+        if next_text == text:
+            break
+        text = next_text
+    text = _LATEX_REMAINING_COMMAND_RE.sub(" ", text)
+    return text.replace("{", " ").replace("}", " ")
+
+
+def _normalize_claim_match_text(text: str) -> str:
+    lowered = text.casefold()
+    without_punctuation = re.sub(r"[^\w\s]", " ", lowered, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", without_punctuation).strip()
+
+
+def _claim_occurs_in_tex(claim_text: str, tex_source: str) -> bool:
+    normalized_claim = _normalize_claim_match_text(claim_text)
+    if not normalized_claim:
+        return False
+    stripped_source = "\n".join(_UNESCAPED_COMMENT_RE.sub("", line) for line in tex_source.splitlines())
+    normalized_raw = _normalize_claim_match_text(stripped_source)
+    normalized_visible = _normalize_claim_match_text(_latex_visible_text(tex_source))
+    return normalized_claim in normalized_raw or normalized_claim in normalized_visible
+
+
+def _claim_support_issue_texts(claims: Any) -> list[str]:
     """Return claim texts that are explicitly marked unsupported or lack evidence."""
 
     if isinstance(claims, dict):
@@ -158,6 +303,28 @@ def find_unsupported_claims(claims: Any) -> list[str]:
         elif simulation_claim_without_assumptions:
             unsupported.append(claim_text or json.dumps(item, ensure_ascii=False, sort_keys=True))
 
+    return unsupported
+
+
+def find_unsupported_and_stale_claims(claims: Any, tex_source: str | None = None) -> tuple[list[str], list[str]]:
+    """Split unsupported claim-map entries into active manuscript issues and stale entries."""
+
+    unsupported: list[str] = []
+    stale: list[str] = []
+    for claim_text in _claim_support_issue_texts(claims):
+        if tex_source is not None and _claim_occurs_in_tex(claim_text, tex_source):
+            unsupported.append(claim_text)
+        elif tex_source is not None and claim_text and not claim_text.lstrip().startswith("{"):
+            stale.append(claim_text)
+        else:
+            unsupported.append(claim_text)
+    return unsupported, stale
+
+
+def find_unsupported_claims(claims: Any) -> list[str]:
+    """Return unsupported claim-map entries using the legacy no-manuscript behavior."""
+
+    unsupported, _ = find_unsupported_and_stale_claims(claims)
     return unsupported
 
 
@@ -221,16 +388,27 @@ def audit_latex_citations(
     tex_path: Path | None = None,
     claim_map_path: Path | None = None,
     allow_nocite_all: bool = False,
+    min_references: int = 0,
+    min_cited_references: int = 0,
+    min_recent_references: int = 0,
+    recent_year_cutoff: int | None = None,
+    required_reference_fields: tuple[str, ...] = (),
+    required_cited_fields: tuple[str, ...] = (),
 ) -> CitationAuditResult:
     """Audit LaTeX citations against a BibTeX file."""
 
     bibtex_source = bibtex_path.read_text(encoding="utf-8")
-    citation_keys = extract_bibtex_keys(bibtex_source)
+    entries = parse_bibtex_entries(bibtex_source)
+    citation_keys = list(entries.keys())
     cited_keys: list[str] = []
     nocite_all = False
+    tex_source: str | None = None
     paragraph_count = 0
     uncited_paragraph_count = 0
     author_notes: list[str] = []
+    resolved_recent_year_cutoff = recent_year_cutoff
+    if min_recent_references > 0 and resolved_recent_year_cutoff is None:
+        resolved_recent_year_cutoff = datetime.now().year - 10
 
     if tex_path is not None:
         tex_source = tex_path.read_text(encoding="utf-8")
@@ -242,13 +420,36 @@ def audit_latex_citations(
     unused_keys = sorted(key for key in citation_keys if key not in set(cited_keys))
 
     unsupported_claims: list[str] = []
+    stale_claims: list[str] = []
     if claim_map_path is not None and claim_map_path.exists():
         claim_map = json.loads(claim_map_path.read_text(encoding="utf-8"))
-        unsupported_claims = find_unsupported_claims(claim_map)
+        unsupported_claims, stale_claims = find_unsupported_and_stale_claims(claim_map, tex_source)
+
+    effective_cited_keys = citation_keys if nocite_all and allow_nocite_all else cited_keys
+    recent_reference_count = _recent_reference_count(entries, resolved_recent_year_cutoff)
+    invalid_references = _reference_field_violations(
+        entries=entries,
+        required_reference_fields=required_reference_fields,
+        required_cited_fields=required_cited_fields,
+        cited_keys=effective_cited_keys,
+    )
 
     violations: list[str] = []
     if not citation_keys:
         violations.append("No BibTeX citation keys were found.")
+    if min_references > 0 and len(citation_keys) < min_references:
+        violations.append(f"BibTeX reference count below threshold: {len(citation_keys)}/{min_references}.")
+    if min_cited_references > 0 and len(effective_cited_keys) < min_cited_references:
+        violations.append(
+            f"Inline cited reference count below threshold: {len(effective_cited_keys)}/{min_cited_references}."
+        )
+    if min_recent_references > 0 and recent_reference_count < min_recent_references:
+        violations.append(
+            f"Recent reference count below threshold: {recent_reference_count}/{min_recent_references} "
+            f"since {resolved_recent_year_cutoff}."
+        )
+    if invalid_references:
+        violations.append("BibTeX entries are missing required fields: " + "; ".join(invalid_references) + ".")
     if missing_keys:
         violations.append(f"Missing BibTeX keys cited in LaTeX: {', '.join(missing_keys)}.")
     if nocite_all and not allow_nocite_all:
@@ -262,6 +463,11 @@ def audit_latex_citations(
     if author_notes:
         violations.append("Author/tool process notes remain in manuscript text: " + ", ".join(author_notes) + ".")
 
+    metadata: dict[str, Any] = {}
+    if claim_map_path is not None and claim_map_path.exists():
+        metadata["claim_map_sync_status"] = "stale_entries" if stale_claims else "current"
+        metadata["stale_claim_count"] = len(stale_claims)
+
     return CitationAuditResult(
         status="fail" if violations else "pass",
         bibtex_path=str(bibtex_path),
@@ -273,10 +479,85 @@ def audit_latex_citations(
         nocite_all=nocite_all,
         violations=violations,
         unsupported_claims=unsupported_claims,
+        stale_claims=stale_claims,
         paragraph_count=paragraph_count,
         uncited_paragraph_count=uncited_paragraph_count,
         author_notes=author_notes,
+        reference_count=len(citation_keys),
+        cited_reference_count=len(effective_cited_keys),
+        recent_reference_count=recent_reference_count,
+        recent_year_cutoff=resolved_recent_year_cutoff,
+        invalid_references=invalid_references,
+        metadata=metadata,
     )
+
+
+def _recent_reference_count(entries: dict[str, BibTeXEntry], recent_year_cutoff: int | None) -> int:
+    if recent_year_cutoff is None:
+        return 0
+    count = 0
+    for entry in entries.values():
+        year = _entry_year(entry)
+        if year is not None and year >= recent_year_cutoff:
+            count += 1
+    return count
+
+
+def _entry_year(entry: BibTeXEntry) -> int | None:
+    match = re.search(r"\d{4}", entry.fields.get("year", ""))
+    if not match:
+        return None
+    try:
+        return int(match.group(0))
+    except ValueError:
+        return None
+
+
+def _reference_field_violations(
+    *,
+    entries: dict[str, BibTeXEntry],
+    required_reference_fields: tuple[str, ...],
+    required_cited_fields: tuple[str, ...],
+    cited_keys: list[str],
+) -> list[str]:
+    violations: list[str] = []
+    for key, entry in entries.items():
+        missing = _missing_required_fields(entry, required_reference_fields)
+        if missing:
+            violations.append(f"{key} missing {', '.join(missing)}")
+    for key in cited_keys:
+        entry = entries.get(key)
+        if entry is None:
+            continue
+        missing = _missing_required_fields(entry, required_cited_fields)
+        if missing:
+            violations.append(f"{key} missing {', '.join(missing)}")
+    return list(dict.fromkeys(violations))
+
+
+def _missing_required_fields(entry: BibTeXEntry, required_fields: tuple[str, ...]) -> list[str]:
+    missing: list[str] = []
+    for field_name in required_fields:
+        normalized = field_name.strip().lower()
+        if not normalized:
+            continue
+        if normalized == "venue":
+            present = any(
+                _field_has_value(entry, candidate)
+                for candidate in ("journal", "booktitle", "publisher", "school", "institution", "organization")
+            )
+        elif normalized in {"url_or_doi", "doi_or_url"}:
+            present = _field_has_value(entry, "doi") or _field_has_value(entry, "url")
+        else:
+            present = _field_has_value(entry, normalized)
+        if not present:
+            missing.append(field_name)
+    return missing
+
+
+def _field_has_value(entry: BibTeXEntry, field_name: str) -> bool:
+    value = entry.fields.get(field_name, "").strip()
+    return bool(value and value not in {"-", "n/a", "N/A"})
 
 
 def write_citation_audit(result: CitationAuditResult, output_path: Path) -> Path:

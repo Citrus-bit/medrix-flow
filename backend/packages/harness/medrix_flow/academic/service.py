@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
@@ -55,6 +56,7 @@ from .utils import (
 
 logger = logging.getLogger(__name__)
 
+_ACADEMIC_FETCH_CONCURRENCY = 6
 _REVIEW_DELIVERABLE_TYPES = {
     "experiment_design",
     "experiment_report",
@@ -184,6 +186,13 @@ class AcademicResearchService:
         if coverage_targets["review_quality_profile"]:
             max_candidates = max(max_candidates, coverage_targets["target_reference_count"] * 3)
             core_paper_limit = max(core_paper_limit, coverage_targets["min_core_paper_count"])
+        ingest_request_signature = self._ingest_request_signature(
+            project,
+            core_paper_limit=core_paper_limit,
+            source_profile=resolved_source_profile,
+            quality_mode=resolved_quality_mode,
+            preprint_policy=resolved_preprint_policy,
+        )
 
         configured_adapters = self._adapters or list(
             build_default_adapters(
@@ -198,26 +207,16 @@ class AcademicResearchService:
         local_papers = await self._load_local_upload_papers(project) if use_local_uploads else []
         provider_limit = max(4, min(25, max_candidates // max(len(queries), 1)))
         raw_papers: list[PaperRecord] = list(local_papers)
-
-        for adapter in configured_adapters:
-            if len(raw_papers) >= max_candidates:
-                break
-            query_window = self._query_window_for_adapter(adapter.name)
-            for query in queries[:query_window]:
-                if len(raw_papers) >= max_candidates:
-                    break
-                try:
-                    results = await adapter.search(
-                        query.query_text,
-                        project_id=project.project_id,
-                        limit=min(provider_limit, max_candidates - len(raw_papers)),
-                    )
-                except Exception:
-                    logger.warning("Academic adapter failed: %s", adapter.name, exc_info=True)
-                    continue
-                raw_papers.extend(results)
-                if adapter.name == "arxiv":
-                    break
+        if len(raw_papers) < max_candidates:
+            fetched_papers = await self._fetch_candidates_for_queries(
+                project,
+                configured_adapters,
+                queries,
+                max_candidates=max_candidates - len(raw_papers),
+                provider_limit=provider_limit,
+                failure_context="academic search",
+            )
+            raw_papers.extend(fetched_papers)
 
         normalized_papers = [hydrate_quality_metadata(paper.model_copy(deep=True)) for paper in raw_papers]
         merged = self._dedupe_candidates(
@@ -277,6 +276,7 @@ class AcademicResearchService:
                 "source_profile": resolved_source_profile,
                 "quality_mode": resolved_quality_mode,
                 "preprint_policy": resolved_preprint_policy,
+                "ingest_request_signature": ingest_request_signature,
                 "provider_breakdown": provider_breakdown(stored),
                 "venue_breakdown": venue_breakdown(stored),
                 "preprint_ratio": preprint_ratio(stored),
@@ -307,27 +307,46 @@ class AcademicResearchService:
         *,
         max_candidates: int,
         provider_limit: int,
+        failure_context: str = "coverage repair",
     ) -> list[PaperRecord]:
-        raw_papers: list[PaperRecord] = []
+        if max_candidates <= 0 or not adapters or not queries:
+            return []
+
+        jobs: list[tuple[int, AcademicSourceAdapter, SearchQueryRecord]] = []
         for adapter in adapters:
-            if len(raw_papers) >= max_candidates:
-                break
             query_window = self._query_window_for_adapter(adapter.name)
-            for query in queries[:query_window]:
-                if len(raw_papers) >= max_candidates:
-                    break
+            adapter_queries = queries[:query_window]
+            if adapter.name == "arxiv":
+                adapter_queries = adapter_queries[:1]
+            for query in adapter_queries:
+                jobs.append((len(jobs), adapter, query))
+
+        semaphore = asyncio.Semaphore(_ACADEMIC_FETCH_CONCURRENCY)
+
+        async def fetch(
+            job_index: int,
+            adapter: AcademicSourceAdapter,
+            query: SearchQueryRecord,
+        ) -> tuple[int, list[PaperRecord]]:
+            async with semaphore:
                 try:
                     results = await adapter.search(
                         query.query_text,
                         project_id=project.project_id,
-                        limit=min(provider_limit, max_candidates - len(raw_papers)),
+                        limit=min(provider_limit, max_candidates),
                     )
                 except Exception:
-                    logger.warning("Academic adapter failed during coverage repair: %s", adapter.name, exc_info=True)
-                    continue
-                raw_papers.extend(results)
-                if adapter.name == "arxiv":
-                    break
+                    logger.warning("Academic adapter failed during %s: %s", failure_context, adapter.name, exc_info=True)
+                    return job_index, []
+                return job_index, results
+
+        fetched = await asyncio.gather(*(fetch(job_index, adapter, query) for job_index, adapter, query in jobs))
+        raw_papers: list[PaperRecord] = []
+        for _, results in sorted(fetched, key=lambda item: item[0]):
+            if len(raw_papers) >= max_candidates:
+                break
+            remaining = max_candidates - len(raw_papers)
+            raw_papers.extend(results[:remaining])
         return raw_papers
 
     async def synthesize_project(
@@ -444,19 +463,42 @@ class AcademicResearchService:
                 ),
             },
         )
-        await self.ingest_project(
-            project.project_id,
-            max_candidates=max_candidates,
-            core_paper_limit=core_paper_limit,
-            source_profile=source_profile,
-            quality_mode=quality_mode,
-            preprint_policy=preprint_policy,
+        project = await self._apply_coverage_metadata(
+            project,
             deliverable_type=deliverable_type,
             min_reference_count=min_reference_count,
             target_reference_count=target_reference_count,
             required_topics=required_topics,
             required_evidence_types=required_evidence_types,
         )
+        await self._repository.update_project_status(
+            project.project_id,
+            status=project.status,
+            metadata={"reference_style": normalized_reference_style},
+            domain=project.domain,
+        )
+        project = await self._require_project(project.project_id)
+        ingest_request_signature = self._ingest_request_signature(
+            project,
+            core_paper_limit=core_paper_limit,
+            source_profile=source_profile,
+            quality_mode=quality_mode,
+            preprint_policy=preprint_policy,
+        )
+        if not await self._can_reuse_ingested_project(project, ingest_request_signature):
+            await self.ingest_project(
+                project.project_id,
+                max_candidates=max_candidates,
+                core_paper_limit=core_paper_limit,
+                source_profile=source_profile,
+                quality_mode=quality_mode,
+                preprint_policy=preprint_policy,
+                deliverable_type=deliverable_type,
+                min_reference_count=min_reference_count,
+                target_reference_count=target_reference_count,
+                required_topics=required_topics,
+                required_evidence_types=required_evidence_types,
+            )
         return await self.synthesize_project(
             project.project_id,
             output_dir=output_dir,
@@ -726,6 +768,70 @@ class AcademicResearchService:
             "required_topics": self._normalize_text_list(metadata.get("required_topics")),
             "required_evidence_types": self._normalize_text_list(metadata.get("required_evidence_types")),
         }
+
+    def _ingest_request_signature(
+        self,
+        project: ResearchProject,
+        *,
+        core_paper_limit: int,
+        source_profile: str | None,
+        quality_mode: str | None,
+        preprint_policy: str | None,
+    ) -> dict[str, Any]:
+        targets = self._coverage_targets(project)
+        effective_core_paper_limit = core_paper_limit
+        if targets["review_quality_profile"]:
+            effective_core_paper_limit = max(effective_core_paper_limit, targets["min_core_paper_count"])
+        return {
+            "source_profile": source_profile or ("cs_ai_premium" if project.domain == "cs_ai" else "default"),
+            "quality_mode": quality_mode or ("strict" if project.domain == "cs_ai" else "balanced"),
+            "preprint_policy": preprint_policy or "prefer_final",
+            "core_paper_limit": max(20, min(int(effective_core_paper_limit), 80)),
+            "coverage_targets": {
+                "review_quality_profile": bool(targets["review_quality_profile"]),
+                "min_reference_count": int(targets["min_reference_count"]),
+                "target_reference_count": int(targets["target_reference_count"]),
+                "min_core_paper_count": int(targets["min_core_paper_count"]),
+                "required_topics": sorted(targets["required_topics"], key=str.lower),
+                "required_evidence_types": sorted(targets["required_evidence_types"], key=str.lower),
+            },
+        }
+
+    async def _can_reuse_ingested_project(
+        self,
+        project: ResearchProject,
+        expected_ingest_signature: dict[str, Any] | None = None,
+    ) -> bool:
+        if project.status not in {"ingested", "synthesized"}:
+            return False
+
+        metadata = project.metadata or {}
+        if expected_ingest_signature is not None and metadata.get("ingest_request_signature") != expected_ingest_signature:
+            return False
+
+        audit = metadata.get("reference_coverage_audit")
+        if not isinstance(audit, dict) or audit.get("status") != "pass":
+            return False
+
+        papers = await self._repository.list_project_papers(project.project_id)
+        if not papers:
+            return False
+
+        targets = self._coverage_targets(project)
+        included_count = int(audit.get("included_reference_count") or 0)
+        if included_count < targets["min_reference_count"]:
+            return False
+        if targets["review_quality_profile"] and int(audit.get("quantitative_evidence_count") or 0) <= 0:
+            return False
+
+        audited_topics = set(self._normalize_text_list(audit.get("required_topics")))
+        audited_evidence = set(self._normalize_text_list(audit.get("required_evidence_types")))
+        if not set(targets["required_topics"]).issubset(audited_topics):
+            return False
+        if not set(targets["required_evidence_types"]).issubset(audited_evidence):
+            return False
+
+        return True
 
     def _reference_coverage_audit(
         self,

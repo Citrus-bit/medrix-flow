@@ -186,10 +186,14 @@ Config values starting with `$` are resolved as environment variables (e.g., `$O
 
 **Research Configuration** (`config.yaml` → `research`):
 - `manuscript_model`: optional model name for manuscript section generation in `research_assistant action="run_pipeline"`; `null` inherits the current thread model.
+- `fast_draft_model`: optional model for the first-pass editable manuscript draft; `null` falls back to `manuscript_model` or the thread model.
+- `finalization_model`: optional model for background review/final-bundle continuation; `null` falls back to `manuscript_model`.
+- `manuscript_section_concurrency`: max concurrent manuscript section generation calls; defaults to `3`.
 - `default_auto_gates`: gate types that `run_pipeline` may auto-approve by default. Keep this empty unless the product deliberately allows unattended gates.
 - `default_max_stages`: maximum lifecycle stages advanced by one `run_pipeline` tool call; defaults to `5` to avoid long blocking tool calls.
 - `default_quality_mode`: final-bundle quality gate mode for `run_pipeline`; `auto_repair` is the default, with `audit_only` and `strict_gate` available for less/more enforcement.
 - `default_quality_repair_budget`: maximum automatic quality-repair approvals before returning to a human gate; defaults to `2`.
+- `research_assistant action="run_pipeline"` accepts `delivery_mode`. `fast_draft_first` is the default tool behavior and pauses after `manuscript_draft`, writes a fast draft artifact, records `draft_ready_at` / `finalization_run_id`, and starts a tracked background finalization run. `final_only` keeps the previous one-shot final-bundle behavior.
 - Academic reference formatting is user-selected. `academic_research`, `/api/academic/projects/{project_id}/synthesize`, and `/api/academic/projects/{project_id}/references` accept `reference_style`/`style` values such as `apa7`, `mla9`, `chicago`, `gbt7714`, `plain`, and `bibtex`; APA 7 is only the compatibility default when no style is specified.
 
 **Extensions Configuration** (`extensions_config.json`):

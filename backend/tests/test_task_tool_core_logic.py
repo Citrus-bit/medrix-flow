@@ -6,7 +6,7 @@ from enum import Enum
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from medrix_flow.subagents.config import SubagentConfig
+from medrix_flow.subagents.config import MIN_SUBAGENT_MAX_TURNS, SubagentConfig
 
 # Use module import so tests can patch the exact symbols referenced inside task_tool().
 task_tool_module = importlib.import_module("medrix_flow.tools.builtins.task_tool")
@@ -131,7 +131,7 @@ def test_task_tool_emits_running_and_completed_events(monkeypatch):
     assert captured["task_id"] == "tc-123"
     assert captured["executor_kwargs"]["thread_id"] == "thread-1"
     assert captured["executor_kwargs"]["parent_model"] == "context-model"
-    assert captured["executor_kwargs"]["config"].max_turns == 7
+    assert captured["executor_kwargs"]["config"].max_turns == MIN_SUBAGENT_MAX_TURNS
     assert "Skills Appendix" in captured["executor_kwargs"]["config"].system_prompt
 
     get_available_tools.assert_called_once_with(model_name="context-model", subagent_enabled=False)
@@ -139,6 +139,45 @@ def test_task_tool_emits_running_and_completed_events(monkeypatch):
     event_types = [e["type"] for e in events]
     assert event_types == ["task_started", "task_running", "task_running", "task_completed"]
     assert events[-1]["result"] == "all done"
+
+
+def test_task_tool_keeps_safe_max_turn_overrides(monkeypatch):
+    config = _make_subagent_config()
+    runtime = _make_runtime()
+    captured = {}
+
+    class DummyExecutor:
+        def __init__(self, **kwargs):
+            captured["config"] = kwargs["config"]
+
+        def execute_async(self, prompt, task_id=None):
+            return task_id or "generated-task-id"
+
+    responses = iter(
+        [
+            _make_result(FakeSubagentStatus.COMPLETED, result="done"),
+        ]
+    )
+
+    monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
+    monkeypatch.setattr(task_tool_module, "SubagentExecutor", DummyExecutor)
+    monkeypatch.setattr(task_tool_module, "get_subagent_config", lambda _: config)
+    monkeypatch.setattr(task_tool_module, "get_skills_prompt_section", lambda: "")
+    monkeypatch.setattr(task_tool_module, "get_background_task_result", lambda _: next(responses))
+    monkeypatch.setattr(task_tool_module, "get_stream_writer", lambda: lambda _: None)
+    monkeypatch.setattr(task_tool_module.time, "sleep", lambda _: None)
+    monkeypatch.setattr("medrix_flow.tools.get_available_tools", lambda **kwargs: [])
+
+    task_tool_module.task_tool.func(
+        runtime=runtime,
+        description="运行子任务",
+        prompt="collect diagnostics",
+        subagent_type="general-purpose",
+        tool_call_id="tc-safe-turns",
+        max_turns=24,
+    )
+
+    assert captured["config"].max_turns == 24
 
 
 def test_task_tool_emits_lightweight_heartbeat_without_message(monkeypatch):

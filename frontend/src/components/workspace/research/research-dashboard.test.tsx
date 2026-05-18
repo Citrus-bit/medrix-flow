@@ -18,7 +18,12 @@ const snapshot: ResearchQuestSnapshot = {
     status: "blocked",
     academic_project_id: "academic-1",
     experiment_project_ids: ["exp-1"],
-    metadata: {},
+    metadata: {
+      delivery_mode: "fast_draft_first",
+      draft_ready_at: "2026-05-09T00:03:30Z",
+      finalization_run_id: "run-finalization",
+      draft_artifacts: ["/mnt/user-data/outputs/fast-draft-rq-demo.tex"],
+    },
     created_at: "2026-05-09T00:00:00Z",
     updated_at: "2026-05-09T00:05:00Z",
   },
@@ -99,7 +104,7 @@ const snapshot: ResearchQuestSnapshot = {
       content: "",
       claim_ids: ["claim-1"],
       artifact_paths: ["/mnt/user-data/outputs/methods.md"],
-      status: "draft",
+      status: "draft_ready",
       created_at: "2026-05-09T00:03:00Z",
       updated_at: "2026-05-09T00:03:00Z",
     },
@@ -135,6 +140,8 @@ describe("ResearchQuestSnapshotView", () => {
     expect(screen.getByText("Quest Timeline")).toBeInTheDocument();
     expect(screen.getByText("Claim Evidence Map")).toBeInTheDocument();
     expect(screen.getByText("final_release")).toBeInTheDocument();
+    expect(screen.getByText("Finalizing")).toBeInTheDocument();
+    expect(screen.getAllByText(/run run-finalization/).length).toBeGreaterThan(0);
     expect(screen.getByText("Claim-level evidence maps reduce unsupported manuscript claims.")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /Approve final_release/i }));
@@ -149,8 +156,39 @@ describe("ResearchQuestSnapshotView", () => {
     fireEvent.click(screen.getByRole("tab", { name: /Manuscript/i }));
     expect(screen.getByText("Artifact Bundle")).toBeInTheDocument();
     expect(screen.getByText("/mnt/user-data/outputs/methods.md")).toBeInTheDocument();
+    expect(screen.getByText("/mnt/user-data/outputs/fast-draft-rq-demo.tex")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: /Review/i }));
     expect(screen.getByText("citation-integrity")).toBeInTheDocument();
+  });
+
+  it("shows final PDF artifacts from quest metadata", () => {
+    const finalSnapshot: ResearchQuestSnapshot = {
+      ...snapshot,
+      quest: {
+        ...snapshot.quest,
+        stage: "final_bundle",
+        status: "completed",
+        metadata: {
+          delivery_mode: "final_only",
+          final_bundle_artifacts: [
+            "/mnt/user-data/outputs/manuscript-rq-demo.pdf",
+            "/mnt/user-data/outputs/manuscript-rq-demo.tex",
+            "/mnt/user-data/outputs/references.bib",
+            "/mnt/user-data/outputs/citation_audit.json",
+          ],
+          final_bundle_ready_at: "2026-05-09T00:06:00Z",
+          final_bundle_export_status: "passed",
+          final_bundle_export_message: "PASS: manuscript_export wrote `/mnt/user-data/outputs/manuscript-rq-demo.pdf`.",
+        },
+      },
+    };
+
+    render(<ResearchQuestSnapshotView snapshot={finalSnapshot} />);
+
+    expect(screen.getByText("Final PDF ready")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: /Manuscript/i }));
+    expect(screen.getByText("/mnt/user-data/outputs/manuscript-rq-demo.pdf")).toBeInTheDocument();
   });
 });

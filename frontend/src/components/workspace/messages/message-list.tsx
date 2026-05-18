@@ -22,6 +22,7 @@ import type { Subtask } from "@/core/tasks";
 import { useUpdateSubtask } from "@/core/tasks/context";
 import { parseTaskToolResult } from "@/core/tasks/result-parser";
 import type { AgentThreadState } from "@/core/threads";
+import type { ModelRetryStatus } from "@/core/threads/hooks";
 import { cn } from "@/lib/utils";
 
 import { ArtifactFileList } from "../artifacts/artifact-file-list";
@@ -32,7 +33,6 @@ import { useThread } from "./context";
 import { MarkdownContent } from "./markdown-content";
 import { MessageGroup } from "./message-group";
 import { MessageListItem } from "./message-list-item";
-import { PlanApprovalCard } from "./plan-approval-card";
 import { MessageListSkeleton } from "./skeleton";
 import { SubtaskCard } from "./subtask-card";
 
@@ -75,12 +75,14 @@ export function MessageList({
   threadId,
   thread,
   runId,
+  modelRetryStatus,
   paddingBottom = 160,
 }: {
   className?: string;
   threadId: string;
   thread: BaseStream<AgentThreadState>;
   runId?: string | null;
+  modelRetryStatus?: ModelRetryStatus | null;
   paddingBottom?: number;
 }) {
   const { t } = useI18n();
@@ -255,17 +257,12 @@ export function MessageList({
             />
           );
         })}
-        <PlanApprovalCard
-          plan={thread.values?.plan}
-          threadId={threadId}
-          onSubmit={sendMessage}
-          isLoading={thread.isLoading}
-        />
         <RunStatusIndicator
           className="my-4"
           threadId={threadId}
           currentRunId={runId}
           streaming={thread.isLoading}
+          modelRetryStatus={modelRetryStatus}
         />
         <div style={{ height: `${paddingBottom}px` }} />
       </ConversationContent>

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -397,6 +397,102 @@ describe("ThreadDetailsTrigger", () => {
     expect(await screen.findByText("scanned-only.txt")).toBeInTheDocument();
   });
 
+  it("attributes slow-step timing to tool calls and keeps single-event runs visible", async () => {
+    mocks.cancelThreadRun.mockResolvedValue(undefined);
+    mocks.listThreadRuns.mockResolvedValue([
+      {
+        run_id: "run-slow",
+        thread_id: "thread-1",
+        assistant_id: "lead_agent",
+        status: "success",
+        metadata: {},
+        kwargs: {},
+        multitask_strategy: "reject",
+        created_at: "2026-05-09T00:00:00Z",
+        updated_at: "2026-05-09T00:00:12Z",
+      },
+    ]);
+    mocks.getRunWorkflow.mockResolvedValue({
+      run: {
+        run_id: "run-slow",
+        thread_id: "thread-1",
+        assistant_id: "lead_agent",
+        status: "success",
+        created_at: "2026-05-09T00:00:00Z",
+        updated_at: "2026-05-09T00:00:12Z",
+        last_event_at: "2026-05-09T00:00:12Z",
+      },
+      nodes: [],
+      edges: [],
+      events: [
+        {
+          seq: 1,
+          run_id: "run-slow",
+          thread_id: "thread-1",
+          event_type: "ai_tool_calls",
+          caller: "assistant",
+          summary: "Starting experiment",
+          content: {
+            type: "ai",
+            tool_calls: [
+              {
+                name: "experiment_lab",
+                args: {},
+                id: "tool-start",
+              },
+            ],
+          },
+          created_at: "2026-05-09T00:00:00Z",
+        },
+        {
+          seq: 2,
+          run_id: "run-slow",
+          thread_id: "thread-1",
+          event_type: "subagent_event",
+          caller: "task",
+          summary: '""',
+          content: {
+            type: "task",
+            task_id: "task-1",
+            heartbeat: true,
+            content: '""',
+          },
+          created_at: "2026-05-09T00:00:05Z",
+        },
+      ],
+      artifacts: [],
+      usage: { input_tokens: 0, output_tokens: 0, total_tokens: 0 },
+      has_more: false,
+    });
+
+    render(
+      <ThreadDetailsTrigger threadId="thread-1" currentRunId="run-slow" streaming={false} />,
+      { wrapper },
+    );
+
+    fireEvent.click(screen.getByTestId("thread-details-trigger"));
+    expect(await screen.findByText("Agent 工作流、工具调用、产出文件与运行日志")).toBeInTheDocument();
+    expect(await screen.findByText("用户目标 / Run")).toBeInTheDocument();
+
+    const statsTab = screen.getByRole("tab", { name: "统计" });
+    fireEvent.pointerDown(statsTab);
+    fireEvent.click(statsTab);
+
+    expect(await screen.findByText("慢步骤来源")).toBeInTheDocument();
+    const slowStepRow = screen.getByText("experiment_lab").closest(".grid");
+    if (!(slowStepRow instanceof HTMLElement)) {
+      throw new Error("Expected experiment_lab slow-step row");
+    }
+    expect(within(slowStepRow).getByText("12s")).toBeInTheDocument();
+    expect(within(slowStepRow).getByText("1 个事件")).toBeInTheDocument();
+
+    const logsTab = screen.getByRole("tab", { name: "日志" });
+    fireEvent.pointerDown(logsTab);
+    fireEvent.click(logsTab);
+    expect(screen.getByText("#1")).toBeInTheDocument();
+    expect(screen.queryByText("#2")).not.toBeInTheDocument();
+  });
+
   it("renders the details panel fully in English when English locale is active", async () => {
     setTestLocale("en-US");
     mockEmptyWorkflow();
@@ -426,6 +522,7 @@ describe("ThreadDetailsTrigger", () => {
   });
 
   it("opens reliably while a run is actively streaming", async () => {
+    const now = new Date().toISOString();
     mocks.cancelThreadRun.mockResolvedValue(undefined);
     mocks.listThreadRuns.mockResolvedValue([
       {
@@ -436,8 +533,8 @@ describe("ThreadDetailsTrigger", () => {
         metadata: {},
         kwargs: {},
         multitask_strategy: "reject",
-        created_at: "2026-05-09T00:00:00Z",
-        updated_at: "2026-05-09T00:00:10Z",
+        created_at: now,
+        updated_at: now,
       },
     ]);
     mocks.getRunWorkflow.mockResolvedValue({
@@ -446,9 +543,9 @@ describe("ThreadDetailsTrigger", () => {
         thread_id: "thread-1",
         assistant_id: "lead_agent",
         status: "running",
-        created_at: "2026-05-09T00:00:00Z",
-        updated_at: "2026-05-09T00:00:10Z",
-        last_event_at: "2026-05-09T00:00:10Z",
+        created_at: now,
+        updated_at: now,
+        last_event_at: now,
       },
       nodes: [],
       edges: [],
@@ -469,11 +566,13 @@ describe("ThreadDetailsTrigger", () => {
 
     const trigger = await screen.findByTestId("thread-details-trigger");
     expect(trigger.querySelector(".animate-ping")).toBeInTheDocument();
+    expect(mocks.getRunWorkflow).not.toHaveBeenCalled();
 
     fireEvent.click(trigger);
 
     expect(await screen.findByText("Agent 工作流、工具调用、产出文件与运行日志")).toBeInTheDocument();
     expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await waitFor(() => expect(mocks.getRunWorkflow).toHaveBeenCalled());
   });
 
   it("does not show an active badge for stale pending runs", async () => {

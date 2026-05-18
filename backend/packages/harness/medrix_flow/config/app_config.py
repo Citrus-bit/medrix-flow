@@ -32,6 +32,20 @@ class ResearchConfig(BaseModel):
         default=None,
         description="Optional model name for manuscript section generation; None inherits the current thread model.",
     )
+    fast_draft_model: str | None = Field(
+        default=None,
+        description="Optional model name for fast manuscript draft generation; None falls back to manuscript_model.",
+    )
+    finalization_model: str | None = Field(
+        default=None,
+        description="Optional model name for final manuscript review/finalization; None falls back to manuscript_model.",
+    )
+    manuscript_section_concurrency: int = Field(
+        default=3,
+        ge=1,
+        le=12,
+        description="Maximum concurrent manuscript section generation calls.",
+    )
     default_auto_gates: list[str] = Field(
         default_factory=list,
         description="Human gate types that research_assistant may auto-approve for run_pipeline by default.",
@@ -40,6 +54,10 @@ class ResearchConfig(BaseModel):
         default=5,
         ge=1,
         description="Default maximum number of lifecycle stages advanced by one run_pipeline tool call.",
+    )
+    default_delivery_mode: str = Field(
+        default="final_only",
+        description="Default delivery mode for research_assistant run_pipeline: final_only or fast_draft_first.",
     )
     default_quality_mode: str = Field(
         default="auto_repair",

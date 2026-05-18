@@ -1,4 +1,5 @@
 import asyncio
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -180,6 +181,61 @@ def test_checkpoint_diff_materialization_persists_only_new_messages():
         assert stored.messages_complete is True
         assert stored.persisted_message_count == 3
         assert stored.status is RunStatus.success
+
+        await db.close()
+
+    asyncio.run(scenario())
+
+
+def test_gateway_reconciles_stale_external_runs_as_interrupted():
+    async def scenario():
+        service, db = await _make_runtime_service(messages=[HumanMessage(content="before")])
+        old = (datetime.now(UTC) - timedelta(minutes=31)).isoformat()
+        await service._run_store.put(
+            "run-stale",
+            thread_id="thread-stale",
+            assistant_id="lead_agent",
+            status="pending",
+            multitask_strategy="reject",
+            source="external",
+            metadata={},
+            kwargs={},
+            created_at=old,
+            updated_at=old,
+        )
+
+        listed = await service.list_runs("thread-stale")
+        required = await service.require_run("thread-stale", "run-stale")
+
+        assert listed[0].status is RunStatus.interrupted
+        assert required.status is RunStatus.interrupted
+        assert required.error == "External run was marked interrupted after 30 minutes without updates."
+
+        await db.close()
+
+    asyncio.run(scenario())
+
+
+def test_gateway_keeps_recent_external_runs_active():
+    async def scenario():
+        service, db = await _make_runtime_service(messages=[HumanMessage(content="before")])
+        recent = (datetime.now(UTC) - timedelta(minutes=5)).isoformat()
+        await service._run_store.put(
+            "run-recent",
+            thread_id="thread-recent",
+            assistant_id="lead_agent",
+            status="running",
+            multitask_strategy="reject",
+            source="external",
+            metadata={},
+            kwargs={},
+            created_at=recent,
+            updated_at=recent,
+        )
+
+        record = await service.require_run("thread-recent", "run-recent")
+
+        assert record.status is RunStatus.running
 
         await db.close()
 

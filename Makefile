@@ -1,6 +1,6 @@
 # Anaxa - Unified Development Environment
 
-.PHONY: help bootstrap config setup doctor config-upgrade check install verify release-check dev dev-daemon start stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway
+.PHONY: help bootstrap config setup doctor config-upgrade check install verify release-check dev dev-daemon start stop up down clean clean-cache docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway
 
 PYTHON ?= python3
 
@@ -20,6 +20,7 @@ help:
 	@echo "  make start           - Start all services in production mode (optimized, no hot-reloading)"
 	@echo "  make stop            - Stop all running services"
 	@echo "  make clean           - Clean up processes and temporary files"
+	@echo "  make clean-cache     - Remove safe regenerated caches, keep local data and dependencies"
 	@echo ""
 	@echo "Docker Production Commands:"
 	@echo "  make up              - Build and start production Docker services (localhost:6200)"
@@ -159,12 +160,30 @@ stop:
 	@-./scripts/cleanup-containers.sh medrix-flow-sandbox 2>/dev/null || true
 	@echo "✓ All services stopped"
 
+# Clean up safe regenerated caches. This intentionally keeps backend/.medrix-flow,
+# backend/.venv, and frontend/node_modules.
+clean-cache:
+	@echo "Cleaning safe regenerated caches..."
+	@-rm -rf frontend/.next 2>/dev/null || true
+	@-rm -rf logs 2>/dev/null || true
+	@-rm -rf .code-review-graph 2>/dev/null || true
+	@-rm -rf backend/.pytest_cache backend/.ruff_cache 2>/dev/null || true
+	@-rm -rf frontend/.pytest_cache frontend/.ruff_cache 2>/dev/null || true
+	@-find backend frontend scripts -type d -name "__pycache__" -prune -exec rm -rf {} + 2>/dev/null || true
+	@echo "Retained: backend/.medrix-flow, backend/.venv, frontend/node_modules"
+	@echo "Current size summary:"
+	@-du -sh . 2>/dev/null || true
+	@-for path in frontend/.next frontend/node_modules backend/.venv backend/.medrix-flow logs .code-review-graph; do \
+		if [ -e "$$path" ]; then \
+			du -sh "$$path"; \
+		else \
+			echo "0B	$$path (absent)"; \
+		fi; \
+	done
+	@echo "✓ Cache cleanup complete"
+
 # Clean up
-clean: stop
-	@echo "Cleaning up..."
-	@-rm -rf backend/.medrix-flow 2>/dev/null || true
-	@-rm -rf backend/.langgraph_api 2>/dev/null || true
-	@-rm -rf logs/*.log 2>/dev/null || true
+clean: stop clean-cache
 	@echo "✓ Cleanup complete"
 
 # ==========================================

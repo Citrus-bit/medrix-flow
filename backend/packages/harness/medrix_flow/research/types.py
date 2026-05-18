@@ -19,7 +19,7 @@ ResearchStage = Literal[
 ]
 
 ResearchQuestStatus = Literal["active", "blocked", "completed", "error", "cancelled"]
-PipelineStatus = Literal["completed", "blocked_on_gate", "stopped_at_max_stages", "error", "cancelled"]
+PipelineStatus = Literal["completed", "blocked_on_gate", "stopped_at_max_stages", "draft_ready", "error", "cancelled"]
 GateStatus = Literal["pending", "approved", "rejected"]
 SupportStatus = Literal["supported", "unsupported", "contradicted", "uncertain"]
 OverlapRisk = Literal["low", "medium", "high"]

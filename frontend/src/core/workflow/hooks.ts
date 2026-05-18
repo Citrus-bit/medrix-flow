@@ -12,14 +12,6 @@ export function isWorkflowRunActive(status?: string | null) {
   return status === "pending" || status === "running";
 }
 
-function sameUsage(left: WorkflowSnapshot["usage"], right: WorkflowSnapshot["usage"]) {
-  return (
-    left.input_tokens === right.input_tokens &&
-    left.output_tokens === right.output_tokens &&
-    left.total_tokens === right.total_tokens
-  );
-}
-
 function sameRun(left: WorkflowSnapshot["run"], right: WorkflowSnapshot["run"]) {
   return (
     left.run_id === right.run_id &&
@@ -28,12 +20,6 @@ function sameRun(left: WorkflowSnapshot["run"], right: WorkflowSnapshot["run"]) 
     left.last_event_at === right.last_event_at
   );
 }
-
-const ZERO_USAGE: WorkflowSnapshot["usage"] = {
-  input_tokens: 0,
-  output_tokens: 0,
-  total_tokens: 0,
-};
 
 export function mergeWorkflowSnapshots(
   previous: WorkflowSnapshot | undefined,
@@ -67,7 +53,6 @@ export function mergeWorkflowSnapshots(
     newNodes.length === 0 &&
     newEdges.length === 0 &&
     newArtifacts.length === 0 &&
-    sameUsage(incoming.usage, ZERO_USAGE) &&
     sameRun(previous.run, incoming.run)
   ) {
     return previous;
@@ -127,7 +112,7 @@ export function useThreadWorkflow({
         afterSeq,
       }),
     enabled: enabled && Boolean(threadId && run?.run_id),
-    refetchInterval: active ? 2000 : false,
+    refetchInterval: active ? 5000 : false,
     refetchOnWindowFocus: true,
     staleTime: active ? 0 : 10_000,
     retry: 1,

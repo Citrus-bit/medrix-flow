@@ -118,6 +118,8 @@ Formal review/manuscript requests now run with stronger evidence defaults:
 - Ingest stores `reference_coverage_audit` with coverage status, off-topic references, quantitative/benchmark evidence, missing topic/evidence hints, and recommended expansion queries.
 - Research quests persist `ResearchQualityAudit` records during review/final stages. The audit checks citation density, unsupported claims, paper/snippet bindings, quantitative evidence, feasibility discussion, repeated or over-absolute wording, and process-note residue.
 - `research_assistant action="run_pipeline"` defaults to `quality_mode="auto_repair"` and will auto-approve the `final_quality_repair` gate only up to the configured repair budget before returning to a human gate.
+- `research_assistant action="run_pipeline"` now defaults to `delivery_mode="fast_draft_first"`: it returns after an editable `manuscript_draft`, writes a fast draft `.tex` artifact, and starts a tracked background finalization run for review, repair, and final bundle checks.
+- Manuscript section drafting runs concurrently up to `research.manuscript_section_concurrency` (default `3`). Optional `fast_draft_model` and `finalization_model` let first-pass drafting use a faster model while final review keeps the higher-quality model.
 
 ### Gateway API
 

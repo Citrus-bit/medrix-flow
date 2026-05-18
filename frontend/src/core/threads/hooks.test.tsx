@@ -3,7 +3,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { useThreadStream } from "./hooks";
+import { threadStateSignature, useThreadStream } from "./hooks";
 
 const mocks = vi.hoisted(() => ({
   registerThreadRun: vi.fn(),
@@ -57,6 +57,10 @@ vi.mock("@/core/i18n/hooks", () => ({
       },
       uploads: { uploadingFiles: "Uploading files" },
       common: { thinking: "Thinking" },
+      conversation: {
+        modelProviderOverloaded:
+          "Model provider is temporarily overloaded, concurrency-limited, or unavailable. Retry later or switch models.",
+      },
     },
   }),
 }));
@@ -132,6 +136,27 @@ describe("useThreadStream", () => {
         reasoning_effort: undefined,
       },
     });
+  });
+
+  it("keeps the same polling signature for equivalent thread state", () => {
+    const first = threadStateSignature({
+      title: "Research thread",
+      messages: [{ id: "m1", type: "human", content: "hello" }],
+      artifacts: ["/mnt/user-data/outputs/a.pdf"],
+    });
+    const second = threadStateSignature({
+      title: "Research thread",
+      messages: [{ id: "m1", type: "human", content: "hello" }],
+      artifacts: ["/mnt/user-data/outputs/a.pdf"],
+    });
+    const changed = threadStateSignature({
+      title: "Research thread",
+      messages: [{ id: "m1", type: "human", content: "updated" }],
+      artifacts: ["/mnt/user-data/outputs/a.pdf"],
+    });
+
+    expect(second).toBe(first);
+    expect(changed).not.toBe(first);
   });
 
   it("records tool-start events so workflow can reconstruct decisions", async () => {
@@ -305,6 +330,314 @@ describe("useThreadStream", () => {
     );
   });
 
+  it("stores and persists model retry custom events", async () => {
+    mocks.registerThreadRun.mockResolvedValue(undefined);
+    mocks.createRunEvent.mockResolvedValue(undefined);
+
+    const { result } = renderHook(
+      () =>
+        useThreadStream({
+          threadId: "thread-1",
+          context: {
+            mode: "flash",
+            model_name: undefined,
+            reasoning_effort: undefined,
+          },
+        }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      (capturedOptions?.onCreated as (meta: { thread_id: string; run_id: string }) => void)({
+        thread_id: "thread-1",
+        run_id: "run-1",
+      });
+    });
+    mocks.createRunEvent.mockClear();
+
+    await act(async () => {
+      (
+        capturedOptions?.onCustomEvent as (event: {
+          type: string;
+          attempt: number;
+          delay_seconds: number;
+          error_class?: string;
+          status_code?: number;
+          provider_code?: string;
+          retry_at?: string;
+        }) => void
+      )({
+        type: "model_retry",
+        attempt: 2,
+        delay_seconds: 4,
+        error_class: "APIError",
+        status_code: 503,
+        provider_code: "model_unavailable",
+        retry_at: "2026-05-15T00:00:04+00:00",
+      });
+    });
+
+    expect(result.current[5]).toEqual({
+      attempt: 2,
+      delaySeconds: 4,
+      errorClass: "APIError",
+      statusCode: 503,
+      providerCode: "model_unavailable",
+      retryAt: "2026-05-15T00:00:04+00:00",
+    });
+    expect(mocks.createRunEvent).toHaveBeenCalledWith(
+      "thread-1",
+      "run-1",
+      expect.objectContaining({
+        event_type: "model_retry",
+        caller: "model",
+        content: expect.objectContaining({
+          type: "model_retry",
+          attempt: 2,
+          delay_seconds: 4,
+          error_class: "APIError",
+          status_code: 503,
+          provider_code: "model_unavailable",
+          retry_at: "2026-05-15T00:00:04+00:00",
+        }),
+      }),
+    );
+  });
+
+  it("clears model retry status when the run finishes", async () => {
+    const { result } = renderHook(
+      () =>
+        useThreadStream({
+          threadId: "thread-1",
+          context: {
+            mode: "flash",
+            model_name: undefined,
+            reasoning_effort: undefined,
+          },
+        }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      (capturedOptions?.onCustomEvent as (event: unknown) => void)({
+        type: "model_retry",
+        attempt: 1,
+        delay_seconds: 2,
+      });
+    });
+    expect(result.current[5]).toEqual({ attempt: 1, delaySeconds: 2 });
+
+    await act(async () => {
+      (capturedOptions?.onFinish as (state: { values: Record<string, unknown> }) => void)({
+        values: { title: "", messages: [], artifacts: [] },
+      });
+    });
+
+    expect(result.current[5]).toBeNull();
+  });
+
+  it("clears model retry status when the stream errors", async () => {
+    const { result } = renderHook(
+      () =>
+        useThreadStream({
+          threadId: "thread-1",
+          context: {
+            mode: "flash",
+            model_name: undefined,
+            reasoning_effort: undefined,
+          },
+        }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      (capturedOptions?.onCustomEvent as (event: unknown) => void)({
+        type: "model_retry",
+        attempt: 1,
+        delay_seconds: 2,
+      });
+    });
+    expect(result.current[5]).toEqual({ attempt: 1, delaySeconds: 2 });
+
+    await act(async () => {
+      (capturedOptions?.onError as (error: unknown) => void)(
+        new Error("local failure"),
+      );
+    });
+
+    expect(result.current[5]).toBeNull();
+  });
+
+  it("clears model retry status when the thread changes", async () => {
+    const { result, rerender } = renderHook(
+      ({ threadId }) =>
+        useThreadStream({
+          threadId,
+          context: {
+            mode: "flash",
+            model_name: undefined,
+            reasoning_effort: undefined,
+          },
+        }),
+      {
+        wrapper,
+        initialProps: { threadId: "thread-1" },
+      },
+    );
+
+    await act(async () => {
+      (capturedOptions?.onCustomEvent as (event: unknown) => void)({
+        type: "model_retry",
+        attempt: 1,
+        delay_seconds: 2,
+      });
+    });
+    expect(result.current[5]).toEqual({ attempt: 1, delaySeconds: 2 });
+
+    rerender({ threadId: "thread-2" });
+
+    await waitFor(() => {
+      expect(result.current[5]).toBeNull();
+    });
+  });
+
+  it("shows a friendly message for generic internal stream errors", async () => {
+    renderHook(
+      () =>
+        useThreadStream({
+          threadId: "thread-1",
+          context: {
+            mode: "flash",
+            model_name: undefined,
+            reasoning_effort: undefined,
+          },
+        }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      (capturedOptions?.onError as (error: unknown) => void)(
+        new Error("An internal error occurred"),
+      );
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "Model provider is temporarily overloaded, concurrency-limited, or unavailable. Retry later or switch models.",
+      { id: "model-provider-overloaded" },
+    );
+  });
+
+  it("handles provider overload submit rejections without rethrowing", async () => {
+    mocks.submit.mockRejectedValueOnce(
+      new Error("503 Service Unavailable: system_cpu_overloaded"),
+    );
+
+    const { result } = renderHook(
+      () =>
+        useThreadStream({
+          threadId: "thread-1",
+          context: {
+            mode: "flash",
+            model_name: undefined,
+            reasoning_effort: undefined,
+          },
+        }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      await result.current[1]("thread-1", {
+        text: "hello",
+        files: [],
+      });
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "Model provider is temporarily overloaded, concurrency-limited, or unavailable. Retry later or switch models.",
+      { id: "model-provider-overloaded" },
+    );
+  });
+
+  it("maps concurrency limit stream errors to the provider unavailable message", async () => {
+    renderHook(
+      () =>
+        useThreadStream({
+          threadId: "thread-1",
+          context: {
+            mode: "flash",
+            model_name: undefined,
+            reasoning_effort: undefined,
+          },
+        }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      (capturedOptions?.onError as (error: unknown) => void)(
+        new Error("Concurrency limit exceeded for account, please retry later"),
+      );
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "Model provider is temporarily overloaded, concurrency-limited, or unavailable. Retry later or switch models.",
+      { id: "model-provider-overloaded" },
+    );
+  });
+
+  it("maps model unavailable stream errors to the provider unavailable message", async () => {
+    renderHook(
+      () =>
+        useThreadStream({
+          threadId: "thread-1",
+          context: {
+            mode: "flash",
+            model_name: undefined,
+            reasoning_effort: undefined,
+          },
+        }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      (capturedOptions?.onError as (error: unknown) => void)(
+        new Error("Model unavailable, please retry later"),
+      );
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "Model provider is temporarily overloaded, concurrency-limited, or unavailable. Retry later or switch models.",
+      { id: "model-provider-overloaded" },
+    );
+  });
+
+  it("keeps model configuration errors on the settings action path", async () => {
+    renderHook(
+      () =>
+        useThreadStream({
+          threadId: "thread-1",
+          context: {
+            mode: "flash",
+            model_name: undefined,
+            reasoning_effort: undefined,
+          },
+        }),
+      { wrapper },
+    );
+
+    await act(async () => {
+      (capturedOptions?.onError as (error: unknown) => void)(
+        new Error(
+          "No chat models are configured. Please configure at least one model.",
+        ),
+      );
+    });
+
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      "No model",
+      expect.objectContaining({ id: "model-not-configured" }),
+    );
+  });
+
   it("marks ordinary text requests as non-visual", async () => {
     mocks.submit.mockResolvedValue(undefined);
 
@@ -387,7 +720,7 @@ describe("useThreadStream", () => {
     expect(mocks.submit.mock.calls[0]?.[1]?.context.synthetic_data_mode).toBe(true);
   });
 
-  it("approves a pending plan before submitting an explicit approval message", async () => {
+  it("submits approval-like text without mutating legacy plan state", async () => {
     mocks.updateState.mockResolvedValue(undefined);
     mocks.submit.mockResolvedValue(undefined);
     mocks.streamValues = {
@@ -430,20 +763,7 @@ describe("useThreadStream", () => {
       });
     });
 
-    expect(mocks.updateState).toHaveBeenCalledWith(
-      "thread-1",
-      expect.objectContaining({
-        values: {
-          plan: expect.objectContaining({
-            status: "approved",
-            revision_count: 2,
-          }),
-        },
-      }),
-    );
-    expect(mocks.updateState.mock.invocationCallOrder[0]!).toBeLessThan(
-      mocks.submit.mock.invocationCallOrder[0]!,
-    );
+    expect(mocks.updateState).not.toHaveBeenCalled();
     expect(mocks.submit).toHaveBeenCalledOnce();
   });
 

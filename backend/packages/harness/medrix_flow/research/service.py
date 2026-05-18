@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 import uuid
 from collections.abc import Awaitable, Callable
@@ -673,40 +674,84 @@ class ResearchQuestService:
                 {"section_key": "results", "title": "Results"},
                 {"section_key": "limitations", "title": "Limitations"},
             ]
+
+        normalized_sections: list[dict[str, Any]] = []
         for payload in sections:
-            section_key = str(payload.get("section_key") or slugify(str(payload.get("title") or "section")))
-            content = str(payload.get("content") or "")
-            if not content and content_generator is not None:
+            normalized_sections.append(
+                {
+                    **payload,
+                    "section_key": str(payload.get("section_key") or slugify(str(payload.get("title") or "section"))),
+                    "title": str(payload.get("title") or "Section"),
+                    "content": str(payload.get("content") or ""),
+                }
+            )
+
+        concurrency = self._resolve_section_concurrency(quest, inputs)
+        generated_contents: dict[str, str] = {}
+        sections_to_generate = [
+            payload for payload in normalized_sections if not payload["content"] and content_generator is not None
+        ]
+        if sections_to_generate and content_generator is not None:
+            snapshot = await self.get_snapshot(quest.quest_id)
+            semaphore = asyncio.Semaphore(concurrency)
+
+            async def generate_section(payload: dict[str, Any]) -> tuple[str, str | None, str | None]:
+                section_key = str(payload["section_key"])
                 try:
-                    generated_content = (await content_generator(section_key, await self.get_snapshot(quest.quest_id))).strip()
-                    if generated_content:
-                        content = generated_content
-                    else:
-                        content_generation_errors.append(
-                            {"section_key": section_key, "error": "content_generator returned empty content"}
-                        )
+                    async with semaphore:
+                        generated_content = (await content_generator(section_key, snapshot)).strip()
+                    if not generated_content:
+                        return section_key, None, "content_generator returned empty content"
+                    return section_key, generated_content, None
                 except Exception as exc:
-                    content_generation_errors.append({"section_key": section_key, "error": str(exc)})
+                    return section_key, None, str(exc)
+
+            generated = await asyncio.gather(*(generate_section(payload) for payload in sections_to_generate))
+            for section_key, generated_content, error in generated:
+                if generated_content:
+                    generated_contents[section_key] = generated_content
+                elif error:
+                    content_generation_errors.append({"section_key": section_key, "error": error})
+
+        now = now_iso()
+        draft_status = str(inputs.get("draft_status") or "draft_ready")
+        draft_artifacts = [artifact for artifact in artifacts if artifact]
+        for payload in normalized_sections:
+            section_key = str(payload["section_key"])
+            content = str(payload["content"] or generated_contents.get(section_key) or "")
             await self._repository.upsert_manuscript_section(
                 ManuscriptSectionRecord(
                     section_id=str(payload.get("section_id") or f"section-{uuid.uuid4().hex[:12]}"),
                     quest_id=quest.quest_id,
                     section_key=section_key,
-                    title=str(payload.get("title") or "Section"),
+                    title=str(payload["title"]),
                     content=content,
                     claim_ids=payload.get("claim_ids", claim_ids),
-                    artifact_paths=payload.get("artifact_paths", artifacts),
-                    status=str(payload.get("status") or "draft"),
-                    created_at=now_iso(),
-                    updated_at=now_iso(),
+                    artifact_paths=payload.get("artifact_paths", draft_artifacts),
+                    status=str(payload.get("status") or draft_status),
+                    created_at=now,
+                    updated_at=now,
                 )
             )
+
+        quest.metadata = {
+            **quest.metadata,
+            "draft_ready_at": now,
+            "draft_status": draft_status,
+            "manuscript_section_concurrency": concurrency,
+        }
+        await self._repository.update_quest(quest)
         await self._ensure_gate(quest, "review", "pre_review")
         return {
-            "section_count": len(sections),
+            "section_count": len(normalized_sections),
             "linked_claim_count": len(claim_ids),
             "review_gate": "pre_review",
+            "draft_status": draft_status,
+            "section_generation_mode": "parallel" if sections_to_generate else "provided",
+            "section_generation_concurrency": concurrency,
+            "section_generation_errors": content_generation_errors,
             "content_generation_errors": content_generation_errors,
+            "draft_artifacts": draft_artifacts,
         }
 
     async def _stage_review(self, quest: ResearchQuest, inputs: dict[str, Any]) -> dict[str, Any]:
@@ -1021,6 +1066,14 @@ class ResearchQuestService:
         if not isinstance(value, list):
             return []
         return [item for item in value if isinstance(item, dict)]
+
+    @staticmethod
+    def _resolve_section_concurrency(quest: ResearchQuest, inputs: dict[str, Any]) -> int:
+        value = inputs.get("section_concurrency") or quest.metadata.get("manuscript_section_concurrency") or 3
+        try:
+            return max(1, min(int(value), 12))
+        except (TypeError, ValueError):
+            return 3
 
     async def _collect_hypotheses(self, quest_id: str, inputs: dict[str, Any]) -> list[dict[str, Any]]:
         hypotheses: list[dict[str, Any]] = []

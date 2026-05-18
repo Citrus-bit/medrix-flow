@@ -19,7 +19,7 @@ from langchain_core.runnables import RunnableConfig
 from medrix_flow.agents.thread_state import SandboxState, ThreadDataState, ThreadState
 from medrix_flow.config.subagents_config import DEFAULT_SUBAGENT_POOL_SIZE, get_subagents_app_config
 from medrix_flow.models import create_chat_model
-from medrix_flow.subagents.config import SubagentConfig
+from medrix_flow.subagents.config import MIN_SUBAGENT_MAX_TURNS, SubagentConfig
 
 logger = logging.getLogger(__name__)
 
@@ -298,7 +298,7 @@ class SubagentExecutor:
 
             # Build config with thread_id for sandbox access and recursion limit
             run_config: RunnableConfig = {
-                "recursion_limit": self.config.max_turns,
+                "recursion_limit": max(MIN_SUBAGENT_MAX_TURNS, self.config.max_turns),
             }
             context = {}
             if self.thread_id:

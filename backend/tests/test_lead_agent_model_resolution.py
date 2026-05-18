@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 
 from medrix_flow.agents.lead_agent import agent as lead_agent_module
+from medrix_flow.agents.middlewares.model_provider_error_middleware import ModelProviderErrorMiddleware
 from medrix_flow.config.app_config import AppConfig
 from medrix_flow.config.model_config import ModelConfig
 from medrix_flow.config.sandbox_config import SandboxConfig
@@ -201,7 +202,7 @@ def test_build_middlewares_adds_visual_quality_only_for_visual_intent(monkeypatc
     assert not any(isinstance(m, lead_agent_module.VisualQualityMiddleware) for m in bootstrap)
 
 
-def test_build_middlewares_suppresses_plan_middleware_for_bootstrap(monkeypatch):
+def test_build_middlewares_never_adds_legacy_plan_middleware(monkeypatch):
     app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
 
     monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: app_config)
@@ -209,11 +210,26 @@ def test_build_middlewares_suppresses_plan_middleware_for_bootstrap(monkeypatch)
     monkeypatch.setattr(lead_agent_module, "_create_todo_list_middleware", lambda is_plan_mode: None)
 
     middlewares = lead_agent_module._build_middlewares(
-        {"configurable": {"is_plan_mode": True, "is_bootstrap": True}},
+        {"configurable": {"is_plan_mode": True, "is_bootstrap": False}},
         model_name="safe-model",
     )
 
-    assert not any(isinstance(m, lead_agent_module.PlanMiddleware) for m in middlewares)
+    assert not any(type(m).__name__ == "PlanMiddleware" for m in middlewares)
+
+
+def test_build_middlewares_adds_model_provider_error_middleware(monkeypatch):
+    app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
+
+    monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: app_config)
+    monkeypatch.setattr(lead_agent_module, "_create_summarization_middleware", lambda: None)
+    monkeypatch.setattr(lead_agent_module, "_create_todo_list_middleware", lambda is_plan_mode: None)
+
+    middlewares = lead_agent_module._build_middlewares(
+        {"configurable": {"is_plan_mode": False, "is_bootstrap": False}},
+        model_name="safe-model",
+    )
+
+    assert any(isinstance(m, ModelProviderErrorMiddleware) for m in middlewares)
 
 
 def test_make_lead_agent_passes_visual_intent_to_tools_and_prompt(monkeypatch):

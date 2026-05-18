@@ -114,6 +114,7 @@ def test_experiment_service_synthetic_mode_exports_simulation_evidence(tmp_path)
     assert any(path.endswith("simulated_experiment_contract.json") for path in result.bundle.export_files)
     assert any(path.endswith("simulation_assumptions.json") for path in result.bundle.export_files)
     assert any(path.endswith("synthetic_results.json") for path in result.bundle.export_files)
+    assert any(path.endswith("synthetic_results.csv") for path in result.bundle.export_files)
     assert any(path.endswith("synthetic_inputs/synthetic_dataset.csv") for path in result.bundle.export_files)
 
     claim_path = next(
@@ -153,10 +154,86 @@ def test_experiment_service_synthetic_mode_autofills_missing_experiment_inputs(t
     assert result.run.status == "success"
     assert any(path.endswith("synthetic_inputs/synthetic_dataset.csv") for path in result.bundle.export_files)
     assert any(path.endswith("synthetic_results.json") for path in result.bundle.export_files)
+    assert any(path.endswith("synthetic_results.csv") for path in result.bundle.export_files)
     assert any(path.endswith("ablation_results.json") for path in result.bundle.export_files)
     assert any(path.endswith("robustness_results.json") for path in result.bundle.export_files)
     assert any(path.endswith("claim_support_matrix.json") for path in result.bundle.export_files)
+    assert sum(path.endswith("synthetic_results.csv") for path in result.bundle.export_files) == 1
+    assert sum(path.endswith("synthetic_results.json") for path in result.bundle.export_files) == 1
+    claim_path = next(
+        outputs / path.removeprefix("/mnt/user-data/outputs/")
+        for path in result.bundle.export_files
+        if path.endswith("claim_support_matrix.json")
+    )
+    claim_matrix = json.loads(claim_path.read_text(encoding="utf-8"))
+    assert any(
+        item["support_status"] == "supported_by_simulation" and "Ablation" in item["claim"]
+        for item in claim_matrix["claims"]
+    )
+    assert any(
+        item["support_status"] == "supported_by_simulation" and "Robustness" in item["claim"]
+        for item in claim_matrix["claims"]
+    )
     asyncio.run(db.close())
+
+
+def test_experiment_service_synthetic_unsupervised_workflows_record_primary_metric(tmp_path):
+    for analysis_type, expected_metric in [
+        ("clustering", "silhouette"),
+        ("dimensionality_reduction", "explained_variance_pc1"),
+    ]:
+        paths = _make_paths(tmp_path / analysis_type)
+        thread_id = f"thread-exp-synthetic-{analysis_type}"
+        paths.ensure_thread_dirs(thread_id)
+        outputs = paths.sandbox_outputs_dir(thread_id)
+
+        service, db = _prepare_service(tmp_path / analysis_type)
+        with patch("medrix_flow.experiments.service.get_paths", return_value=paths):
+            result = asyncio.run(
+                service.run_experiment(
+                    thread_id=thread_id,
+                    agent_name="cs-ai-lab",
+                    topic=f"Generate simulated {analysis_type} evidence",
+                    dataset_ids=[],
+                    output_dir=outputs,
+                    analysis_type=analysis_type,
+                    metadata={
+                        "synthetic_data_mode": True,
+                        "synthetic_sample_size": 48,
+                    },
+                )
+            )
+
+        assert result.run.status == "success"
+        claim_path = next(
+            outputs / path.removeprefix("/mnt/user-data/outputs/")
+            for path in result.bundle.export_files
+            if path.endswith("claim_support_matrix.json")
+        )
+        ablation_path = next(
+            outputs / path.removeprefix("/mnt/user-data/outputs/")
+            for path in result.bundle.export_files
+            if path.endswith("ablation_results.json")
+        )
+        robustness_path = next(
+            outputs / path.removeprefix("/mnt/user-data/outputs/")
+            for path in result.bundle.export_files
+            if path.endswith("robustness_results.json")
+        )
+
+        claim_matrix = json.loads(claim_path.read_text(encoding="utf-8"))
+        ablation = json.loads(ablation_path.read_text(encoding="utf-8"))
+        robustness = json.loads(robustness_path.read_text(encoding="utf-8"))
+
+        primary_claim = claim_matrix["claims"][0]
+        assert expected_metric in primary_claim["claim"]
+        assert primary_claim["support_status"] == "supported_by_simulation"
+        assert ablation["status"] == "recorded"
+        assert ablation["results"]
+        assert robustness["status"] == "recorded"
+        assert robustness["results"]
+
+        asyncio.run(db.close())
 
 
 def test_experiment_service_preserves_empirical_method_contract(tmp_path):
